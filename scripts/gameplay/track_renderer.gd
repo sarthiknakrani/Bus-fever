@@ -18,10 +18,12 @@ func _draw() -> void:
 		shadow_pts[i] += Vector2(0, 8)
 		
 	# Helper to draw a bulletproof thick line (handles overlapping joints safely)
-	_draw_thick_path(shadow_pts, Color(0, 0, 0, 0.15), 68.0)
-	_draw_thick_path(points, Color("64748b"), 66.0)
-	_draw_thick_path(points, Color("94a3b8"), 58.0)
-	_draw_thick_path(points, Color(1, 1, 1, 0.15), 52.0) # subtle inner highlight
+	# Use SOLID colors to avoid extreme brightening from overlapping alpha joints
+	var bg_shadow = Color("0284c7").darkened(0.5) # Solid dark tone for shadow
+	_draw_thick_path(shadow_pts, bg_shadow, 68.0)
+	_draw_thick_path(points, Color("475569"), 66.0) # Dark slate border
+	_draw_thick_path(points, Color("64748b"), 58.0) # Medium grey track
+	_draw_thick_path(points, Color("94a3b8"), 52.0) # Light inner highlight
 
 func _draw_thick_path(pts: PackedVector2Array, color: Color, width: float) -> void:
 	var radius = width / 2.0

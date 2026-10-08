@@ -65,8 +65,8 @@ var slot_boarding_points: Dictionary = {}
 var _waiting_label: Label
 var track_time: float = 0.0
 const PASSENGER_SPACING := 50.0
-const PASSENGER_NORMAL_SPEED := 6750.0
-const PASSENGER_SPRINT_SPEED := 11880.0
+@export var passenger_normal_speed: float = 750.0
+@export var passenger_sprint_speed: float = 1350.0
 const TRACK_SPEED := 40.0
 
 
@@ -88,7 +88,7 @@ func _process(delta: float) -> void:
 		# ---------------------------------------------
 		# GAP CLOSING LOGIC
 		# ---------------------------------------------
-		var speed = PASSENGER_NORMAL_SPEED
+		var speed = passenger_normal_speed
 		if circulating_ids.size() > 1:
 			var ahead_idx = (i + 1) % circulating_ids.size()
 			var ahead_id = circulating_ids[ahead_idx]
@@ -99,7 +99,7 @@ func _process(delta: float) -> void:
 			
 			# If the gap is larger than the ideal spacing, smoothly speed up to catch up!
 			if diff > PASSENGER_SPACING * 1.2:
-				speed = PASSENGER_SPRINT_SPEED
+				speed = passenger_sprint_speed
 		# ---------------------------------------------
 		
 		var old_prog = p["progress"]
