@@ -319,8 +319,8 @@ func _setup_visuals(lvl: CarJamLevelData) -> void:
 	# 1. Board Background
 	board_bg.setup(lvl.board_size)
 
-	# 2. Parking Slots (Exactly 4 slots)
-	var slot_spacing := 84.0
+	# 2. Parking Slots
+	var slot_spacing := 94.0
 	var total_span: float = float(lvl.parking_slots_count - 1) * slot_spacing
 	
 	# Draw a thick rounded asphalt background for parking
@@ -1179,13 +1179,9 @@ func _animate_individual_boarding(p: Dictionary, vehicle_id: int, slot_id: int, 
 	var final_local = _get_slot_world_pos(slot_id)
 	
 	if vv != null and is_instance_valid(vv) and vv.boarding_anchor != null:
-		var rot_target = 0.0
-		if vv.vehicle_dir == CarJamVehicleData.Direction.UP: rot_target = PI/2.0
-		elif vv.vehicle_dir == CarJamVehicleData.Direction.DOWN: rot_target = -PI/2.0
-		elif vv.vehicle_dir == CarJamVehicleData.Direction.LEFT: rot_target = 0.0
-		elif vv.vehicle_dir == CarJamVehicleData.Direction.RIGHT: rot_target = 0.0
-		var anchor_local = vv.boarding_anchor.position.rotated(rot_target) * 0.45
-		target_pos = transit_layer.to_global(final_local + anchor_local)
+		# Use the live global position of the boarding anchor, which is correctly 
+		# transformed by the parked vehicle's dynamic scale and orientation.
+		target_pos = vv.boarding_anchor.global_position
 	else:
 		target_pos = transit_layer.to_global(final_local)
 	
