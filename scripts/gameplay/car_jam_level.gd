@@ -391,11 +391,9 @@ func _init_passenger_track() -> void:
 	curve.add_point(Vector2(270, 0)) # Close loop
 	passenger_track.curve = curve
 	
-	var plaza = Sprite2D.new()
-	var ptex = _load_interim_sprite("res://assets/sprites/interim/fountain.png")
-	if ptex:
-		plaza.texture = ptex
-		plaza.scale = Vector2(0.8, 0.8)
+	# PREMIUM PLAZA INTEGRATION
+	var plaza = preload("res://scripts/gameplay/plaza_environment.gd").new()
+	plaza.name = "PlazaEnvironment"
 	passenger_visuals.add_child(plaza)
 
 	# Use custom robust track renderer instead of Godot 4 Line2D nodes
