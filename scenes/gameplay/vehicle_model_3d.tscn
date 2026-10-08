@@ -1,0 +1,7 @@
+[gd_scene format=3]
+
+[node name="VehicleModel3D" type="Node3D" unique_id=447992686]
+
+[node name="Body" type="CSGBox3D" parent="." unique_id=459791465]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+size = Vector3(1.2, 0.8, 2)

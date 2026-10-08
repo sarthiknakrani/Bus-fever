@@ -1,0 +1,12 @@
+# Godot 4+ specific ignores
+.godot/
+build/
+export_presets.cfg
+*.translation
+*.pot
+*.po
+
+# OS specific
+.DS_Store
+*.DS_Store
+Thumbs.db
