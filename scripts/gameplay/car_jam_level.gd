@@ -81,7 +81,7 @@ func _process(delta: float) -> void:
 		if p["state"] != "CIRCULATING": continue
 		
 		var old_prog = p["progress"]
-		p["progress"] += 60.0 * delta
+		p["progress"] += 80.0 * delta
 		var new_prog = p["progress"]
 		
 		var crossed_wrap = false
@@ -108,14 +108,12 @@ func _process(delta: float) -> void:
 				var slot = controller.parking.get_slot(slot_idx)
 				if slot and slot.state == CarJamParkingManager.SlotState.OCCUPIED and slot.vehicle_id != -1:
 					var v = controller.vehicles.get(slot.vehicle_id, null)
-					print("Passenger %d (color %s) crossed slot %d (vehicle %d, color %s). Pending: %d, Occ: %d, Cap: %d" % [p["id"], p["color_id"], slot_idx, slot.vehicle_id, v.color_id if v else "none", controller.pending_boarders.get(v.id, 0) if v else 0, v.passenger_occupancy if v else 0, v.capacity if v else 0])
+
 					if controller.try_reserve_boarding(slot.vehicle_id, p["color_id"]):
 						p["state"] = "BOARDING"
-						print(" -> BOARDING INITIATED!")
 						_animate_individual_boarding(p, slot.vehicle_id, slot_idx, trigger_prog)
 						break
-					else:
-						print(" -> REJECTED")
+
 
 func _ready() -> void:
 	_build_scene_hierarchy()
@@ -347,14 +345,41 @@ func _init_passenger_track() -> void:
 	curve.add_point(Vector2(270, 0)) # Close loop
 	passenger_track.curve = curve
 	
-	var track_bg = Line2D.new()
 	var baked_pts = curve.get_baked_points()
+	
+	# 1. Shadow
+	var track_shadow = Line2D.new()
+	track_shadow.width = 68
+	track_shadow.default_color = Color(0, 0, 0, 0.15)
+	track_shadow.position = Vector2(0, 8)
+	track_shadow.closed = true
+	track_shadow.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	track_shadow.end_cap_mode = Line2D.LINE_CAP_ROUND
+	
+	# 2. Border
+	var track_border = Line2D.new()
+	track_border.width = 66
+	track_border.default_color = Color("64748b") # slate 500
+	track_border.closed = true
+	track_border.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	track_border.end_cap_mode = Line2D.LINE_CAP_ROUND
+	
+	# 3. Surface
+	var track_surface = Line2D.new()
+	track_surface.width = 58
+	track_surface.default_color = Color("94a3b8") # slate 400
+	track_surface.closed = true
+	track_surface.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	track_surface.end_cap_mode = Line2D.LINE_CAP_ROUND
+	
 	for pt in baked_pts:
-		track_bg.add_point(pt)
-	track_bg.width = 16
-	track_bg.default_color = Color(1.0, 1.0, 1.0, 0.4)
-	track_bg.closed = true
-	passenger_track.add_child(track_bg)
+		track_shadow.add_point(pt)
+		track_border.add_point(pt)
+		track_surface.add_point(pt)
+		
+	passenger_track.add_child(track_shadow)
+	passenger_track.add_child(track_border)
+	passenger_track.add_child(track_surface)
 
 	var plaza = Sprite2D.new()
 	var ptex = _load_interim_sprite("res://assets/sprites/interim/fountain.png")
@@ -380,7 +405,7 @@ func _init_passenger_track() -> void:
 		var slot_pos = _get_slot_world_pos(i)
 		var closest = passenger_track.curve.get_closest_offset(Vector2((i - 2) * 80.0, 90))
 		slot_boarding_points[i] = closest
-		print("Slot %d offset: %f" % [i, closest])
+
 
 
 	# Spawn all passengers exactly once based on initial_count
@@ -994,7 +1019,7 @@ func _update_layout() -> void:
 				chevron.scale = Vector2(0.4, 0.4)
 				chevron.rotation = PI/2 # Point down
 				chevron.position = Vector2(slot_x, (loop_bottom_y + parking_top_y)/2.0)
-				boarding_paths_root.add_child(chevron)
+				
 				
 			boarding_paths_root.add_child(line)
 
@@ -1120,11 +1145,15 @@ func _animate_individual_boarding(p: Dictionary, vehicle_id: int, slot_id: int, 
 	var tw = create_tween()
 	var dist_error = gpos.distance_to(exact_gpos)
 	if dist_error > 2.0:
-		# Correct overshoot delta
-		tw.tween_property(pv, "global_position", exact_gpos, 0.1).set_trans(Tween.TRANS_LINEAR)
+		# Correct overshoot delta faster
+		tw.tween_property(pv, "global_position", exact_gpos, 0.05).set_trans(Tween.TRANS_LINEAR)
+	
+	# Faster distance-aware travel
+	var travel_dist = exact_gpos.distance_to(target_pos)
+	var duration = clampf(travel_dist / 350.0, 0.20, 0.35)
 	
 	# Travel straight down the walkway
-	tw.tween_property(pv, "global_position", target_pos, 0.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(pv, "global_position", target_pos, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	
 	var token = controller.session_token
 	tw.tween_callback(self._on_individual_boarded.bind(p["id"], vehicle_id, p["color_id"], token))
