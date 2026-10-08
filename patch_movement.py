@@ -1,10 +1,9 @@
-extends RefCounted
-class_name VehicleMovement
+import re
 
-## Handles smooth 2D visual tweening for vehicle dispatch and departure.
-## Separated from authoritative simulation logic for clean restart safety and testability.
+with open("scripts/gameplay/vehicle_movement.gd", "r") as f:
+    code = f.read()
 
-static func animate_dispatch(
+replacement = """static func animate_dispatch(
 	vehicle_node: Node2D,
 	start_pos: Vector2,
 	exit_pos: Vector2,
@@ -49,34 +48,11 @@ static func animate_dispatch(
 			vehicle_node.set_parking_mode(true)
 		controller.on_vehicle_arrived_at_slot(vehicle_id, slot_id, token)
 	)
+"""
 
+code = re.sub(r'static func animate_dispatch\([\s\S]*?controller.on_vehicle_arrived_at_slot\(vehicle_id, slot_id, token\)\n\t\)', replacement, code)
 
-static func animate_departure(
-	vehicle_node: Node2D,
-	slot_pos: Vector2,
-	token: int,
-	controller: Node,
-	vehicle_id: int,
-	slot_id: int
-) -> void:
-	if vehicle_node == null or not is_instance_valid(vehicle_node):
-		return
+with open("scripts/gameplay/vehicle_movement.gd", "w") as f:
+    f.write(code)
 
-	# Hide capacity badge
-	vehicle_node.set_parking_mode(false)
-
-	# Drive straight off-screen to the right from current parked position
-	var exit_target := vehicle_node.position + Vector2(750.0, 0.0)
-	var tw := vehicle_node.create_tween().set_parallel(true)
-
-	# Brief departure acceleration
-	tw.tween_property(vehicle_node, "position", exit_target, 0.40).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_IN)
-	# Also rotate to face right when departing!
-	var cur_rot = vehicle_node.rotation
-	tw.tween_property(vehicle_node, "rotation", cur_rot + PI/2.0, 0.2)
-	
-	tw.chain().tween_callback(func():
-		if is_instance_valid(vehicle_node):
-			vehicle_node.visible = false
-		controller.on_vehicle_departed_from_slot(vehicle_id, slot_id, token)
-	)
+print("Patched vehicle movement")

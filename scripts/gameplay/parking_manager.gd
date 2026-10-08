@@ -16,14 +16,21 @@ class ParkingSlot:
 	var slot_id: int = 0
 	var state: int = SlotState.EMPTY
 	var vehicle_id: int = -1
+	var is_unlocked: bool = false
 
 	func _init(id: int) -> void:
 		slot_id = id
 		state = SlotState.EMPTY
 		vehicle_id = -1
+		# Default unlock rule: Slot 0 is VIP (locked), Slots 1-3 are normal (unlocked), Slots 4+ are locked
+		if id >= 1 and id <= 3:
+			is_unlocked = true
+		else:
+			is_unlocked = false
 
 	func is_available() -> bool:
-		return state == SlotState.EMPTY
+		return state == SlotState.EMPTY and is_unlocked
+
 
 	func snapshot() -> Dictionary:
 		return {
@@ -58,13 +65,13 @@ func is_full() -> bool:
 func get_available_slot_count() -> int:
 	var count := 0
 	for s in _slots:
-		if s.slot_id < 4 and s.is_available():
+		if s.is_available():
 			count += 1
 	return count
 
 func find_available_slot() -> int:
 	for s in _slots:
-		if s.slot_id < 4 and s.is_available():
+		if s.is_available():
 			return s.slot_id
 	return -1
 

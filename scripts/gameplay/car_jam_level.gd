@@ -129,9 +129,6 @@ func _build_scene_hierarchy() -> void:
 	board_root = Node2D.new()
 	board_root.name = "BoardRoot"
 	
-	# Apply isometric transform to board
-	var iso_transform = Transform2D(Vector2(1.0, 0.5), Vector2(-1.0, 0.5), Vector2(0,0))
-	board_root.transform = iso_transform
 	board_root.position = Vector2(0, BOARD_Y)
 	world_root.add_child(board_root)
 
