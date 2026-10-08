@@ -3,40 +3,19 @@ extends Node2D
 class_name PlazaEnvironment
 
 func _ready() -> void:
-    # FOUNTAIN CENTER
-    var center_tex = ResourceLoader.load("res://assets/sprites/premium_plaza/fountain_center.png") as Texture2D
-    if center_tex:
-        var center = Sprite2D.new()
-        center.name = "FountainCenter"
-        center.texture = center_tex
-        # Need to fit 745x505 into roughly 300x180 so it's prominent in the middle
-        # Scale to fit height 150 -> 150/505 = 0.3
-        center.scale = Vector2(0.3, 0.3)
-        center.position = Vector2(0, 0)
-        add_child(center)
-        
-    # GARDEN LEFT
-    var left_tex = ResourceLoader.load("res://assets/sprites/premium_plaza/garden_left.png") as Texture2D
-    if left_tex:
-        var garden_l = Sprite2D.new()
-        garden_l.name = "GardenLeft"
-        garden_l.texture = left_tex
-        # 388x402 scaled down
-        garden_l.scale = Vector2(0.28, 0.28)
-        garden_l.position = Vector2(-170, 0)
-        add_child(garden_l)
-        
-    # GARDEN RIGHT
-    var right_tex = ResourceLoader.load("res://assets/sprites/premium_plaza/garden_right.png") as Texture2D
-    if right_tex:
-        var garden_r = Sprite2D.new()
-        garden_r.name = "GardenRight"
-        garden_r.texture = right_tex
-        garden_r.scale = Vector2(0.28, 0.28)
-        garden_r.position = Vector2(170, 0)
-        add_child(garden_r)
+    # Use the composite island to ensure zero gaps and a coherent stone underlay
+    var tex = ResourceLoader.load("res://assets/sprites/premium_plaza/fountain_island_composite.png") as Texture2D
+    if tex:
+        var island = Sprite2D.new()
+        island.name = "FountainIsland"
+        island.texture = tex
+        # 1200x420. Track is 540x180.
+        # Scale to fit exactly inside the track oval safely
+        island.scale = Vector2(0.35, 0.35)
+        island.position = Vector2(0, 0)
+        add_child(island)
 
-    # We keep a small water stream at the center to retain the lightweight animation.
+    # Subtle animated water overlay aligned with the central spout
     var stream_f = CPUParticles2D.new()
     stream_f.name = "StreamFront"
     stream_f.position = Vector2(0, -10)
