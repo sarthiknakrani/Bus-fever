@@ -342,29 +342,18 @@ func _init_passenger_track() -> void:
 func _fill_passenger_track() -> void:
 	if passenger_track == null: return
 	var total_remaining = controller.queue.get_remaining_total()
-	var MAX_VISIBLE = 32
-	var needed = min(MAX_VISIBLE, total_remaining)
 	
 	if _waiting_label != null:
-		var extra = total_remaining - needed
-		if extra > 0:
-			_waiting_label.text = "+%d waiting..." % extra
-			_waiting_label.visible = true
-			# Place it at the end of the visible line
-			var tail_prog = track_time + needed * PASSENGER_SPACING
-			var tail_transform = passenger_track.curve.sample_baked_with_rotation(tail_prog)
-			_waiting_label.position = tail_transform.origin + Vector2(-40, -40)
-		else:
-			_waiting_label.visible = false
+		_waiting_label.visible = false
 			
-	if active_passengers.size() >= needed: return
+	if active_passengers.size() >= total_remaining: return
 	
-	var visible_groups := controller.queue.get_visible_groups(needed)
+	var all_groups := controller.queue.get_all_groups()
 	var current_idx = 0
 	
-	for g in visible_groups:
+	for g in all_groups:
 		for i in g.remaining_count:
-			if current_idx >= active_passengers.size() and current_idx < needed:
+			if current_idx >= active_passengers.size():
 				var pv := PassengerView.new()
 				pv.setup(g.color_id)
 				var pf := PathFollow2D.new()
@@ -373,13 +362,16 @@ func _fill_passenger_track() -> void:
 				pf.add_child(pv)
 				passenger_track.add_child(pf)
 				
-				var start_prog = track_time + current_idx * PASSENGER_SPACING
+				# Initial spacing
+				var start_prog = current_idx * PASSENGER_SPACING
 				pf.progress = start_prog
 				
 				active_passengers.append({
 					"view": pv,
 					"follower": pf,
-					"color_id": g.color_id
+					"color_id": g.color_id,
+					"progress": start_prog,
+					"state": "CIRCULATING"
 				})
 			current_idx += 1
 
@@ -439,37 +431,6 @@ func _on_boarding_started(vehicle_id: int, color_id: String, count: int, slot_id
 		if v_model != null:
 			vv.set_occupancy(v_model.passenger_occupancy)
 		vv.play_badge_pulse()
-
-	var slot_pos := _get_slot_world_pos(slot_id)
-
-	# Extract real passengers from the track
-	for i in count:
-		if active_passengers.is_empty(): break
-		
-		# Find first matching passenger (should be at front of queue)
-		var p_idx = -1
-		for j in active_passengers.size():
-			if active_passengers[j]["color_id"] == color_id:
-				p_idx = j
-				break
-		
-		if p_idx == -1: break
-		
-		var p_dict = active_passengers.pop_at(p_idx)
-		var pv: PassengerView = p_dict["view"]
-		var pf: PathFollow2D = p_dict["follower"]
-		
-		var global_p = pv.global_position
-		pf.remove_child(pv)
-		boarding_effects.add_child(pv)
-		pv.global_position = global_p
-		pf.queue_free()
-		
-		var delay: float = float(i) * 0.12
-		var tw := create_tween()
-		tw.tween_interval(delay)
-		tw.tween_property(pv, "position", slot_pos + Vector2(0, 12), 0.36).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-		tw.tween_callback(pv.queue_free)
 
 func _on_vehicle_filled(vehicle_id: int, slot_id: int) -> void:
 	var vv: VehicleView = vehicle_views.get(vehicle_id, null)
@@ -1065,3 +1026,27 @@ func _load_interim_sprite(path: String) -> Texture2D:
 	if err == OK:
 		return ImageTexture.create_from_image(img)
 	return null
+
+
+func _animate_individual_boarding(p: Dictionary, vehicle_id: int, slot_id: int) -> void:
+	var pv: PassengerView = p["view"]
+	var pf: PathFollow2D = p["follower"]
+	
+	# Reparent to visuals for free tweening
+	var gpos = pv.global_position
+	pf.remove_child(pv)
+	passenger_visuals.add_child(pv)
+	pv.global_position = gpos
+	pf.queue_free()
+	
+	var target_pos = _get_slot_world_pos(slot_id) + Vector2(0, -40)
+	pv.animate_jump(0.0)
+	
+	var tw = create_tween()
+	tw.tween_property(pv, "global_position", target_pos, 0.3).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_callback(self._on_individual_boarded.bind(pv, vehicle_id, p["color_id"]))
+
+func _on_individual_boarded(pv: Node, vehicle_id: int, color_id: String) -> void:
+	if is_instance_valid(pv):
+		pv.queue_free()
+	controller.execute_individual_boarding(vehicle_id, color_id)

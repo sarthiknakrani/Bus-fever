@@ -147,11 +147,46 @@ func on_vehicle_departed_from_slot(vehicle_id: int, slot_id: int, token: int) ->
 	_process_boarding_cycle(token)
 	_check_terminal_states()
 
+
+# -----------------------------------------------------------------
+# NEW INDIVIDUAL BOARDING LOGIC
+# -----------------------------------------------------------------
+var pending_boarders: Dictionary = {} # vehicle_id -> int
+
+func mark_pending_boarding(vehicle_id: int) -> void:
+	pending_boarders[vehicle_id] = pending_boarders.get(vehicle_id, 0) + 1
+
+func execute_individual_boarding(vehicle_id: int, color_id: String) -> void:
+	if state != GameState.PLAYING: return
+	
+	var v = vehicles.get(vehicle_id, null)
+	if v != null:
+		v.board(1)
+		if pending_boarders.has(vehicle_id) and pending_boarders[vehicle_id] > 0:
+			pending_boarders[vehicle_id] -= 1
+			
+		var was_filled = v.is_full()
+		if was_filled:
+			v.state = VehicleModel.VehicleState.FULL
+			vehicle_filled.emit(v.id, parking.get_vehicle_slot(v.id))
+			
+		# Reduce the color count in the queue logically
+		# Since it's no longer order-dependent, just find the first group with this color and decrement it
+		var all_groups = queue.get_all_groups()
+		for g in all_groups:
+			if g.color_id == color_id and g.remaining_count > 0:
+				g.board(1)
+				break
+				
+		boarding_started.emit(vehicle_id, color_id, 1, parking.get_vehicle_slot(v.id))
+		_check_terminal_states()
+
+
 func _process_boarding_cycle(token: int) -> void:
 	if token != session_token:
 		return
 
-	var events := boarding_scheduler.evaluate_boarding(queue, parking, vehicles)
+	var events := [] # Disabled strict boarding
 	if not events.is_empty():
 		queue_updated.emit()
 		parking_updated.emit()
@@ -180,53 +215,23 @@ func _check_terminal_states() -> void:
 	# Failure / Softlock check:
 	# If parking is full (no free slots) AND no parked vehicle matches the head of queue:
 	if parking.is_full():
-		var head_color := queue.get_head_color()
-		var matching_parked := false
+		var has_match := false
+		var all_groups = queue.get_all_groups()
 		for i in parking.get_slot_count():
-			var slot := parking.get_slot(i)
-			if slot != null and slot.vehicle_id != -1:
-				var v: VehicleModel = vehicles.get(slot.vehicle_id, null)
-				if v != null:
-					# If a vehicle is FULL, it is about to depart and free a slot. Not a softlock!
-					if v.state == VehicleModel.VehicleState.FULL:
-						matching_parked = true
-						break
-					if v.color_id == head_color and v.remaining_capacity() > 0:
-						matching_parked = true
-						break
-		if not matching_parked and not is_dispatching:
-			# True deadlock: all slots occupied, queue head blocked!
+			var slot = parking.get_slot(i)
+			if slot and slot.state == CarJamParkingManager.SlotState.OCCUPIED:
+				var v = vehicles.get(slot.vehicle_id, null)
+				if v != null and v.remaining_capacity() > 0:
+					for g in all_groups:
+						if g.remaining_count > 0 and g.color_id == v.color_id:
+							has_match = true
+							break
+			if has_match: break
+		
+		if not has_match:
 			state = GameState.FAIL
 			puzzle_failed.emit()
 			return
-
-	# Also check if no vehicles remain in parking, but all remaining on-board vehicles are blocked:
-	if not is_dispatching and parking.get_available_slot_count() > 0:
-		var has_any_on_board := false
-		var has_any_escape := false
-		for vid in vehicles:
-			var v: VehicleModel = vehicles[vid]
-			if v.can_dispatch():
-				has_any_on_board = true
-				if board.check_swept_escape(v)["can_escape"]:
-					has_any_escape = true
-					break
-		if has_any_on_board and not has_any_escape:
-			# Complete gridlock on board with no parked vehicles to free space!
-			state = GameState.FAIL
-			puzzle_failed.emit()
-
-func pause() -> void:
-	if state == GameState.PLAYING:
-		state = GameState.PAUSED
-
-func resume() -> void:
-	if state == GameState.PAUSED:
-		state = GameState.PLAYING
-
-# -----------------------------------------------------------------
-# QA & DEBUG ASSERTIONS
-# -----------------------------------------------------------------
 
 func _debug_passenger_accounting() -> void:
 	if not OS.is_debug_build():
