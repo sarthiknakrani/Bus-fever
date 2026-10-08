@@ -32,12 +32,11 @@ func _setup_plaza() -> void:
     # 2. Border Stones
     var border = _create_sprite(self, "PlazaBorder", "plaza_border_stones.png", Vector2.ZERO, 1)
     
-    # 3. Landscaping (Shrubs and Flowers)
-    # We break these into quadrants so they can have organic shapes and overlap correctly
-    _create_sprite(self, "FlowerBedTop", "flower_bed_top.png", Vector2(0, -50), 2)
-    _create_sprite(self, "FlowerBedBottom", "flower_bed_bottom.png", Vector2(0, 50), 2)
-    _create_sprite(self, "FlowerBedLeft", "flower_bed_left.png", Vector2(-150, 0), 2)
-    _create_sprite(self, "FlowerBedRight", "flower_bed_right.png", Vector2(150, 0), 2)
+    # 3. Landscaping (Tasteful curved grass patches)
+    _create_sprite(self, "FlowerBedTop", "flower_bed_top.png", Vector2(0, -55), 2)
+    _create_sprite(self, "FlowerBedBottom", "flower_bed_bottom.png", Vector2(0, 55), 2)
+    _create_sprite(self, "FlowerBedLeft", "flower_bed_left.png", Vector2(-220, 0), 2)
+    _create_sprite(self, "FlowerBedRight", "flower_bed_right.png", Vector2(220, 0), 2)
     
     # 4. Fountain Assembly Root (Centered)
     var fountain = Node2D.new()
@@ -47,10 +46,10 @@ func _setup_plaza() -> void:
     
     # Fountain Shadow
     var f_shadow = _create_sprite(fountain, "FountainShadow", "fountain_shadow.png", Vector2(0, 20), 3)
-    f_shadow.modulate = Color(0, 0, 0, 0.4)
+    f_shadow.modulate = Color(0, 0, 0, 0.25) # Softer shadow
     
     # Back Rim (drawn behind water)
-    _create_sprite(fountain, "BasinBack", "fountain_basin_back.png", Vector2(0, -10), 4)
+    _create_sprite(fountain, "BasinBack", "fountain_basin_back.png", Vector2(0, 0), 4)
     
     # Water Pool (Shader applied)
     var pool = _create_sprite(fountain, "WaterPool", "fountain_water_pool.png", Vector2(0, 0), 5)
@@ -62,44 +61,44 @@ func _setup_plaza() -> void:
             pool.material = mat
             
     # Front Rim (drawn over water to give depth)
-    _create_sprite(fountain, "BasinFront", "fountain_basin_front.png", Vector2(0, 10), 6)
+    _create_sprite(fountain, "BasinFront", "fountain_basin_front.png", Vector2(0, 0), 6)
     
-    # Pedestal (Center Pillar)
-    _create_sprite(fountain, "Pedestal", "fountain_pedestal.png", Vector2(0, -20), 7)
+    # Pedestal (Small centered base)
+    _create_sprite(fountain, "Pedestal", "fountain_pedestal.png", Vector2(0, -10), 7)
     
     # Upper Bowl
-    _create_sprite(fountain, "UpperBowl", "fountain_bowl.png", Vector2(0, -50), 8)
+    _create_sprite(fountain, "UpperBowl", "fountain_bowl.png", Vector2(0, -25), 8)
     
     # Animated Water Streams
     # Using a simple particle system for lightweight mobile streams dropping from the upper bowl
     var stream_l = CPUParticles2D.new()
     stream_l.name = "StreamLeft"
-    stream_l.position = Vector2(-25, -45)
+    stream_l.position = Vector2(-25, -25)
     stream_l.amount = 16
-    stream_l.lifetime = 0.6
+    stream_l.lifetime = 0.4
     stream_l.direction = Vector2(-0.5, 1)
     stream_l.spread = 15
     stream_l.gravity = Vector2(0, 400)
-    stream_l.initial_velocity_min = 40
-    stream_l.initial_velocity_max = 60
+    stream_l.initial_velocity_min = 30
+    stream_l.initial_velocity_max = 50
     stream_l.scale_amount_min = 2.0
-    stream_l.scale_amount_max = 4.0
-    stream_l.color = Color(0.7, 0.9, 1.0, 0.8)
+    stream_l.scale_amount_max = 3.0
+    stream_l.color = Color(0.7, 0.9, 1.0, 0.6)
     stream_l.z_index = 9
     fountain.add_child(stream_l)
     
     var stream_r = stream_l.duplicate()
     stream_r.name = "StreamRight"
-    stream_r.position = Vector2(25, -45)
+    stream_r.position = Vector2(25, -25)
     stream_r.direction = Vector2(0.5, 1)
     fountain.add_child(stream_r)
     
     var stream_f = stream_l.duplicate()
     stream_f.name = "StreamFront"
-    stream_f.position = Vector2(0, -40)
+    stream_f.position = Vector2(0, -20)
     stream_f.direction = Vector2(0, 1)
-    stream_f.initial_velocity_min = 20
-    stream_f.initial_velocity_max = 40
+    stream_f.initial_velocity_min = 10
+    stream_f.initial_velocity_max = 30
     fountain.add_child(stream_f)
     
     # Splash Particles where streams hit the pool
@@ -107,20 +106,20 @@ func _setup_plaza() -> void:
     splash.name = "SplashBase"
     splash.position = Vector2(0, 5)
     splash.amount = 24
-    splash.lifetime = 0.4
+    splash.lifetime = 0.3
     splash.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
-    splash.emission_rect_extents = Vector2(30, 10)
+    splash.emission_rect_extents = Vector2(30, 5)
     splash.direction = Vector2(0, -1)
-    splash.spread = 45
-    splash.gravity = Vector2(0, 200)
-    splash.initial_velocity_min = 30
-    splash.initial_velocity_max = 50
+    splash.spread = 60
+    splash.gravity = Vector2(0, 150)
+    splash.initial_velocity_min = 20
+    splash.initial_velocity_max = 40
     splash.scale_amount_min = 1.0
-    splash.scale_amount_max = 3.0
-    splash.color = Color(0.8, 0.95, 1.0, 0.9)
+    splash.scale_amount_max = 2.0
+    splash.color = Color(0.8, 0.95, 1.0, 0.8)
     splash.z_index = 9
     fountain.add_child(splash)
     
     # Top Statue
-    _create_sprite(fountain, "TopStatue", "fountain_statue.png", Vector2(0, -80), 10)
+    _create_sprite(fountain, "TopStatue", "fountain_statue.png", Vector2(0, -45), 10)
 
