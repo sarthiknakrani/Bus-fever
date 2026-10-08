@@ -24,6 +24,8 @@ var _roof_sprite: NinePatchRect
 var _glass_sprite: NinePatchRect
 var _arrow_sprite: Sprite2D
 var _wheels: Array[Sprite2D] = []
+var boarding_anchor: Marker2D
+var boarding_layer: Node2D
 
 func setup(p_id: int, p_code: String, p_col_id: String, p_dir: int, p_cap: int, p_footprint: Array[Vector2i] = [Vector2i.ZERO]) -> void:
 	vehicle_id = p_id
@@ -112,6 +114,22 @@ func _build_visuals() -> void:
 		
 	# 3. Base Body
 	_base_sprite = create_np.call(tex_body, vehicle_color.darkened(0.2), pixel_w, pixel_h, 0)
+	
+	# Boarding Layer and Anchor
+	if not boarding_layer:
+		boarding_layer = Node2D.new()
+		boarding_layer.name = "BoardingLayer"
+	else:
+		boarding_layer.get_parent().remove_child(boarding_layer)
+	add_child(boarding_layer)
+	
+	if not boarding_anchor:
+		boarding_anchor = Marker2D.new()
+		boarding_anchor.name = "BoardingAnchor"
+	else:
+		boarding_anchor.get_parent().remove_child(boarding_anchor)
+	boarding_layer.add_child(boarding_anchor)
+	boarding_anchor.position = Vector2(0, 0) # Center of the bus body
 	
 	# 4. Glass
 	_glass_sprite = create_np.call(tex_glass, Color.WHITE, pixel_w - 8, pixel_h - 8, 0)

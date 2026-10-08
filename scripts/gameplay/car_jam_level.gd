@@ -1112,8 +1112,9 @@ func _animate_individual_boarding(p: Dictionary, vehicle_id: int, slot_id: int, 
 	
 	var target_pos: Vector2
 	var vv: VehicleView = vehicle_views.get(vehicle_id, null)
-	if vv != null and is_instance_valid(vv):
-		target_pos = vv.global_position
+	if vv != null and is_instance_valid(vv) and vv.boarding_anchor != null:
+		# Use the actual boarding anchor converted to global space
+		target_pos = vv.boarding_anchor.global_position
 	else:
 		target_pos = _get_slot_world_pos(slot_id)
 	
@@ -1124,12 +1125,23 @@ func _animate_individual_boarding(p: Dictionary, vehicle_id: int, slot_id: int, 
 	var travel_dist = gpos.distance_to(target_pos)
 	var duration = clampf(travel_dist / 350.0, 0.20, 0.35)
 	
+	var overlap_time = duration * 0.75
+	var fade_time = duration * 0.25
+	
 	# Travel straight to the actual bus center smoothly
 	tw.tween_property(pv, "global_position", target_pos, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	
-	# Fade and shrink into the bus in the last half of the movement
-	tw.tween_property(pv, "scale", Vector2(0.2, 0.2), duration * 0.4).set_delay(duration * 0.6).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tw.tween_property(pv, "modulate:a", 0.0, duration * 0.4).set_delay(duration * 0.6).set_trans(Tween.TRANS_LINEAR)
+	# When passenger overlaps bus, reparent it into the boarding layer
+	var tw_reparent = create_tween()
+	tw_reparent.tween_interval(overlap_time)
+	tw_reparent.tween_callback(func():
+		if is_instance_valid(pv) and is_instance_valid(vv) and vv.boarding_layer != null:
+			pv.reparent(vv.boarding_layer, true)
+	)
+	
+	# Shrink/fade ONLY during the final portion when already overlapping the bus
+	tw.tween_property(pv, "scale", Vector2(0.2, 0.2), fade_time).set_delay(overlap_time).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_property(pv, "modulate:a", 0.0, fade_time).set_delay(overlap_time).set_trans(Tween.TRANS_LINEAR)
 	
 	var token = controller.session_token
 	tw.chain().tween_callback(self._on_individual_boarded.bind(p["id"], vehicle_id, p["color_id"], token))
