@@ -86,7 +86,7 @@ func _process(delta: float) -> void:
 		# ---------------------------------------------
 		# GAP CLOSING LOGIC
 		# ---------------------------------------------
-		var speed = 125.0
+		var speed = 660.0
 		if circulating_ids.size() > 1:
 			var ahead_idx = (i + 1) % circulating_ids.size()
 			var ahead_id = circulating_ids[ahead_idx]
@@ -97,7 +97,7 @@ func _process(delta: float) -> void:
 			
 			# If the gap is larger than the ideal spacing, smoothly speed up to catch up!
 			if diff > PASSENGER_SPACING * 1.2:
-				speed = 220.0
+				speed = 660.0
 		# ---------------------------------------------
 		
 		var old_prog = p["progress"]

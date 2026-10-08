@@ -33,15 +33,15 @@ static func animate_dispatch(
 	var tw := vehicle_node.create_tween().set_parallel(false)
 
 	# 1. Drive along escape corridor
-	tw.tween_property(vehicle_node, "position", exit_pos, 0.26).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_property(vehicle_node, "position", exit_pos, 0.173).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	
 	# 2. Parallel group for arc to mid_pos, scale and rotation
-	tw.tween_property(vehicle_node, "position", mid_pos, 0.18).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw.parallel().tween_property(vehicle_node, "rotation", rot_target, 0.38).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
-	tw.parallel().tween_property(vehicle_node, "scale", target_scale, 0.38).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(vehicle_node, "position", mid_pos, 0.120).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(vehicle_node, "rotation", rot_target, 0.253).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+	tw.parallel().tween_property(vehicle_node, "scale", target_scale, 0.253).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
 	
 	# 3. Final approach to slot
-	tw.tween_property(vehicle_node, "position", slot_pos, 0.20).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(vehicle_node, "position", slot_pos, 0.133).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
 
 	# 4. Callback
 	tw.tween_callback(func():
@@ -70,10 +70,10 @@ static func animate_departure(
 	var tw := vehicle_node.create_tween().set_parallel(true)
 
 	# Brief departure acceleration
-	tw.tween_property(vehicle_node, "position", exit_target, 0.40).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_IN)
+	tw.tween_property(vehicle_node, "position", exit_target, 0.267).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_IN)
 	# Also rotate to face right when departing!
 	var cur_rot = vehicle_node.rotation
-	tw.tween_property(vehicle_node, "rotation", cur_rot + PI/2.0, 0.2)
+	tw.tween_property(vehicle_node, "rotation", cur_rot + PI/2.0, 0.133)
 	
 	tw.chain().tween_callback(func():
 		if is_instance_valid(vehicle_node):
