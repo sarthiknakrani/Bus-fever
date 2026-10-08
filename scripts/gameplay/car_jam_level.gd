@@ -34,6 +34,7 @@ var parked_vehicles_node: Node2D
 
 var passenger_track_root: Node2D
 var passenger_visuals: Node2D
+var boarding_paths_root: Node2D
 var boarding_effects: Node2D
 
 var transit_layer: Node2D
@@ -70,25 +71,51 @@ var _anim_clock: float = 0.0
 
 func _process(delta: float) -> void:
 	if passenger_track == null: return
-	if controller.state == CarJamController.GameState.PLAYING:
-		track_time -= TRACK_SPEED * delta
-		var track_len = passenger_track.curve.get_baked_length()
-		if track_time < 0: track_time += track_len
+	var track_len = passenger_track.curve.get_baked_length()
+	
+	if controller.state != CarJamController.GameState.PLAYING:
+		return
+	
+	# Check proximity for boarding
+	for i in range(active_passengers.size() - 1, -1, -1):
+		var p = active_passengers[i]
+		if p["state"] != "CIRCULATING": continue
 		
-		for i in active_passengers.size():
-			var p = active_passengers[i]
-			var pf: PathFollow2D = p["follower"]
-			var target_prog = track_time + i * PASSENGER_SPACING
+		# Move passenger natively along the track
+		p["progress"] += 60.0 * delta
+		if p["progress"] > track_len:
+			p["progress"] -= track_len
 			
-			# Wrap around logic for smooth lerping
-			target_prog = fmod(target_prog, track_len)
-			if target_prog < 0: target_prog += track_len
-			
-			var diff = target_prog - pf.progress
-			if diff > track_len / 2.0: diff -= track_len
-			if diff < -track_len / 2.0: diff += track_len
-			
-			pf.progress += diff * 10.0 * delta # Smooth catch up
+		p["follower"].progress = p["progress"]
+		
+		# Proximity check against parked buses
+		var p_pos = p["follower"].global_position
+		var best_bus = null
+		var best_slot_id = -1
+		var min_dist = 90.0 # Boarding distance threshold
+		
+		for slot_idx in controller.parking.get_slot_count():
+			var slot = controller.parking.get_slot(slot_idx)
+			if slot and slot.state == CarJamParkingManager.SlotState.OCCUPIED and slot.vehicle_id != -1:
+				var v = controller.vehicles.get(slot.vehicle_id, null)
+				if v != null and v.state == VehicleModel.VehicleState.PARKED and v.color_id == p["color_id"]:
+					var pending = controller.pending_boarders.get(v.id, 0)
+					if v.passenger_occupancy + pending < v.capacity:
+						var slot_pos = _get_slot_world_pos(slot_idx)
+						var target_pos = slot_pos + Vector2(0, -60)
+						var dist = p_pos.distance_to(target_pos)
+						
+						# Refined proximity: horizontally close, and above the bay
+						if dist < min_dist and abs(p_pos.x - slot_pos.x) < 20.0 and p_pos.y < slot_pos.y:
+							min_dist = dist
+							best_bus = v
+							best_slot_id = slot_idx
+							
+		if best_bus != null:
+			p["state"] = "BOARDING"
+			controller.mark_pending_boarding(best_bus.id)
+			active_passengers.remove_at(i)
+			_animate_individual_boarding(p, best_bus.id, best_slot_id)
 
 func _ready() -> void:
 	_build_scene_hierarchy()
@@ -134,6 +161,13 @@ func _build_scene_hierarchy() -> void:
 	
 	board_root.position = Vector2(0, BOARD_Y)
 	world_root.add_child(board_root)
+	
+	boarding_paths_root = Node2D.new()
+	boarding_paths_root.name = "BoardingPaths"
+	# Ensure it renders below the parking and passengers
+	world_root.add_child(boarding_paths_root)
+	world_root.move_child(boarding_paths_root, 0)
+
 
 	board_bg = BoardView.new()
 	board_bg.name = "BoardBackground"
@@ -927,6 +961,40 @@ func _update_layout() -> void:
 	if passenger_track_root != null:
 		passenger_track_root.position = Vector2(0, -half_h + 280)
 
+	# Build explicit visual boarding paths connecting track to parking
+	if boarding_paths_root != null and parking_root != null and passenger_track_root != null:
+		# Clear old
+		for c in boarding_paths_root.get_children():
+			c.queue_free()
+		
+		var loop_bottom_y = passenger_track_root.position.y + 90
+		var parking_top_y = parking_root.position.y - 60
+		
+		# For each slot, draw a walkway
+		for i in 5:
+			var slot_x = (i - 2) * 80.0 # From _build_parking
+			
+			var line = Line2D.new()
+			line.add_point(Vector2(slot_x, loop_bottom_y))
+			line.add_point(Vector2(slot_x, parking_top_y + 10)) # Slight overlap
+			line.width = 46.0
+			line.default_color = Color(1.0, 1.0, 1.0, 0.15)
+			line.begin_cap_mode = Line2D.LINE_CAP_ROUND
+			line.end_cap_mode = Line2D.LINE_CAP_ROUND
+			
+			# Add a subtle directional arrow / chevron
+			var chevron = Sprite2D.new()
+			var tex = _load_interim_sprite("res://assets/sprites/interim/arrow.png")
+			if tex:
+				chevron.texture = tex
+				chevron.modulate = Color(1.0, 1.0, 1.0, 0.3)
+				chevron.scale = Vector2(0.4, 0.4)
+				chevron.rotation = PI/2 # Point down
+				chevron.position = Vector2(slot_x, (loop_bottom_y + parking_top_y)/2.0)
+				boarding_paths_root.add_child(chevron)
+				
+			boarding_paths_root.add_child(line)
+
 
 
 func _on_restart_pressed() -> void:
@@ -1036,14 +1104,17 @@ func _animate_individual_boarding(p: Dictionary, vehicle_id: int, slot_id: int) 
 	var gpos = pv.global_position
 	pf.remove_child(pv)
 	passenger_visuals.add_child(pv)
-	pv.global_position = gpos
-	pf.queue_free()
 	
 	var target_pos = _get_slot_world_pos(slot_id) + Vector2(0, -40)
+	
+	# Snap X to perfect lane alignment so the travel is strictly vertical down the walkway
+	pv.global_position = Vector2(target_pos.x, gpos.y)
+	
 	pv.animate_jump(0.0)
 	
 	var tw = create_tween()
-	tw.tween_property(pv, "global_position", target_pos, 0.3).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+	# Walkway traversal takes 0.45s to be visually readable
+	tw.tween_property(pv, "global_position", target_pos, 0.45).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	tw.tween_callback(self._on_individual_boarded.bind(pv, vehicle_id, p["color_id"]))
 
 func _on_individual_boarded(pv: Node, vehicle_id: int, color_id: String) -> void:
