@@ -1040,7 +1040,7 @@ func _update_layout() -> void:
 	var top_y = -half_h + (150.0 / scale_factor) # Start drawing below the header
 	
 	# Or dynamically center the content block vertically in the available space:
-	var available_local_h = (screen_safe_h / scale_factor)
+	available_local_h = (screen_safe_h / scale_factor)
 	var start_y = top_y + (available_local_h - total_content_h) / 2.0 + (track_h / 2.0)
 	
 	var track_y = start_y
