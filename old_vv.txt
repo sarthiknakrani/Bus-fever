@@ -1,6 +1,4 @@
-import os
-
-code = """extends Node2D
+extends Node2D
 class_name VehicleView
 
 signal tapped(vehicle_id: int)
@@ -15,6 +13,8 @@ var passenger_occupancy: int = 0
 var is_in_parking: bool = false
 
 const CELL_SIZE: float = 78.0
+const DEPTH: float = 14.0 # 3D extrusion wall thickness
+
 var _badge_node: Node2D
 var _badge_label: Label
 var _touch_area: Area2D
@@ -55,6 +55,7 @@ func _setup_touch_area() -> void:
 	var col_shape := CollisionShape2D.new()
 	var rect_shape := RectangleShape2D.new()
 	
+	# Approximate bounds for the click area
 	var min_x = 0; var max_x = 0; var min_y = 0; var max_y = 0
 	for p in vehicle_footprint:
 		if p.x < min_x: min_x = p.x
@@ -96,61 +97,83 @@ func play_badge_pulse() -> void:
 func _draw() -> void:
 	var cells_w: float = float(vehicle_footprint.size()) if vehicle_dir == CarJamVehicleData.Direction.RIGHT or vehicle_dir == CarJamVehicleData.Direction.LEFT else 1.0
 	var cells_h: float = float(vehicle_footprint.size()) if vehicle_dir == CarJamVehicleData.Direction.UP or vehicle_dir == CarJamVehicleData.Direction.DOWN else 1.0
-
-	var pixel_w = cells_w * CELL_SIZE - 12.0
-	var pixel_h = cells_h * CELL_SIZE - 12.0
-	var rect = Rect2(-pixel_w/2.0, -pixel_h/2.0, pixel_w, pixel_h)
 	
-	var style_base = StyleBoxFlat.new()
-	style_base.bg_color = vehicle_color.darkened(0.2)
-	style_base.set_corner_radius_all(16)
-	style_base.shadow_color = Color(0, 0, 0, 0.3)
-	style_base.shadow_size = 8
-	style_base.shadow_offset = Vector2(0, 8)
+	var tile_w = 80.0
+	var tile_h = 46.0
+	var height = 35.0
+	var margin = 0.15 # 15% margin
 	
-	var style_roof = StyleBoxFlat.new()
-	style_roof.bg_color = vehicle_color
-	style_roof.set_corner_radius_all(12)
+	# Compute logical corners in local grid space (centered at 0,0)
+	var hw = cells_w / 2.0 - margin
+	var hh = cells_h / 2.0 - margin
 	
-	var style_glass = StyleBoxFlat.new()
-	style_glass.bg_color = Color("93c5fd")
-	style_glass.set_corner_radius_all(8)
+	# Helper to convert local grid coords to local isometric coords
+	var to_iso = func(lx: float, ly: float) -> Vector2:
+		return Vector2((lx - ly) * (tile_w / 2.0), (lx + ly) * (tile_h / 2.0))
 	
-	draw_style_box(style_base, rect)
+	# The 4 corners on the ground
+	# 0: top, 1: right, 2: bottom, 3: left in grid space
+	var g0 = to_iso.call(-hw, -hh)
+	var g1 = to_iso.call(hw, -hh)
+	var g2 = to_iso.call(hw, hh)
+	var g3 = to_iso.call(-hw, hh)
 	
-	var glass_rect = rect.grow(-4)
-	draw_style_box(style_glass, glass_rect)
+	# Shift up for 3D roof
+	var up = Vector2(0, -height)
+	var r0 = g0 + up
+	var r1 = g1 + up
+	var r2 = g2 + up
+	var r3 = g3 + up
 	
-	var roof_rect = rect.grow(-12)
-	roof_rect.position.y -= 4
-	draw_style_box(style_roof, roof_rect)
+	var c_top = vehicle_color.lightened(0.15)
+	var c_left = vehicle_color
+	var c_right = vehicle_color.darkened(0.25)
 	
-	var center = roof_rect.get_center()
-	var arr_size = 12.0
-	var p1 = center
-	var p2 = center
-	var p3 = center
+	# Draw Left Face (g3, g2, r2, r3)
+	draw_colored_polygon(PackedVector2Array([g3, g2, r2, r3]), c_left)
 	
+	# Draw Right Face (g2, g1, r1, r2)
+	draw_colored_polygon(PackedVector2Array([g2, g1, r1, r2]), c_right)
+	
+	# Draw Top Face (r0, r1, r2, r3)
+	draw_colored_polygon(PackedVector2Array([r0, r1, r2, r3]), c_top)
+	
+	# Outline for pop
+	var oc = Color(0,0,0, 0.4)
+	draw_line(r0, r1, oc, 2.0)
+	draw_line(r1, r2, oc, 2.0)
+	draw_line(r2, r3, oc, 2.0)
+	draw_line(r3, r0, oc, 2.0)
+	draw_line(g2, r2, oc, 2.0)
+	draw_line(g3, r3, oc, 2.0)
+	draw_line(g1, r1, oc, 2.0)
+	
+	# Draw directional arrow on top face
+	var arrow_dir = Vector2.ZERO
 	if vehicle_dir == CarJamVehicleData.Direction.UP:
-		p1 += Vector2(0, -arr_size)
-		p2 += Vector2(-arr_size, arr_size)
-		p3 += Vector2(arr_size, arr_size)
+		arrow_dir = Vector2(0, -1)
 	elif vehicle_dir == CarJamVehicleData.Direction.DOWN:
-		p1 += Vector2(0, arr_size)
-		p2 += Vector2(-arr_size, -arr_size)
-		p3 += Vector2(arr_size, -arr_size)
+		arrow_dir = Vector2(0, 1)
 	elif vehicle_dir == CarJamVehicleData.Direction.LEFT:
-		p1 += Vector2(-arr_size, 0)
-		p2 += Vector2(arr_size, -arr_size)
-		p3 += Vector2(arr_size, arr_size)
+		arrow_dir = Vector2(-1, 0)
 	elif vehicle_dir == CarJamVehicleData.Direction.RIGHT:
-		p1 += Vector2(arr_size, 0)
-		p2 += Vector2(-arr_size, -arr_size)
-		p3 += Vector2(-arr_size, arr_size)
+		arrow_dir = Vector2(1, 0)
 		
-	var arr_pts = PackedVector2Array([p1, p2, p3])
-	draw_colored_polygon(arr_pts, Color(1, 1, 1, 0.8))
-
+	# Center of roof
+	var roof_center = (r0 + r2) / 2.0
+	
+	# Compute arrow tip in grid space, then project
+	var arrow_len = 0.35
+	var arrow_tip_g = arrow_dir * arrow_len
+	var arrow_back_g = -arrow_dir * (arrow_len * 0.5)
+	var arrow_left_g = arrow_back_g + Vector2(arrow_dir.y, -arrow_dir.x) * 0.2
+	var arrow_right_g = arrow_back_g + Vector2(-arrow_dir.y, arrow_dir.x) * 0.2
+	
+	var a_tip = roof_center + to_iso.call(arrow_tip_g.x, arrow_tip_g.y)
+	var a_left = roof_center + to_iso.call(arrow_left_g.x, arrow_left_g.y)
+	var a_right = roof_center + to_iso.call(arrow_right_g.x, arrow_right_g.y)
+	
+	draw_colored_polygon(PackedVector2Array([a_tip, a_right, a_left]), Color(1,1,1,0.8))
 func _setup_capacity_badge() -> void:
 	_badge_node = Node2D.new()
 	_badge_node.name = "CapacityBadge"
@@ -197,9 +220,3 @@ func _setup_capacity_badge() -> void:
 	_badge_node.add_child(_badge_label)
 
 	add_child(_badge_node)
-"""
-
-with open("scripts/gameplay/vehicle_view.gd", "w") as f:
-    f.write(code)
-
-print("Restored vehicle_view.gd")

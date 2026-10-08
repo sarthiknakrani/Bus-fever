@@ -60,7 +60,7 @@ var slot_views: Array[ParkingSlotView] = []
 var passenger_track: Path2D
 var active_passengers: Array[Dictionary] = []
 var track_time: float = 0.0
-const PASSENGER_SPACING := 32.0
+const PASSENGER_SPACING := 50.0
 const TRACK_SPEED := 40.0
 
 
@@ -288,13 +288,7 @@ func _cell_to_board_local(c: Vector2i, b_size: Vector2i) -> Vector2:
 	var lx = float(c.x) - float(b_size.x - 1) / 2.0
 	var ly = float(c.y) - float(b_size.y - 1) / 2.0
 	
-	var tile_w = 80.0
-	var tile_h = 46.0
-	
-	var ix = (lx - ly) * (tile_w / 2.0)
-	var iy = (lx + ly) * (tile_h / 2.0)
-	
-	return Vector2(ix, iy)
+	return Vector2(lx * CELL_SIZE, ly * CELL_SIZE)
 
 func _get_slot_world_pos(slot_id: int) -> Vector2:
 	if slot_id >= 0 and slot_id < slot_views.size():
@@ -304,14 +298,14 @@ func _get_slot_world_pos(slot_id: int) -> Vector2:
 func _init_passenger_track() -> void:
 	passenger_track = Path2D.new()
 	var curve = Curve2D.new()
-	# Create an oval track
-	var center = Vector2(0, -60)
-	var rx = 180.0
-	var ry = 70.0
-	var pts = 32
+	# Create a large wide curved track across the top
+	var rx = 300.0
+	var ry = 100.0
+	var pts = 40
+	# An open curve or wide oval
 	for i in range(pts + 1):
 		var t = float(i) / pts * PI * 2.0
-		curve.add_point(center + Vector2(cos(t)*rx, sin(t)*ry))
+		curve.add_point(Vector2(cos(t)*rx, sin(t)*ry))
 	passenger_track.curve = curve
 	passenger_visuals.add_child(passenger_track)
 	track_time = curve.get_baked_length() * 0.25
@@ -554,7 +548,7 @@ func _build_hud() -> void:
 	booster_bar.anchor_bottom = 1.0
 	booster_bar.offset_left = 20.0
 	booster_bar.offset_right = -20.0
-	booster_bar.offset_top = -120.0
+	booster_bar.offset_top = -160.0
 	booster_bar.offset_bottom = -20.0
 	safe_area_root.add_child(booster_bar)
 
@@ -920,15 +914,16 @@ func _update_layout() -> void:
 
 	# Parking between passenger track and board
 	if parking_root != null:
-		parking_root.position = Vector2(0, -half_h + 650)
+		parking_root.position = Vector2(0, -half_h + 520)
 
 	# Board below parking
 	if board_root != null:
-		board_root.position = Vector2(0, -half_h + 1050)
+		board_root.position = Vector2(0, -half_h + 860)
 
 	# Passenger track right above the parking
 	if passenger_track_root != null:
-		passenger_track_root.position = Vector2(0, -half_h + 350)
+		passenger_track_root.position = Vector2(0, -half_h + 280)
+
 
 
 func _on_restart_pressed() -> void:
