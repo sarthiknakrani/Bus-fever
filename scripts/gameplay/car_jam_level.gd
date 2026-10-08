@@ -65,6 +65,8 @@ var slot_boarding_points: Dictionary = {}
 var _waiting_label: Label
 var track_time: float = 0.0
 const PASSENGER_SPACING := 50.0
+const PASSENGER_NORMAL_SPEED := 1125.0
+const PASSENGER_SPRINT_SPEED := 1980.0
 const TRACK_SPEED := 40.0
 
 
@@ -86,7 +88,7 @@ func _process(delta: float) -> void:
 		# ---------------------------------------------
 		# GAP CLOSING LOGIC
 		# ---------------------------------------------
-		var speed = 375.0
+		var speed = PASSENGER_NORMAL_SPEED
 		if circulating_ids.size() > 1:
 			var ahead_idx = (i + 1) % circulating_ids.size()
 			var ahead_id = circulating_ids[ahead_idx]
@@ -97,7 +99,7 @@ func _process(delta: float) -> void:
 			
 			# If the gap is larger than the ideal spacing, smoothly speed up to catch up!
 			if diff > PASSENGER_SPACING * 1.2:
-				speed = 660.0
+				speed = PASSENGER_SPRINT_SPEED
 		# ---------------------------------------------
 		
 		var old_prog = p["progress"]
@@ -381,7 +383,7 @@ func _init_passenger_track() -> void:
 	track_shadow.closed = true
 	track_shadow.begin_cap_mode = Line2D.LINE_CAP_ROUND
 	track_shadow.end_cap_mode = Line2D.LINE_CAP_ROUND
-	track_shadow.z_index = -3
+	track_shadow.z_index = 0
 	
 	# 2. Border
 	var track_border = Line2D.new()
@@ -390,7 +392,7 @@ func _init_passenger_track() -> void:
 	track_border.closed = true
 	track_border.begin_cap_mode = Line2D.LINE_CAP_ROUND
 	track_border.end_cap_mode = Line2D.LINE_CAP_ROUND
-	track_border.z_index = -2
+	track_border.z_index = 0
 	
 	# 3. Surface
 	var track_surface = Line2D.new()
@@ -399,7 +401,7 @@ func _init_passenger_track() -> void:
 	track_surface.closed = true
 	track_surface.begin_cap_mode = Line2D.LINE_CAP_ROUND
 	track_surface.end_cap_mode = Line2D.LINE_CAP_ROUND
-	track_surface.z_index = -1
+	track_surface.z_index = 0
 	
 	for pt in baked_pts:
 		track_shadow.add_point(pt)
@@ -409,17 +411,16 @@ func _init_passenger_track() -> void:
 	# Important: Add to passenger_visuals, NOT passenger_track!
 	# The passenger_track is a Path2D which might have drawing caveats.
 	# We want these Line2Ds to draw identically to the Path2D.
-	passenger_visuals.add_child(track_shadow)
-	passenger_visuals.add_child(track_border)
-	passenger_visuals.add_child(track_surface)
-
 	var plaza = Sprite2D.new()
 	var ptex = _load_interim_sprite("res://assets/sprites/interim/fountain.png")
 	if ptex:
 		plaza.texture = ptex
 		plaza.scale = Vector2(0.8, 0.8)
-	plaza.z_index = -4 # Keep it below the track
 	passenger_visuals.add_child(plaza)
+
+	passenger_visuals.add_child(track_shadow)
+	passenger_visuals.add_child(track_border)
+	passenger_visuals.add_child(track_surface)
 
 	_waiting_label = Label.new()
 	_waiting_label.add_theme_font_size_override("font_size", 20)
