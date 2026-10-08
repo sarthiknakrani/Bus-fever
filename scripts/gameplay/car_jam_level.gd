@@ -373,44 +373,6 @@ func _init_passenger_track() -> void:
 	curve.add_point(Vector2(270, 0)) # Close loop
 	passenger_track.curve = curve
 	
-	var baked_pts = curve.get_baked_points()
-	
-	# 1. Shadow
-	var track_shadow = Line2D.new()
-	track_shadow.width = 68
-	track_shadow.default_color = Color(0, 0, 0, 0.15)
-	track_shadow.position = Vector2(0, 8)
-	track_shadow.closed = true
-	track_shadow.begin_cap_mode = Line2D.LINE_CAP_ROUND
-	track_shadow.end_cap_mode = Line2D.LINE_CAP_ROUND
-	track_shadow.z_index = 0
-	
-	# 2. Border
-	var track_border = Line2D.new()
-	track_border.width = 66
-	track_border.default_color = Color("64748b") # slate 500
-	track_border.closed = true
-	track_border.begin_cap_mode = Line2D.LINE_CAP_ROUND
-	track_border.end_cap_mode = Line2D.LINE_CAP_ROUND
-	track_border.z_index = 0
-	
-	# 3. Surface
-	var track_surface = Line2D.new()
-	track_surface.width = 58
-	track_surface.default_color = Color("94a3b8") # slate 400
-	track_surface.closed = true
-	track_surface.begin_cap_mode = Line2D.LINE_CAP_ROUND
-	track_surface.end_cap_mode = Line2D.LINE_CAP_ROUND
-	track_surface.z_index = 0
-	
-	for pt in baked_pts:
-		track_shadow.add_point(pt)
-		track_border.add_point(pt)
-		track_surface.add_point(pt)
-		
-	# Important: Add to passenger_visuals, NOT passenger_track!
-	# The passenger_track is a Path2D which might have drawing caveats.
-	# We want these Line2Ds to draw identically to the Path2D.
 	var plaza = Sprite2D.new()
 	var ptex = _load_interim_sprite("res://assets/sprites/interim/fountain.png")
 	if ptex:
@@ -418,9 +380,11 @@ func _init_passenger_track() -> void:
 		plaza.scale = Vector2(0.8, 0.8)
 	passenger_visuals.add_child(plaza)
 
-	passenger_visuals.add_child(track_shadow)
-	passenger_visuals.add_child(track_border)
-	passenger_visuals.add_child(track_surface)
+	# Use custom robust track renderer instead of Godot 4 Line2D nodes
+	var track_renderer = preload("res://scripts/gameplay/track_renderer.gd").new()
+	track_renderer.name = "TrackRenderer"
+	track_renderer.curve = curve
+	passenger_visuals.add_child(track_renderer)
 
 	_waiting_label = Label.new()
 	_waiting_label.add_theme_font_size_override("font_size", 20)
