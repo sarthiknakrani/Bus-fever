@@ -3,119 +3,31 @@ extends Node2D
 class_name PlazaEnvironment
 
 func _ready() -> void:
-    _setup_plaza()
-
-func _load_tex(path: String) -> Texture2D:
-    if ResourceLoader.exists(path):
-        return ResourceLoader.load(path) as Texture2D
-    return null
-
-func _create_sprite(parent: Node, name: String, tex_name: String, pos: Vector2 = Vector2.ZERO, z: int = 0) -> Sprite2D:
-    var s = Sprite2D.new()
-    s.name = name
-    s.position = pos
-    s.z_index = z
-    var t = _load_tex("res://assets/sprites/premium_plaza/" + tex_name)
-    if t:
-        s.texture = t
-    else:
-        # If the asset is missing, create a small invisible placeholder so the node tree is intact
-        # and the developer knows exactly what is missing.
-        pass
-    parent.add_child(s)
-    return s
-
-func _setup_plaza() -> void:
-    # Floor and border replaced by the integrated artwork.
+    # INTEGRATED ARTWORK
+    var art = Sprite2D.new()
+    var tex = ResourceLoader.load("res://assets/sprites/fountain_masked.png") as Texture2D
+    if tex:
+        art.texture = tex
+        # The track is 540x180. The image is 1024x768.
+        # To fit inside the 180 height without covering the walkway, we must scale by 180/768 = 0.23.
+        # We cannot stretch it horizontally (non-uniform scale) without distorting and damaging the artwork.
+        art.scale = Vector2(0.23, 0.23) 
+        art.position = Vector2(0, 0)
+    add_child(art)
     
-    # 3. Landscaping (Tasteful curved grass patches)
-    _create_sprite(self, "FlowerBedTop", "flower_bed_top.png", Vector2(0, -55), 2)
-    _create_sprite(self, "FlowerBedBottom", "flower_bed_bottom.png", Vector2(0, 55), 2)
-    _create_sprite(self, "FlowerBedLeft", "flower_bed_left.png", Vector2(-220, 0), 2)
-    _create_sprite(self, "FlowerBedRight", "flower_bed_right.png", Vector2(220, 0), 2)
-    
-    # 4. Fountain Assembly Root (Centered)
-    var fountain = Node2D.new()
-    fountain.name = "FountainRoot"
-    fountain.position = Vector2(0, 0)
-    add_child(fountain)
-    
-    # Fountain Shadow
-    var f_shadow = _create_sprite(fountain, "FountainShadow", "fountain_shadow.png", Vector2(0, 20), 3)
-    f_shadow.modulate = Color(0, 0, 0, 0.25) # Softer shadow
-    
-    # Back Rim (drawn behind water)
-    _create_sprite(fountain, "BasinBack", "fountain_basin_back.png", Vector2(0, 0), 4)
-    
-    # Water Pool (Shader applied)
-    var pool = _create_sprite(fountain, "WaterPool", "fountain_water_pool.png", Vector2(0, 0), 5)
-    if pool.texture:
-        var mat = ShaderMaterial.new()
-        var shader = ResourceLoader.load("res://shaders/water_ripple.gdshader") as Shader
-        if shader:
-            mat.shader = shader
-            pool.material = mat
-            
-    # Front Rim (drawn over water to give depth)
-    _create_sprite(fountain, "BasinFront", "fountain_basin_front.png", Vector2(0, 0), 6)
-    
-    # Pedestal (Small centered base)
-    _create_sprite(fountain, "Pedestal", "fountain_pedestal.png", Vector2(0, -10), 7)
-    
-    # Upper Bowl
-    _create_sprite(fountain, "UpperBowl", "fountain_bowl.png", Vector2(0, -25), 8)
-    
-    # Animated Water Streams
-    # Using a simple particle system for lightweight mobile streams dropping from the upper bowl
-    var stream_l = CPUParticles2D.new()
-    stream_l.name = "StreamLeft"
-    stream_l.position = Vector2(-25, -25)
-    stream_l.amount = 16
-    stream_l.lifetime = 0.4
-    stream_l.direction = Vector2(-0.5, 1)
-    stream_l.spread = 15
-    stream_l.gravity = Vector2(0, 400)
-    stream_l.initial_velocity_min = 30
-    stream_l.initial_velocity_max = 50
-    stream_l.scale_amount_min = 2.0
-    stream_l.scale_amount_max = 3.0
-    stream_l.color = Color(0.7, 0.9, 1.0, 0.6)
-    stream_l.z_index = 9
-    fountain.add_child(stream_l)
-    
-    var stream_r = stream_l.duplicate()
-    stream_r.name = "StreamRight"
-    stream_r.position = Vector2(25, -25)
-    stream_r.direction = Vector2(0.5, 1)
-    fountain.add_child(stream_r)
-    
-    var stream_f = stream_l.duplicate()
+    # We keep a small water stream at the center to retain the lightweight animation.
+    var stream_f = CPUParticles2D.new()
     stream_f.name = "StreamFront"
     stream_f.position = Vector2(0, -20)
+    stream_f.amount = 16
+    stream_f.lifetime = 0.4
     stream_f.direction = Vector2(0, 1)
+    stream_f.spread = 15
+    stream_f.gravity = Vector2(0, 400)
     stream_f.initial_velocity_min = 10
     stream_f.initial_velocity_max = 30
-    fountain.add_child(stream_f)
-    
-    # Splash Particles where streams hit the pool
-    var splash = CPUParticles2D.new()
-    splash.name = "SplashBase"
-    splash.position = Vector2(0, 5)
-    splash.amount = 24
-    splash.lifetime = 0.3
-    splash.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
-    splash.emission_rect_extents = Vector2(30, 5)
-    splash.direction = Vector2(0, -1)
-    splash.spread = 60
-    splash.gravity = Vector2(0, 150)
-    splash.initial_velocity_min = 20
-    splash.initial_velocity_max = 40
-    splash.scale_amount_min = 1.0
-    splash.scale_amount_max = 2.0
-    splash.color = Color(0.8, 0.95, 1.0, 0.8)
-    splash.z_index = 9
-    fountain.add_child(splash)
-    
-    # Top Statue
-    _create_sprite(fountain, "TopStatue", "fountain_statue.png", Vector2(0, -45), 10)
-
+    stream_f.scale_amount_min = 2.0
+    stream_f.scale_amount_max = 3.0
+    stream_f.color = Color(0.7, 0.9, 1.0, 0.6)
+    stream_f.z_index = 9
+    add_child(stream_f)
