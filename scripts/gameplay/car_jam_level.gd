@@ -86,7 +86,7 @@ func _process(delta: float) -> void:
 		# ---------------------------------------------
 		# GAP CLOSING LOGIC
 		# ---------------------------------------------
-		var speed = 70.0
+		var speed = 125.0
 		if circulating_ids.size() > 1:
 			var ahead_idx = (i + 1) % circulating_ids.size()
 			var ahead_id = circulating_ids[ahead_idx]
@@ -97,7 +97,7 @@ func _process(delta: float) -> void:
 			
 			# If the gap is larger than the ideal spacing, smoothly speed up to catch up!
 			if diff > PASSENGER_SPACING * 1.2:
-				speed = 140.0
+				speed = 220.0
 		# ---------------------------------------------
 		
 		var old_prog = p["progress"]
@@ -291,6 +291,10 @@ func _setup_visuals(lvl: CarJamLevelData) -> void:
 	if is_instance_valid(passenger_track):
 		passenger_track.queue_free()
 		passenger_track = null
+	
+	if is_instance_valid(passenger_visuals):
+		for c in passenger_visuals.get_children():
+			c.queue_free()
 
 	# 1. Board Background
 	board_bg.setup(lvl.board_size)
@@ -377,6 +381,7 @@ func _init_passenger_track() -> void:
 	track_shadow.closed = true
 	track_shadow.begin_cap_mode = Line2D.LINE_CAP_ROUND
 	track_shadow.end_cap_mode = Line2D.LINE_CAP_ROUND
+	track_shadow.z_index = -3
 	
 	# 2. Border
 	var track_border = Line2D.new()
@@ -385,6 +390,7 @@ func _init_passenger_track() -> void:
 	track_border.closed = true
 	track_border.begin_cap_mode = Line2D.LINE_CAP_ROUND
 	track_border.end_cap_mode = Line2D.LINE_CAP_ROUND
+	track_border.z_index = -2
 	
 	# 3. Surface
 	var track_surface = Line2D.new()
@@ -393,22 +399,27 @@ func _init_passenger_track() -> void:
 	track_surface.closed = true
 	track_surface.begin_cap_mode = Line2D.LINE_CAP_ROUND
 	track_surface.end_cap_mode = Line2D.LINE_CAP_ROUND
+	track_surface.z_index = -1
 	
 	for pt in baked_pts:
 		track_shadow.add_point(pt)
 		track_border.add_point(pt)
 		track_surface.add_point(pt)
 		
-	passenger_track.add_child(track_shadow)
-	passenger_track.add_child(track_border)
-	passenger_track.add_child(track_surface)
+	# Important: Add to passenger_visuals, NOT passenger_track!
+	# The passenger_track is a Path2D which might have drawing caveats.
+	# We want these Line2Ds to draw identically to the Path2D.
+	passenger_visuals.add_child(track_shadow)
+	passenger_visuals.add_child(track_border)
+	passenger_visuals.add_child(track_surface)
 
 	var plaza = Sprite2D.new()
 	var ptex = _load_interim_sprite("res://assets/sprites/interim/fountain.png")
 	if ptex:
 		plaza.texture = ptex
 		plaza.scale = Vector2(0.8, 0.8)
-	passenger_track.add_child(plaza)
+	plaza.z_index = -4 # Keep it below the track
+	passenger_visuals.add_child(plaza)
 
 	_waiting_label = Label.new()
 	_waiting_label.add_theme_font_size_override("font_size", 20)
@@ -417,7 +428,7 @@ func _init_passenger_track() -> void:
 	_waiting_label.add_theme_constant_override("outline_size", 4)
 	_waiting_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_waiting_label.visible = false
-	passenger_track.add_child(_waiting_label)
+	passenger_visuals.add_child(_waiting_label)
 
 	passenger_visuals.add_child(passenger_track)
 	
@@ -425,12 +436,10 @@ func _init_passenger_track() -> void:
 	slot_boarding_points.clear()
 	for i in 5:
 		var slot_pos = _get_slot_world_pos(i)
+		# Approximate the X-coordinate on the track curve
 		var closest = passenger_track.curve.get_closest_offset(Vector2((i - 2) * 80.0, 90))
 		slot_boarding_points[i] = closest
 
-
-
-	# Spawn all passengers exactly once based on initial_count
 	all_passengers.clear()
 	circulating_ids.clear()
 	var pid = 0
