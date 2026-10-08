@@ -7,11 +7,7 @@ func _draw() -> void:
 	if curve == null: return
 	
 	# Generate high-res points for smooth drawing
-	var points = PackedVector2Array()
-	var steps = 128
-	for i in steps + 1:
-		var t = float(i) / steps * TAU
-		points.append(Vector2(cos(t) * 270, sin(t) * 90))
+	var points = curve.get_baked_points()
 	
 	var shadow_pts = points.duplicate()
 	for i in shadow_pts.size():

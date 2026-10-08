@@ -65,8 +65,8 @@ var slot_boarding_points: Dictionary = {}
 var _waiting_label: Label
 var track_time: float = 0.0
 const PASSENGER_SPACING := 50.0
-@export var passenger_normal_speed: float = 750.0
-@export var passenger_sprint_speed: float = 1350.0
+@export var passenger_normal_speed: float = 6750.0
+@export var passenger_sprint_speed: float = 11880.0
 const TRACK_SPEED := 40.0
 
 
@@ -78,6 +78,14 @@ func _process(delta: float) -> void:
 	if controller.state != CarJamController.GameState.PLAYING: return
 	
 	var track_len = passenger_track.curve.get_baked_length()
+	if not _speed_logged and circulating_ids.size() > 0:
+		_speed_logged = true
+		print("[QA] Loop length: ", track_len, " px")
+		print("[QA] Normal lap: ", track_len / passenger_normal_speed, " s")
+		print("[QA] Sprint lap: ", track_len / passenger_sprint_speed, " s")
+		print("[QA] Normal delta/frame (60Hz): ", passenger_normal_speed / 60.0, " px")
+		print("[QA] Sprint delta/frame (60Hz): ", passenger_sprint_speed / 60.0, " px")
+
 	var to_remove = []
 	
 	for i in circulating_ids.size():
@@ -1129,11 +1137,16 @@ func _animate_individual_boarding(p: Dictionary, vehicle_id: int, slot_id: int, 
 	
 	var target_pos: Vector2
 	var vv: VehicleView = vehicle_views.get(vehicle_id, null)
+	var final_local = _get_slot_world_pos(slot_id)
+	
 	if vv != null and is_instance_valid(vv) and vv.boarding_anchor != null:
-		# Use the actual boarding anchor converted to global space
-		target_pos = vv.boarding_anchor.global_position
+		var rot_target = 0.0
+		if vv.vehicle_dir == 2: rot_target = PI/2.0
+		elif vv.vehicle_dir == 3: rot_target = -PI/2.0
+		var anchor_local = vv.boarding_anchor.position.rotated(rot_target) * 0.45
+		target_pos = transit_layer.to_global(final_local + anchor_local)
 	else:
-		target_pos = _get_slot_world_pos(slot_id)
+		target_pos = transit_layer.to_global(final_local)
 	
 	pv.animate_jump(0.0)
 	
