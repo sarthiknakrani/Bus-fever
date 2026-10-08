@@ -59,6 +59,7 @@ var slot_views: Array[ParkingSlotView] = []
 # Continuous Passenger Track State
 var passenger_track: Path2D
 var active_passengers: Array[Dictionary] = []
+var _waiting_label: Label
 var track_time: float = 0.0
 const PASSENGER_SPACING := 50.0
 const TRACK_SPEED := 40.0
@@ -340,13 +341,27 @@ func _init_passenger_track() -> void:
 
 func _fill_passenger_track() -> void:
 	if passenger_track == null: return
-	var needed = min(20, controller.queue.get_remaining_total())
+	var total_remaining = controller.queue.get_remaining_total()
+	var MAX_VISIBLE = 32
+	var needed = min(MAX_VISIBLE, total_remaining)
+	
+	if _waiting_label != null:
+		var extra = total_remaining - needed
+		if extra > 0:
+			_waiting_label.text = "+%d waiting..." % extra
+			_waiting_label.visible = true
+			# Place it at the end of the visible line
+			var tail_prog = track_time + needed * PASSENGER_SPACING
+			var tail_transform = passenger_track.curve.sample_baked_with_rotation(tail_prog)
+			_waiting_label.position = tail_transform.origin + Vector2(-40, -40)
+		else:
+			_waiting_label.visible = false
+			
 	if active_passengers.size() >= needed: return
 	
 	var visible_groups := controller.queue.get_visible_groups(needed)
 	var current_idx = 0
 	
-	# Skip ones we already spawned
 	for g in visible_groups:
 		for i in g.remaining_count:
 			if current_idx >= active_passengers.size() and current_idx < needed:
@@ -358,7 +373,6 @@ func _fill_passenger_track() -> void:
 				pf.add_child(pv)
 				passenger_track.add_child(pf)
 				
-				# Initial position behind the last one
 				var start_prog = track_time + current_idx * PASSENGER_SPACING
 				pf.progress = start_prog
 				

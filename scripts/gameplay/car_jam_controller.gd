@@ -161,6 +161,7 @@ func _process_boarding_cycle(token: int) -> void:
 				vehicle_filled.emit(evt["vehicle_id"], evt["slot_id"])
 
 func _check_terminal_states() -> void:
+	_debug_passenger_accounting()
 	if state != GameState.PLAYING:
 		return
 
@@ -222,3 +223,38 @@ func pause() -> void:
 func resume() -> void:
 	if state == GameState.PAUSED:
 		state = GameState.PLAYING
+
+# -----------------------------------------------------------------
+# QA & DEBUG ASSERTIONS
+# -----------------------------------------------------------------
+
+func _debug_passenger_accounting() -> void:
+	if not OS.is_debug_build():
+		return
+		
+	var initial_by_color := {}
+	var remaining_by_color := {}
+	var boarded_by_color := {}
+	var capacity_by_color := {}
+	
+	for g in queue.get_all_groups():
+		initial_by_color[g.color_id] = initial_by_color.get(g.color_id, 0) + g.initial_count
+		remaining_by_color[g.color_id] = remaining_by_color.get(g.color_id, 0) + g.remaining_count
+		
+	for vid in vehicles:
+		var v = vehicles[vid]
+		capacity_by_color[v.color_id] = capacity_by_color.get(v.color_id, 0) + v.capacity
+		boarded_by_color[v.color_id] = boarded_by_color.get(v.color_id, 0) + v.passenger_occupancy
+		# Assertion: Vehicle never exceeds capacity
+		assert(v.passenger_occupancy <= v.capacity, "QA FAIL: Vehicle %d exceeded capacity!" % v.id)
+		
+	print("\n[QA] --- PASSENGER ACCOUNTING REPORT ---")
+	for c in initial_by_color.keys():
+		var init = initial_by_color[c]
+		var rem = remaining_by_color[c]
+		var board = boarded_by_color.get(c, 0)
+		var cap = capacity_by_color.get(c, 0)
+		print("[QA] %s: Initial=%d | Boarded=%d | Remaining=%d | BusCapacity=%d" % [c, init, board, rem, cap])
+		# Assertion: Conservation of passengers
+		assert(init == board + rem, "QA FAIL: Passenger conservation violated for %s! Init(%d) != Boarded(%d) + Rem(%d)" % [c, init, board, rem])
+	print("[QA] -----------------------------------\n")
