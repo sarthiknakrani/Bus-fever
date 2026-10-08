@@ -65,8 +65,8 @@ var slot_boarding_points: Dictionary = {}
 var _waiting_label: Label
 var track_time: float = 0.0
 const PASSENGER_SPACING := 50.0
-const PASSENGER_NORMAL_SPEED := 3375.0
-const PASSENGER_SPRINT_SPEED := 5940.0
+const PASSENGER_NORMAL_SPEED := 6750.0
+const PASSENGER_SPRINT_SPEED := 11880.0
 const TRACK_SPEED := 40.0
 
 
