@@ -86,7 +86,7 @@ func _process(delta: float) -> void:
 		# ---------------------------------------------
 		# GAP CLOSING LOGIC
 		# ---------------------------------------------
-		var speed = 660.0
+		var speed = 375.0
 		if circulating_ids.size() > 1:
 			var ahead_idx = (i + 1) % circulating_ids.size()
 			var ahead_id = circulating_ids[ahead_idx]
