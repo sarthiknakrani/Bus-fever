@@ -60,6 +60,7 @@ var slot_views: Array[ParkingSlotView] = []
 # Continuous Passenger Track State
 var passenger_track: Path2D
 var all_passengers: Dictionary = {}
+var circulating_ids: Array[int] = []
 var slot_boarding_points: Dictionary = {}
 var _waiting_label: Label
 var track_time: float = 0.0
@@ -75,13 +76,32 @@ func _process(delta: float) -> void:
 	if controller.state != CarJamController.GameState.PLAYING: return
 	
 	var track_len = passenger_track.curve.get_baked_length()
+	var to_remove = []
 	
-	for pid in all_passengers:
+	for i in circulating_ids.size():
+		var pid = circulating_ids[i]
 		var p = all_passengers[pid]
 		if p["state"] != "CIRCULATING": continue
 		
+		# ---------------------------------------------
+		# GAP CLOSING LOGIC
+		# ---------------------------------------------
+		var speed = 70.0
+		if circulating_ids.size() > 1:
+			var ahead_idx = (i + 1) % circulating_ids.size()
+			var ahead_id = circulating_ids[ahead_idx]
+			var p_ahead = all_passengers[ahead_id]
+			
+			var diff = p_ahead["progress"] - p["progress"]
+			if diff < 0: diff += track_len
+			
+			# If the gap is larger than the ideal spacing, smoothly speed up to catch up!
+			if diff > PASSENGER_SPACING * 1.2:
+				speed = 140.0
+		# ---------------------------------------------
+		
 		var old_prog = p["progress"]
-		p["progress"] += 80.0 * delta
+		p["progress"] += speed * delta
 		var new_prog = p["progress"]
 		
 		var crossed_wrap = false
@@ -107,13 +127,15 @@ func _process(delta: float) -> void:
 			if crossed:
 				var slot = controller.parking.get_slot(slot_idx)
 				if slot and slot.state == CarJamParkingManager.SlotState.OCCUPIED and slot.vehicle_id != -1:
-					var v = controller.vehicles.get(slot.vehicle_id, null)
-
 					if controller.try_reserve_boarding(slot.vehicle_id, p["color_id"]):
 						p["state"] = "BOARDING"
+						to_remove.append(pid)
 						_animate_individual_boarding(p, slot.vehicle_id, slot_idx, trigger_prog)
 						break
-
+						
+	# Remove boarded passengers from active loop array so gaps are recognized
+	for pid in to_remove:
+		circulating_ids.erase(pid)
 
 func _ready() -> void:
 	_build_scene_hierarchy()
@@ -410,6 +432,7 @@ func _init_passenger_track() -> void:
 
 	# Spawn all passengers exactly once based on initial_count
 	all_passengers.clear()
+	circulating_ids.clear()
 	var pid = 0
 	for g in controller.queue.get_all_groups():
 		for j in g.initial_count:
@@ -432,6 +455,7 @@ func _init_passenger_track() -> void:
 				"progress": float(start_prog),
 				"state": "CIRCULATING"
 			}
+			circulating_ids.append(pid)
 			pid += 1
 
 func _fill_passenger_track() -> void:
