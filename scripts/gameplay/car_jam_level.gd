@@ -1009,6 +1009,9 @@ func _update_layout() -> void:
 	# We need extra width for buses to exit the board cleanly.
 	# A 3-cell bus takes ~234 pixels. We add 300 padding on each side.
 	var required_w = max(640.0, board_pixel_w + 200.0)
+	# Safe areas on screen (top header, bottom boosters)
+	var screen_safe_h = vp_size.y - 450.0 # leave 150 top, 300 bottom
+	var screen_safe_w = vp_size.x * 0.95
 	
 	# Stack vertically with comfortable gaps
 	var scale_w = screen_safe_w / required_w
@@ -1025,9 +1028,6 @@ func _update_layout() -> void:
 	
 	var total_content_h = track_h + gap + parking_h + gap + board_pixel_h
 	
-	# Safe areas on screen (top header, bottom boosters)
-	var screen_safe_h = vp_size.y - 450.0 # leave 150 top, 300 bottom
-	var screen_safe_w = vp_size.x * 0.95
 	
 	# Scale factor was calculated above for dynamic gap
 	
