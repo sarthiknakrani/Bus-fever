@@ -226,19 +226,26 @@ func _check_terminal_states() -> void:
 	# If parking is full (no free slots) AND no parked vehicle matches the head of queue:
 	if parking.is_full():
 		var has_match := false
+		var has_departing_or_arriving := false
 		var all_groups = queue.get_all_groups()
 		for i in parking.get_slot_count():
 			var slot = parking.get_slot(i)
-			if slot and slot.state == CarJamParkingManager.SlotState.OCCUPIED:
-				var v = vehicles.get(slot.vehicle_id, null)
-				if v != null and v.remaining_capacity() > 0:
-					for g in all_groups:
-						if g.remaining_count > 0 and g.color_id == v.color_id:
-							has_match = true
-							break
-			if has_match: break
+			if slot:
+				if slot.state == CarJamParkingManager.SlotState.RESERVED or slot.state == CarJamParkingManager.SlotState.RELEASING:
+					has_departing_or_arriving = true
+				elif slot.state == CarJamParkingManager.SlotState.OCCUPIED:
+					var v = vehicles.get(slot.vehicle_id, null)
+					if v != null:
+						if v.state == VehicleModel.VehicleState.FULL or v.state == VehicleModel.VehicleState.COMPLETED:
+							has_departing_or_arriving = true
+						elif v.remaining_capacity() > 0:
+							for g in all_groups:
+								if g.remaining_count > 0 and g.color_id == v.color_id:
+									has_match = true
+									break
+			if has_match or has_departing_or_arriving: break
 		
-		if not has_match:
+		if not has_match and not has_departing_or_arriving:
 			state = GameState.FAIL
 			puzzle_failed.emit()
 			return

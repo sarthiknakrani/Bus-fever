@@ -69,13 +69,22 @@ static func animate_departure(
 
 	vehicle_node.set_parking_mode(false)
 
-	var exit_target := vehicle_node.position + Vector2(750.0, 0.0)
+	var cur_dir = vehicle_node.vehicle_dir
+	var dir_vec = Vector2.ZERO
+	if cur_dir == 0: dir_vec = Vector2(0, -1)      # UP
+	elif cur_dir == 1: dir_vec = Vector2(0, 1)     # DOWN
+	elif cur_dir == 2: dir_vec = Vector2(-1, 0)    # LEFT
+	elif cur_dir == 3: dir_vec = Vector2(1, 0)     # RIGHT
+	
+	# Fallback if somehow 0
+	if dir_vec == Vector2.ZERO: dir_vec = Vector2(1, 0)
+
+	var exit_target: Vector2 = vehicle_node.position + (dir_vec * 750.0)
 	var tw := vehicle_node.create_tween().set_parallel(true)
 
 	# Total duration: 0.75s
 	tw.tween_property(vehicle_node, "position", exit_target, 0.75).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
-	var cur_rot = vehicle_node.rotation
-	tw.tween_property(vehicle_node, "rotation", cur_rot + deg_to_rad(10), 0.75).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	tw.tween_property(vehicle_node, "modulate:a", 0.0, 0.6).set_delay(0.15)
 	
 	var lambda_func2 = func(v_node, ctrl, v_id, s_id, tok):
 		if is_instance_valid(v_node):

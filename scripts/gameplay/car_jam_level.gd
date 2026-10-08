@@ -505,10 +505,10 @@ func _on_vehicle_parked(vehicle_id: int, slot_id: int) -> void:
 	var vv: VehicleView = vehicle_views.get(vehicle_id, null)
 	if vv != null and slot_id < slot_views.size():
 		# Reparent to ParkedVehicles
-		var global_pos := vv.global_position
+		var global_xform := vv.global_transform
 		vv.get_parent().remove_child(vv)
 		parked_vehicles_node.add_child(vv)
-		vv.global_position = global_pos
+		vv.global_transform = global_xform
 		slot_views[slot_id].set_state(CarJamParkingManager.SlotState.OCCUPIED)
 
 func _on_vehicle_blocked(vehicle_id: int, _blocker_id: int) -> void:
@@ -1008,23 +1008,28 @@ func _update_layout() -> void:
 	# 2. Determine required margins and total logical dimensions
 	# We need extra width for buses to exit the board cleanly.
 	# A 3-cell bus takes ~234 pixels. We add 300 padding on each side.
-	var required_w = max(640.0, board_pixel_w + 600.0)
+	var required_w = max(640.0, board_pixel_w + 200.0)
 	
 	# Stack vertically with comfortable gaps
-	var gap = 60.0
+	var scale_w = screen_safe_w / required_w
+	var scale_h = screen_safe_h / (track_h + 120.0 + parking_h + board_pixel_h)
+	var scale_factor = clampf(min(scale_w, scale_h), 0.4, 2.0)
+	
+	# Compute how much logical vertical space we have available with this scale
+	var available_local_h = screen_safe_h / scale_factor
+	
+	# Distribute the remaining vertical space evenly into the 2 gaps
+	var remaining_h = available_local_h - (track_h + parking_h + board_pixel_h)
+	# But cap the gaps so they don't look completely ridiculous
+	var gap = clampf(remaining_h / 2.5, 60.0, 350.0)
+	
 	var total_content_h = track_h + gap + parking_h + gap + board_pixel_h
 	
 	# Safe areas on screen (top header, bottom boosters)
 	var screen_safe_h = vp_size.y - 450.0 # leave 150 top, 300 bottom
 	var screen_safe_w = vp_size.x * 0.95
 	
-	# 3. Calculate coherent scale factor to fit BOTH width and height
-	var scale_w = screen_safe_w / required_w
-	var scale_h = screen_safe_h / total_content_h
-	var scale_factor = min(scale_w, scale_h)
-	
-	# Prevent it from becoming microscopic or gigantic
-	scale_factor = clampf(scale_factor, 0.4, 2.0)
+	# Scale factor was calculated above for dynamic gap
 	
 	# Apply scale to world root
 	world_root.scale = Vector2(scale_factor, scale_factor)
