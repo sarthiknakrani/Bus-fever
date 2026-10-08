@@ -65,8 +65,8 @@ var slot_boarding_points: Dictionary = {}
 var _waiting_label: Label
 var track_time: float = 0.0
 const PASSENGER_SPACING := 50.0
-const PASSENGER_NORMAL_SPEED := 1125.0
-const PASSENGER_SPRINT_SPEED := 1980.0
+const PASSENGER_NORMAL_SPEED := 3375.0
+const PASSENGER_SPRINT_SPEED := 5940.0
 const TRACK_SPEED := 40.0
 
 
@@ -103,37 +103,45 @@ func _process(delta: float) -> void:
 		# ---------------------------------------------
 		
 		var old_prog = p["progress"]
-		p["progress"] += speed * delta
-		var new_prog = p["progress"]
+		var dist_moved = speed * delta
 		
-		var crossed_wrap = false
-		if new_prog > track_len:
-			p["progress"] -= track_len
-			new_prog = p["progress"]
-			crossed_wrap = true
-			
-		p["follower"].progress = p["progress"]
-		
-		# Check exact progress crossings against boarding gates
+		# Build a sorted list of crossing events
+		var crossings = []
 		for slot_idx in slot_boarding_points:
 			var trigger_prog = slot_boarding_points[slot_idx]
+			var dist_to_gate = trigger_prog - old_prog
+			if dist_to_gate < 0:
+				dist_to_gate += track_len
+				
+			# Passenger could loop multiple times in one frame at extreme speeds.
+			# We find EVERY time they cross this gate within dist_moved.
+			var d = dist_to_gate
+			while d <= dist_moved:
+				crossings.append({ "dist": d, "slot": slot_idx, "trigger": trigger_prog })
+				d += track_len
+				
+		crossings.sort_custom(func(a, b): return a["dist"] < b["dist"])
+		
+		var boarded = false
+		for cross in crossings:
+			var slot_idx = cross["slot"]
+			var trigger_prog = cross["trigger"]
+			var slot = controller.parking.get_slot(slot_idx)
 			
-			var crossed = false
-			if crossed_wrap:
-				if trigger_prog >= old_prog or trigger_prog <= new_prog:
-					crossed = true
-			else:
-				if old_prog <= trigger_prog and new_prog >= trigger_prog:
-					crossed = true
+			if slot and slot.state == CarJamParkingManager.SlotState.OCCUPIED and slot.vehicle_id != -1:
+				if controller.try_reserve_boarding(slot.vehicle_id, p["color_id"]):
+					p["state"] = "BOARDING"
+					to_remove.append(pid)
+					# Adjust visual progress to exact crossing point for the animation
+					p["progress"] = trigger_prog
+					p["follower"].progress = trigger_prog
+					_animate_individual_boarding(p, slot.vehicle_id, slot_idx, trigger_prog)
+					boarded = true
+					break
 					
-			if crossed:
-				var slot = controller.parking.get_slot(slot_idx)
-				if slot and slot.state == CarJamParkingManager.SlotState.OCCUPIED and slot.vehicle_id != -1:
-					if controller.try_reserve_boarding(slot.vehicle_id, p["color_id"]):
-						p["state"] = "BOARDING"
-						to_remove.append(pid)
-						_animate_individual_boarding(p, slot.vehicle_id, slot_idx, trigger_prog)
-						break
+		if not boarded:
+			p["progress"] = fmod(old_prog + dist_moved, track_len)
+			p["follower"].progress = p["progress"]
 						
 	# Remove boarded passengers from active loop array so gaps are recognized
 	for pid in to_remove:

@@ -16,40 +16,42 @@ static func animate_dispatch(
 ) -> void:
 	if vehicle_node == null or not is_instance_valid(vehicle_node):
 		return
-
-	var mid_y: float = (exit_pos.y + slot_pos.y) / 2.0
-	var mid_pos := Vector2(slot_pos.x * 0.7 + exit_pos.x * 0.3, mid_y)
-	
+		
 	var target_scale = Vector2(0.65, 0.65)
 	if vehicle_node.vehicle_capacity > 4:
 		target_scale = Vector2(0.5, 0.5)
-		
-	var cur_dir = vehicle_node.vehicle_dir
-	var rot_target = 0.0
-	if cur_dir == 1: rot_target = 0.0
-	elif cur_dir == 2: rot_target = PI/2.0
-	elif cur_dir == 3: rot_target = -PI/2.0
 
-	var tw := vehicle_node.create_tween().set_parallel(false)
+	var tw := vehicle_node.create_tween()
+	tw.set_parallel(true)
 
-	# 1. Drive along escape corridor
+	# Total duration: 0.0865 + 0.1265 = 0.213s
+	# Phase 1: Drive out of board (0.0865s)
 	tw.tween_property(vehicle_node, "position", exit_pos, 0.0865).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	
-	# 2. Parallel group for arc to mid_pos, scale and rotation
-	tw.tween_property(vehicle_node, "position", mid_pos, 0.060).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw.parallel().tween_property(vehicle_node, "rotation", rot_target, 0.1265).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
-	tw.parallel().tween_property(vehicle_node, "scale", target_scale, 0.1265).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+	# Phase 2: Arc to slot (0.1265s)
+	# Stagger X and Y easing to create a natural curve!
+	tw.tween_property(vehicle_node, "position:x", slot_pos.x, 0.1265).set_delay(0.0865).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(vehicle_node, "position:y", slot_pos.y, 0.1265).set_delay(0.0865).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	
-	# 3. Final approach to slot
-	tw.tween_property(vehicle_node, "position", slot_pos, 0.0665).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+	# Calculate driving angle for natural orientation
+	var drive_dir = (slot_pos - exit_pos).angle()
+	# Rotate to drive direction early, then snap/tween to 0.0 at the end
+	tw.tween_property(vehicle_node, "rotation", drive_dir, 0.06).set_delay(0.0865).set_trans(Tween.TRANS_SINE)
+	tw.tween_property(vehicle_node, "rotation", 0.0, 0.0665).set_delay(0.0865 + 0.06).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	
+	# Scale down smoothly
+	tw.tween_property(vehicle_node, "scale", target_scale, 0.1265).set_delay(0.0865).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
 
-	# 4. Callback
-	tw.tween_callback(func():
+	# Phase 3: Settle bounce (done via a subtle scale pop, without adding time, just embedded in the callback or chained)
+	tw.chain().tween_callback(func():
 		if is_instance_valid(vehicle_node):
 			vehicle_node.set_parking_mode(true)
+			# Settle bounce using a quick local tween
+			var settle_tw = vehicle_node.create_tween()
+			settle_tw.tween_property(vehicle_node, "scale", target_scale * 1.05, 0.05).set_trans(Tween.TRANS_SINE)
+			settle_tw.tween_property(vehicle_node, "scale", target_scale, 0.05).set_trans(Tween.TRANS_BOUNCE)
 		controller.on_vehicle_arrived_at_slot(vehicle_id, slot_id, token)
 	)
-
 
 static func animate_departure(
 	vehicle_node: Node2D,
@@ -65,15 +67,15 @@ static func animate_departure(
 	# Hide capacity badge
 	vehicle_node.set_parking_mode(false)
 
-	# Drive straight off-screen to the right from current parked position
 	var exit_target := vehicle_node.position + Vector2(750.0, 0.0)
 	var tw := vehicle_node.create_tween().set_parallel(true)
 
-	# Brief departure acceleration
-	tw.tween_property(vehicle_node, "position", exit_target, 0.1335).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_IN)
-	# Also rotate to face right when departing!
+	# Total duration: 0.1335s
+	# Smooth acceleration forward
+	tw.tween_property(vehicle_node, "position", exit_target, 0.1335).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	# Fast, readable departure rotation
 	var cur_rot = vehicle_node.rotation
-	tw.tween_property(vehicle_node, "rotation", cur_rot + PI/2.0, 0.0665)
+	tw.tween_property(vehicle_node, "rotation", cur_rot + deg_to_rad(10), 0.1335).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 	
 	tw.chain().tween_callback(func():
 		if is_instance_valid(vehicle_node):
