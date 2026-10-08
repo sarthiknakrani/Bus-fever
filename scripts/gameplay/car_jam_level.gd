@@ -66,8 +66,8 @@ var slot_boarding_points: Dictionary = {}
 var _waiting_label: Label
 var track_time: float = 0.0
 const PASSENGER_SPACING := 50.0
-@export var passenger_normal_speed: float = 150.0
-@export var passenger_sprint_speed: float = 270.0
+@export var passenger_normal_speed: float = 60.0
+@export var passenger_sprint_speed: float = 100.0
 @export var bus_movement_duration_multiplier: float = 3.0
 const TRACK_SPEED := 40.0
 
@@ -997,30 +997,33 @@ func _update_layout() -> void:
 
 	# Calculate scale to fit the board comfortably with some padding
 	var board_pixel_width = 7 * 78.0 # 546.0
-	var scale_factor = (vp_size.x * 0.95) / board_pixel_width
 	
-	# If the window is extremely tall (e.g. narrow phone), we might want to clamp scale
-	# so it doesn't get ridiculously huge. 
-	# Also ensure it fits vertically. The total gameplay area height is roughly 1100 pixels.
-	scale_factor = clampf(vp_size.x / 1050.0, 0.35, 2.0)
+	
+	# Scale to fit standard portrait width while leaving margin for bus exits
+	var scale_factor = clampf(vp_size.x / 900.0, 0.35, 2.0)
 	
 	# Keep world centered at (0,0) which is where the Camera2D looks
 	world_root.scale = Vector2(scale_factor, scale_factor)
 	world_root.position = Vector2.ZERO
 
-	var half_h = (vp_size.y / 2.0) / scale_factor
+	# Center everything vertically around the origin so it fills the screen
+	# instead of bunching up at the very top.
+	# Positive Y is down.
+	var track_y = -400.0
+	var parking_y = -80.0
+	var board_y = 350.0
 
-	# Parking between passenger track and board
-	if parking_root != null:
-		parking_root.position = Vector2(0, -half_h + 520)
-
-	# Board below parking
-	if board_root != null:
-		board_root.position = Vector2(0, -half_h + 860)
-
-	# Passenger track right above the parking
+	# Passenger track prominent in upper section
 	if passenger_track_root != null:
-		passenger_track_root.position = Vector2(0, -half_h + 280)
+		passenger_track_root.position = Vector2(0, track_y)
+
+	# Parking strip right below the track
+	if parking_root != null:
+		parking_root.position = Vector2(0, parking_y)
+
+	# Puzzle board in the lower middle area
+	if board_root != null:
+		board_root.position = Vector2(0, board_y)
 
 
 
