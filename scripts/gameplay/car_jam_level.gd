@@ -476,12 +476,12 @@ func _on_vehicle_dispatch_started(vehicle_id: int, slot_id: int, corridor: Array
 	var ly = final_exit_coord.y - float(controller.level_data.board_size.y - 1) / 2.0
 	var exit_local = Vector2(lx, ly) * CELL_SIZE
 	
-	# Convert to global utilizing the actual board transform (rotation/scale)
-	var exit_pos = board_root.to_global(exit_local)
+	# Convert to world_root space (which is transit_layer's space)
+	var exit_pos = board_root.transform * exit_local
 
 	VehicleMovement.animate_dispatch(
 		vv,
-		vv.global_position,
+		vv.position,
 		exit_pos,
 		target_slot_pos,
 		controller.session_token,
@@ -980,7 +980,8 @@ func _update_layout() -> void:
 	if world_root == null:
 		return
 	var vp := get_viewport()
-	var vp_size: Vector2 = vp.get_visible_rect().size if vp != null else Vector2(720, 1880)
+	var vp_size: Vector2 = vp.get_visible_rect().size if vp != null else Vector2(720, 1280)
+	if DisplayServer.get_name() == "headless": vp_size = Vector2(720, 1280)
 	if vp_size.x <= 0 or vp_size.y <= 0:
 		return
 
@@ -991,7 +992,7 @@ func _update_layout() -> void:
 	# If the window is extremely tall (e.g. narrow phone), we might want to clamp scale
 	# so it doesn't get ridiculously huge. 
 	# Also ensure it fits vertically. The total gameplay area height is roughly 1100 pixels.
-	scale_factor = clampf(vp_size.x / 850.0, 0.35, 2.0)
+	scale_factor = clampf(vp_size.x / 1050.0, 0.35, 2.0)
 	
 	# Keep world centered at (0,0) which is where the Camera2D looks
 	world_root.scale = Vector2(scale_factor, scale_factor)

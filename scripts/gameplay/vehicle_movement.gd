@@ -52,15 +52,16 @@ static func animate_dispatch(
 	tw.tween_property(vehicle_node, "scale", target_scale, 0.1265).set_delay(0.0865).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
 
 	# Phase 3: Settle bounce (done via a subtle scale pop, without adding time, just embedded in the callback or chained)
-	tw.chain().tween_callback(func():
-		if is_instance_valid(vehicle_node):
-			vehicle_node.set_parking_mode(true)
+	var lambda_func = func(v_node, t_scale, ctrl, v_id, s_id, tok):
+		if is_instance_valid(v_node):
+			v_node.set_parking_mode(true)
 			# Settle bounce using a quick local tween
-			var settle_tw = vehicle_node.create_tween()
-			settle_tw.tween_property(vehicle_node, "scale", target_scale * 1.05, 0.05).set_trans(Tween.TRANS_SINE)
-			settle_tw.tween_property(vehicle_node, "scale", target_scale, 0.05).set_trans(Tween.TRANS_BOUNCE)
-		controller.on_vehicle_arrived_at_slot(vehicle_id, slot_id, token)
-	)
+			var settle_tw = v_node.create_tween()
+			settle_tw.tween_property(v_node, "scale", t_scale * 1.05, 0.05).set_trans(Tween.TRANS_SINE)
+			settle_tw.tween_property(v_node, "scale", t_scale, 0.05).set_trans(Tween.TRANS_BOUNCE)
+		ctrl.on_vehicle_arrived_at_slot(v_id, s_id, tok)
+	
+	tw.chain().tween_callback(lambda_func.bind(vehicle_node, target_scale, controller, vehicle_id, slot_id, token))
 
 static func animate_departure(
 	vehicle_node: Node2D,
@@ -86,8 +87,9 @@ static func animate_departure(
 	var cur_rot = vehicle_node.rotation
 	tw.tween_property(vehicle_node, "rotation", cur_rot + deg_to_rad(10), 0.1335).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 	
-	tw.chain().tween_callback(func():
-		if is_instance_valid(vehicle_node):
-			vehicle_node.visible = false
-		controller.on_vehicle_departed_from_slot(vehicle_id, slot_id, token)
-	)
+	var lambda_func2 = func(v_node, ctrl, v_id, s_id, tok):
+		if is_instance_valid(v_node):
+			v_node.visible = false
+		ctrl.on_vehicle_departed_from_slot(v_id, s_id, tok)
+		
+	tw.chain().tween_callback(lambda_func2.bind(vehicle_node, controller, vehicle_id, slot_id, token))
