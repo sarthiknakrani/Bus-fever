@@ -12,7 +12,8 @@ static func animate_dispatch(
 	token: int,
 	controller: Node,
 	vehicle_id: int,
-	slot_id: int
+	slot_id: int,
+	duration_mult: float = 1.0
 ) -> void:
 	if vehicle_node == null or not is_instance_valid(vehicle_node):
 		return
@@ -26,12 +27,12 @@ static func animate_dispatch(
 
 	# Total duration: 0.0865 + 0.1265 = 0.213s
 	# Phase 1: Drive out of board (0.0865s)
-	tw.tween_property(vehicle_node, "position", exit_pos, 0.0865).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_property(vehicle_node, "position", exit_pos, 0.0865 * duration_mult).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	
 	# Phase 2: Arc to slot (0.1265s)
 	# Stagger X and Y easing to create a natural curve!
-	tw.tween_property(vehicle_node, "position:x", slot_pos.x, 0.1265).set_delay(0.0865).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	tw.tween_property(vehicle_node, "position:y", slot_pos.y, 0.1265).set_delay(0.0865).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(vehicle_node, "position:x", slot_pos.x, 0.1265 * duration_mult).set_delay(0.0865 * duration_mult).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(vehicle_node, "position:y", slot_pos.y, 0.1265 * duration_mult).set_delay(0.0865 * duration_mult).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	
 	# Calculate driving angle for natural orientation
 	var drive_dir = (slot_pos - exit_pos).angle()
@@ -45,11 +46,11 @@ static func animate_dispatch(
 	# LEFT (1) can be 0.0 or PI, let's keep it 0.0 so it faces right like the others
 	
 	# Rotate to drive direction early, then tween to horizontal parking orientation at the end
-	tw.tween_property(vehicle_node, "rotation", drive_dir, 0.06).set_delay(0.0865).set_trans(Tween.TRANS_SINE)
-	tw.tween_property(vehicle_node, "rotation", rot_target, 0.0665).set_delay(0.0865 + 0.06).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(vehicle_node, "rotation", drive_dir, 0.06 * duration_mult).set_delay(0.0865 * duration_mult).set_trans(Tween.TRANS_SINE)
+	tw.tween_property(vehicle_node, "rotation", rot_target, 0.0665 * duration_mult).set_delay((0.0865 + 0.06) * duration_mult).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	
 	# Scale down smoothly
-	tw.tween_property(vehicle_node, "scale", target_scale, 0.1265).set_delay(0.0865).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(vehicle_node, "scale", target_scale, 0.1265 * duration_mult).set_delay(0.0865 * duration_mult).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
 
 	# Phase 3: Settle bounce (done via a subtle scale pop, without adding time, just embedded in the callback or chained)
 	var lambda_func = func(v_node, t_scale, ctrl, v_id, s_id, tok):
@@ -69,7 +70,8 @@ static func animate_departure(
 	token: int,
 	controller: Node,
 	vehicle_id: int,
-	slot_id: int
+	slot_id: int,
+	duration_mult: float = 1.0
 ) -> void:
 	if vehicle_node == null or not is_instance_valid(vehicle_node):
 		return
@@ -82,10 +84,10 @@ static func animate_departure(
 
 	# Total duration: 0.1335s
 	# Smooth acceleration forward
-	tw.tween_property(vehicle_node, "position", exit_target, 0.1335).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	tw.tween_property(vehicle_node, "position", exit_target, 0.1335 * duration_mult).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
 	# Fast, readable departure rotation
 	var cur_rot = vehicle_node.rotation
-	tw.tween_property(vehicle_node, "rotation", cur_rot + deg_to_rad(10), 0.1335).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	tw.tween_property(vehicle_node, "rotation", cur_rot + deg_to_rad(10), 0.1335 * duration_mult).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 	
 	var lambda_func2 = func(v_node, ctrl, v_id, s_id, tok):
 		if is_instance_valid(v_node):

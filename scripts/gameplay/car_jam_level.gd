@@ -61,12 +61,14 @@ var slot_views: Array[ParkingSlotView] = []
 var passenger_track: Path2D
 var all_passengers: Dictionary = {}
 var circulating_ids: Array[int] = []
+var _speed_logged: bool = false
 var slot_boarding_points: Dictionary = {}
 var _waiting_label: Label
 var track_time: float = 0.0
 const PASSENGER_SPACING := 50.0
-@export var passenger_normal_speed: float = 6750.0
-@export var passenger_sprint_speed: float = 11880.0
+@export var passenger_normal_speed: float = 150.0
+@export var passenger_sprint_speed: float = 270.0
+@export var bus_movement_duration_multiplier: float = 3.0
 const TRACK_SPEED := 40.0
 
 
