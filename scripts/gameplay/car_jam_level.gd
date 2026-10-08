@@ -132,9 +132,9 @@ func _process(delta: float) -> void:
 				if controller.try_reserve_boarding(slot.vehicle_id, p["color_id"]):
 					p["state"] = "BOARDING"
 					to_remove.append(pid)
-					# Adjust visual progress to exact crossing point for the animation
-					p["progress"] = trigger_prog
-					p["follower"].progress = trigger_prog
+					# DO NOT snap visual progress to trigger_prog; use real position!
+					p["progress"] = fmod(old_prog + dist_moved, track_len)
+					p["follower"].progress = p["progress"]
 					_animate_individual_boarding(p, slot.vehicle_id, slot_idx, trigger_prog)
 					boarded = true
 					break
@@ -995,39 +995,6 @@ func _update_layout() -> void:
 	if passenger_track_root != null:
 		passenger_track_root.position = Vector2(0, -half_h + 280)
 
-	# Build explicit visual boarding paths connecting track to parking
-	if boarding_paths_root != null and parking_root != null and passenger_track_root != null:
-		# Clear old
-		for c in boarding_paths_root.get_children():
-			c.queue_free()
-		
-		var loop_bottom_y = passenger_track_root.position.y + 90
-		var parking_top_y = parking_root.position.y - 60
-		
-		# For each slot, draw a walkway
-		for i in 5:
-			var slot_x = (i - 2) * 80.0 # From _build_parking
-			
-			var line = Line2D.new()
-			line.add_point(Vector2(slot_x, loop_bottom_y))
-			line.add_point(Vector2(slot_x, parking_top_y + 10)) # Slight overlap
-			line.width = 46.0
-			line.default_color = Color(1.0, 1.0, 1.0, 0.15)
-			line.begin_cap_mode = Line2D.LINE_CAP_ROUND
-			line.end_cap_mode = Line2D.LINE_CAP_ROUND
-			
-			# Add a subtle directional arrow / chevron
-			var chevron = Sprite2D.new()
-			var tex = _load_interim_sprite("res://assets/sprites/interim/arrow.png")
-			if tex:
-				chevron.texture = tex
-				chevron.modulate = Color(1.0, 1.0, 1.0, 0.3)
-				chevron.scale = Vector2(0.4, 0.4)
-				chevron.rotation = PI/2 # Point down
-				chevron.position = Vector2(slot_x, (loop_bottom_y + parking_top_y)/2.0)
-				
-				
-			boarding_paths_root.add_child(line)
 
 
 
@@ -1134,6 +1101,7 @@ func _animate_individual_boarding(p: Dictionary, vehicle_id: int, slot_id: int, 
 	var pv: PassengerView = p["view"]
 	var pf: PathFollow2D = p["follower"]
 	
+	# Preserve exact live position to prevent snapping
 	var gpos = pv.global_position
 	pf.remove_child(pv)
 	passenger_visuals.add_child(pv)
@@ -1142,27 +1110,29 @@ func _animate_individual_boarding(p: Dictionary, vehicle_id: int, slot_id: int, 
 	pf.queue_free()
 	p["follower"] = null
 	
-	var exact_local = passenger_track.curve.sample_baked_with_rotation(exact_prog).origin
-	var exact_gpos = passenger_track.to_global(exact_local)
-	var target_pos = _get_slot_world_pos(slot_id) + Vector2(0, -40)
+	var target_pos: Vector2
+	var vv: VehicleView = vehicle_views.get(vehicle_id, null)
+	if vv != null and is_instance_valid(vv):
+		target_pos = vv.global_position
+	else:
+		target_pos = _get_slot_world_pos(slot_id)
 	
 	pv.animate_jump(0.0)
 	
-	var tw = create_tween()
-	var dist_error = gpos.distance_to(exact_gpos)
-	if dist_error > 2.0:
-		# Correct overshoot delta faster
-		tw.tween_property(pv, "global_position", exact_gpos, 0.05).set_trans(Tween.TRANS_LINEAR)
+	var tw = create_tween().set_parallel(true)
 	
-	# Faster distance-aware travel
-	var travel_dist = exact_gpos.distance_to(target_pos)
+	var travel_dist = gpos.distance_to(target_pos)
 	var duration = clampf(travel_dist / 350.0, 0.20, 0.35)
 	
-	# Travel straight down the walkway
+	# Travel straight to the actual bus center smoothly
 	tw.tween_property(pv, "global_position", target_pos, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	
+	# Fade and shrink into the bus in the last half of the movement
+	tw.tween_property(pv, "scale", Vector2(0.2, 0.2), duration * 0.4).set_delay(duration * 0.6).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_property(pv, "modulate:a", 0.0, duration * 0.4).set_delay(duration * 0.6).set_trans(Tween.TRANS_LINEAR)
+	
 	var token = controller.session_token
-	tw.tween_callback(self._on_individual_boarded.bind(p["id"], vehicle_id, p["color_id"], token))
+	tw.chain().tween_callback(self._on_individual_boarded.bind(p["id"], vehicle_id, p["color_id"], token))
 
 func _on_individual_boarded(pid: int, vehicle_id: int, color_id: String, token: int) -> void:
 	if token != controller.session_token: return
