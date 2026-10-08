@@ -95,65 +95,116 @@ func _draw() -> void:
 	var cells_w: float = float(vehicle_footprint.size()) if vehicle_dir == CarJamVehicleData.Direction.RIGHT or vehicle_dir == CarJamVehicleData.Direction.LEFT else 1.0
 	var cells_h: float = float(vehicle_footprint.size()) if vehicle_dir == CarJamVehicleData.Direction.UP or vehicle_dir == CarJamVehicleData.Direction.DOWN else 1.0
 
-	var pixel_w = cells_w * CELL_SIZE - 12.0
-	var pixel_h = cells_h * CELL_SIZE - 12.0
+	var pixel_w = cells_w * CELL_SIZE - 10.0
+	var pixel_h = cells_h * CELL_SIZE - 10.0
 	var rect = Rect2(-pixel_w/2.0, -pixel_h/2.0, pixel_w, pixel_h)
 	
-	var style_base = StyleBoxFlat.new()
-	style_base.bg_color = vehicle_color.darkened(0.2)
-	style_base.set_corner_radius_all(16)
-	style_base.shadow_color = Color(0, 0, 0, 0.3)
-	style_base.shadow_size = 8
-	style_base.shadow_offset = Vector2(0, 8)
+	# Premium 2D Art Layering
 	
-	var style_roof = StyleBoxFlat.new()
-	style_roof.bg_color = vehicle_color
-	style_roof.set_corner_radius_all(12)
+	# 1. Soft Ground Shadow
+	var shadow_rect = rect
+	shadow_rect.position.y += 6
+	var shadow_style = StyleBoxFlat.new()
+	shadow_style.bg_color = Color(0, 0, 0, 0.35)
+	shadow_style.set_corner_radius_all(16)
+	shadow_style.shadow_color = Color(0, 0, 0, 0.2)
+	shadow_style.shadow_size = 12
+	draw_style_box(shadow_style, shadow_rect)
 	
-	var style_glass = StyleBoxFlat.new()
-	style_glass.bg_color = Color("93c5fd")
-	style_glass.set_corner_radius_all(8)
+	# 2. Wheels
+	var wheel_color = Color("1e293b")
+	var wheel_w = 6.0
+	var wheel_h = 16.0
+	var wheel_inset_x = pixel_w / 2.0 - 4
+	var wheel_inset_y = pixel_h / 2.0 - 18
 	
-	draw_style_box(style_base, rect)
+	# Adjust wheels based on orientation so they are on the sides
+	if cells_h > cells_w: # Vertical bus
+		draw_rect(Rect2(-wheel_inset_x - wheel_w, -wheel_inset_y, wheel_w, wheel_h), wheel_color, true)
+		draw_rect(Rect2(wheel_inset_x, -wheel_inset_y, wheel_w, wheel_h), wheel_color, true)
+		draw_rect(Rect2(-wheel_inset_x - wheel_w, wheel_inset_y - wheel_h, wheel_w, wheel_h), wheel_color, true)
+		draw_rect(Rect2(wheel_inset_x, wheel_inset_y - wheel_h, wheel_w, wheel_h), wheel_color, true)
+	else: # Horizontal bus
+		draw_rect(Rect2(-wheel_inset_x, -wheel_inset_y - wheel_w, wheel_h, wheel_w), wheel_color, true)
+		draw_rect(Rect2(-wheel_inset_x, wheel_inset_y, wheel_h, wheel_w), wheel_color, true)
+		draw_rect(Rect2(wheel_inset_x - wheel_h, -wheel_inset_y - wheel_w, wheel_h, wheel_w), wheel_color, true)
+		draw_rect(Rect2(wheel_inset_x - wheel_h, wheel_inset_y, wheel_h, wheel_w), wheel_color, true)
+
+	# 3. Side Body (Base)
+	var body_style = StyleBoxFlat.new()
+	body_style.bg_color = vehicle_color.darkened(0.2)
+	body_style.set_corner_radius_all(16)
+	body_style.border_width_bottom = 8
+	body_style.border_color = vehicle_color.darkened(0.35)
+	draw_style_box(body_style, rect)
 	
+	# 4. Windshields and Windows (Dark Glass)
+	var glass_style = StyleBoxFlat.new()
+	glass_style.bg_color = Color("0f172a") # Very dark blue/grey glass
+	glass_style.set_corner_radius_all(8)
 	var glass_rect = rect.grow(-4)
-	draw_style_box(style_glass, glass_rect)
+	draw_style_box(glass_style, glass_rect)
 	
-	var roof_rect = rect.grow(-12)
-	roof_rect.position.y -= 4
-	draw_style_box(style_roof, roof_rect)
+	# 5. Roof Layer
+	var roof_rect = rect.grow(-10)
+	roof_rect.position.y -= 8 # 3D depth shift
+	var roof_style = StyleBoxFlat.new()
+	roof_style.bg_color = vehicle_color
+	roof_style.set_corner_radius_all(12)
 	
+	# Add glossy highlight to roof
+	roof_style.border_width_top = 4
+	roof_style.border_color = Color(1, 1, 1, 0.4)
+	roof_style.border_blend = true
+	draw_style_box(roof_style, roof_rect)
+	
+	# Roof details (AC unit / ridges)
+	var detail_rect = roof_rect.grow(-8)
+	var detail_style = StyleBoxFlat.new()
+	detail_style.bg_color = vehicle_color.lightened(0.15)
+	detail_style.set_corner_radius_all(6)
+	draw_style_box(detail_style, detail_rect)
+	
+	# 6. Directional Arrow
 	var center = roof_rect.get_center()
-	var arr_size = 12.0
+	var arr_size = 14.0
 	var p1 = center
 	var p2 = center
 	var p3 = center
+	var arr_offset = 0.0
 	
 	if vehicle_dir == CarJamVehicleData.Direction.UP:
-		p1 += Vector2(0, -arr_size)
-		p2 += Vector2(-arr_size, arr_size)
-		p3 += Vector2(arr_size, arr_size)
+		p1 += Vector2(0, -arr_size + arr_offset)
+		p2 += Vector2(-arr_size, arr_size + arr_offset)
+		p3 += Vector2(arr_size, arr_size + arr_offset)
 	elif vehicle_dir == CarJamVehicleData.Direction.DOWN:
-		p1 += Vector2(0, arr_size)
-		p2 += Vector2(-arr_size, -arr_size)
-		p3 += Vector2(arr_size, -arr_size)
+		p1 += Vector2(0, arr_size + arr_offset)
+		p2 += Vector2(-arr_size, -arr_size + arr_offset)
+		p3 += Vector2(arr_size, -arr_size + arr_offset)
 	elif vehicle_dir == CarJamVehicleData.Direction.LEFT:
-		p1 += Vector2(-arr_size, 0)
-		p2 += Vector2(arr_size, -arr_size)
-		p3 += Vector2(arr_size, arr_size)
+		p1 += Vector2(-arr_size + arr_offset, 0)
+		p2 += Vector2(arr_size + arr_offset, -arr_size)
+		p3 += Vector2(arr_size + arr_offset, arr_size)
 	elif vehicle_dir == CarJamVehicleData.Direction.RIGHT:
-		p1 += Vector2(arr_size, 0)
-		p2 += Vector2(-arr_size, -arr_size)
-		p3 += Vector2(-arr_size, arr_size)
+		p1 += Vector2(arr_size + arr_offset, 0)
+		p2 += Vector2(-arr_size + arr_offset, -arr_size)
+		p3 += Vector2(-arr_size + arr_offset, arr_size)
 		
 	var arr_pts = PackedVector2Array([p1, p2, p3])
-	draw_colored_polygon(arr_pts, Color(1, 1, 1, 0.8))
+	
+	# Arrow shadow
+	var arr_shadow = PackedVector2Array([p1 + Vector2(0, 2), p2 + Vector2(0, 2), p3 + Vector2(0, 2)])
+	draw_colored_polygon(arr_shadow, Color(0, 0, 0, 0.2))
+	
+	# Arrow body
+	draw_colored_polygon(arr_pts, Color.WHITE)
 
 func _setup_capacity_badge() -> void:
 	_badge_node = Node2D.new()
 	_badge_node.name = "CapacityBadge"
-	_badge_node.position = Vector2(0, CELL_SIZE * 0.6)
+	_badge_node.position = Vector2(0, CELL_SIZE * 0.7)
 	_badge_node.visible = false
+	_badge_node.z_index = 10 # Keep above overlapping cars
 
 	var badge_draw := Node2D.new()
 	badge_draw.draw.connect(func():

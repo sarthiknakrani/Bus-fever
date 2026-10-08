@@ -1,14 +1,11 @@
 extends Node2D
 class_name ParkingSlotView
 
-## Visual representation of a single parking bay.
-## Communicates EMPTY, RESERVED, and OCCUPIED states with clear color coding.
-
 var slot_id: int = 0
 var slot_state: int = CarJamParkingManager.SlotState.EMPTY
 
-const SLOT_WIDTH: float = 64.0
-const SLOT_HEIGHT: float = 88.0
+const SLOT_WIDTH: float = 72.0
+const SLOT_HEIGHT: float = 120.0
 
 func setup(id: int) -> void:
 	slot_id = id
@@ -20,48 +17,56 @@ func set_state(p_state: int) -> void:
 	queue_redraw()
 
 func _draw() -> void:
-	var bg_col := Color("141c28", 0.0) # Transparent background
-	var border_col := Color("9ca3af")
-	var width := 2.0
+	var is_vip = (slot_id == 0)
+	var is_locked = (slot_id >= 4)
 	
-	if slot_id == 0:
-		border_col = Color("fbbf24") # VIP Yellow
-	elif slot_id >= 4:
-		border_col = Color("4ade80") # Locked Green
+	var rect = Rect2(-SLOT_WIDTH/2.0, -SLOT_HEIGHT/2.0, SLOT_WIDTH, SLOT_HEIGHT)
+	
+	# Draw Asphalt Base
+	var asphalt = StyleBoxFlat.new()
+	asphalt.bg_color = Color("475569") # Slate grey asphalt
+	asphalt.set_corner_radius_all(12)
+	draw_style_box(asphalt, rect)
 
-	match slot_state:
-		CarJamParkingManager.SlotState.RESERVED:
-			border_col = Color("38bdf8") # Blue glow
-			width = 3.0
-		CarJamParkingManager.SlotState.OCCUPIED:
-			border_col = Color("ffffff")
-			width = 3.0
-		CarJamParkingManager.SlotState.RELEASING:
-			border_col = Color("f59e0b")
-			width = 3.0
+	# Draw border lines
+	var border_color = Color.WHITE
+	if is_vip:
+		border_color = Color("fbbf24") # VIP Yellow
+	elif is_locked:
+		border_color = Color(1, 1, 1, 0.4) # Faded white for locked
 
-	var shear := 12.0
-	var p1 = Vector2(-SLOT_WIDTH / 2.0 + shear, -SLOT_HEIGHT / 2.0)
-	var p2 = Vector2(SLOT_WIDTH / 2.0 + shear, -SLOT_HEIGHT / 2.0)
-	var p3 = Vector2(SLOT_WIDTH / 2.0 - shear, SLOT_HEIGHT / 2.0)
-	var p4 = Vector2(-SLOT_WIDTH / 2.0 - shear, SLOT_HEIGHT / 2.0)
+	if is_locked:
+		# Fake dashed line by drawing multiple small lines or a faded box
+		var dashed_box = StyleBoxFlat.new()
+		dashed_box.bg_color = Color.TRANSPARENT
+		dashed_box.border_color = border_color
+		dashed_box.border_width_left = 3
+		dashed_box.border_width_right = 3
+		dashed_box.border_width_top = 3
+		dashed_box.border_width_bottom = 3
+		dashed_box.set_corner_radius_all(12)
+		draw_style_box(dashed_box, rect.grow(-4))
+	else:
+		var solid_box = StyleBoxFlat.new()
+		solid_box.bg_color = Color.TRANSPARENT
+		solid_box.border_color = border_color
+		solid_box.border_width_left = 4
+		solid_box.border_width_right = 4
+		solid_box.border_width_top = 4
+		solid_box.border_width_bottom = 4
+		solid_box.set_corner_radius_all(12)
+		draw_style_box(solid_box, rect.grow(-4))
 
-	var pts = PackedVector2Array([p1, p2, p3, p4, p1])
+	# Icons
+	if is_vip and slot_state == CarJamParkingManager.SlotState.EMPTY:
+		# Draw Crown/VIP text
+		draw_string(ThemeDB.fallback_font, Vector2(-16, 12), "VIP", HORIZONTAL_ALIGNMENT_CENTER, -1, 22, border_color)
+		# Crown poly
+		var crown_c = Vector2(0, -12)
+		draw_colored_polygon(PackedVector2Array([crown_c+Vector2(-12,-6), crown_c+Vector2(-6,2), crown_c+Vector2(0,-10), crown_c+Vector2(6,2), crown_c+Vector2(12,-6), crown_c+Vector2(8,6), crown_c+Vector2(-8,6)]), border_color)
 	
-	# Bay floor (optional, but reference is mostly transparent outline)
-	draw_colored_polygon(pts, Color(0,0,0,0.1))
-	
-	# Outline
-	draw_polyline(pts, border_col, width, true)
-	
-	# VIP or Plus Text
-	if slot_id == 0 and slot_state == CarJamParkingManager.SlotState.EMPTY:
-		# VIP text rotated inside
-		var tr = Transform2D()
-		tr = tr.rotated(deg_to_rad(-15))
-		tr.origin = Vector2(5, 5)
-		draw_set_transform_matrix(tr)
-		draw_string(ThemeDB.fallback_font, Vector2(-12, 5), "VIP", HORIZONTAL_ALIGNMENT_CENTER, -1, 16, Color("fbbf24"))
-		draw_set_transform_matrix(Transform2D())
-	elif slot_id >= 4 and slot_state == CarJamParkingManager.SlotState.EMPTY:
-		draw_string(ThemeDB.fallback_font, Vector2(-6, 5), "+", HORIZONTAL_ALIGNMENT_CENTER, -1, 24, Color("4ade80"))
+	if is_locked and slot_state == CarJamParkingManager.SlotState.EMPTY:
+		# Lock Icon
+		var lock_c = border_color
+		draw_rect(Rect2(-8, 0, 16, 12), lock_c, true)
+		draw_polyline(PackedVector2Array([Vector2(-4, 0), Vector2(-4, -6), Vector2(4, -6), Vector2(4, 0)]), lock_c, 3.0, true)

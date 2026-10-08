@@ -240,21 +240,27 @@ func _setup_visuals(lvl: CarJamLevelData) -> void:
 	board_bg.setup(lvl.board_size)
 
 	# 2. Parking Slots (Exactly 4 slots)
-	var slot_spacing := 72.0
+	var slot_spacing := 84.0
 	var total_span: float = float(lvl.parking_slots_count - 1) * slot_spacing
 	
-	# Draw a slanted grey background behind all slots
-	var bg = Polygon2D.new()
-	bg.color = Color("8c92a1") # Light grey like the reference
-	var bg_shear = 20.0
-	var bg_w = total_span + 100.0
-	var bg_h = 110.0
-	var p1 = Vector2(-bg_w/2 + bg_shear, -bg_h/2)
-	var p2 = Vector2(bg_w/2 + bg_shear, -bg_h/2)
-	var p3 = Vector2(bg_w/2 - bg_shear, bg_h/2)
-	var p4 = Vector2(-bg_w/2 - bg_shear, bg_h/2)
-	bg.polygon = PackedVector2Array([p1, p2, p3, p4])
-	parking_slots_node.add_child(bg)
+	# Draw a thick rounded asphalt background for parking
+	var parking_bg = Node2D.new()
+	parking_bg.name = "ParkingBase"
+	parking_bg.z_index = -1
+	
+	var bg_w = total_span + 40.0
+	var bg_h = 130.0
+	
+	parking_bg.draw.connect(func():
+		var style = StyleBoxFlat.new()
+		style.bg_color = Color("94a3b8") # Light grey concrete surrounding
+		style.set_corner_radius_all(16)
+		style.shadow_color = Color(0,0,0,0.2)
+		style.shadow_size = 10
+		style.shadow_offset = Vector2(0, 8)
+		style.draw(parking_bg.get_canvas_item(), Rect2(-bg_w/2.0 - 6, -bg_h/2.0 - 6, bg_w + 12, bg_h + 12))
+	)
+	parking_slots_node.add_child(parking_bg)
 
 	for i in lvl.parking_slots_count:
 		var slot_view := ParkingSlotView.new()
@@ -299,14 +305,34 @@ func _init_passenger_track() -> void:
 	passenger_track = Path2D.new()
 	var curve = Curve2D.new()
 	# Create a large wide curved track across the top
-	var rx = 300.0
-	var ry = 100.0
+	var rx = 270.0
+	var ry = 90.0
 	var pts = 40
 	# An open curve or wide oval
 	for i in range(pts + 1):
 		var t = float(i) / pts * PI * 2.0
 		curve.add_point(Vector2(cos(t)*rx, sin(t)*ry))
 	passenger_track.curve = curve
+	
+	# Draw the beautiful track pathway
+	var track_bg = Node2D.new()
+	track_bg.z_index = -1
+	track_bg.draw.connect(func():
+		var ci = track_bg.get_canvas_item()
+		var baked_pts = curve.get_baked_points()
+		# Draw shadow
+		var shadow_pts = Array(baked_pts).map(func(p): return p + Vector2(0, 8))
+		track_bg.draw_polyline(PackedVector2Array(shadow_pts), Color(0,0,0,0.15), 50.0, true)
+		# Draw concrete base
+		track_bg.draw_polyline(baked_pts, Color("cbd5e1"), 50.0, true)
+		# Draw path center
+		track_bg.draw_polyline(baked_pts, Color("f8fafc"), 40.0, true)
+		# Draw inner/outer fence lines
+		track_bg.draw_polyline(baked_pts, Color("94a3b8"), 52.0, true)
+		track_bg.draw_polyline(baked_pts, Color("cbd5e1"), 48.0, true)
+	)
+	passenger_track.add_child(track_bg)
+	
 	passenger_visuals.add_child(passenger_track)
 	track_time = curve.get_baked_length() * 0.25
 
