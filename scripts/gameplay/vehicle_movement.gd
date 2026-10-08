@@ -13,14 +13,11 @@ static func animate_dispatch(
 	controller: Node,
 	vehicle_id: int,
 	slot_id: int,
+	target_scale: Vector2,
 	duration_mult: float = 1.0
 ) -> void:
 	if vehicle_node == null or not is_instance_valid(vehicle_node):
 		return
-		
-	var target_scale = Vector2(0.65, 0.65)
-	if vehicle_node.vehicle_capacity > 4:
-		target_scale = Vector2(0.5, 0.5)
 
 	var tw := vehicle_node.create_tween()
 	tw.set_parallel(true)

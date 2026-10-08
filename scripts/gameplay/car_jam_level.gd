@@ -489,6 +489,19 @@ func _on_vehicle_dispatch_started(vehicle_id: int, slot_id: int, corridor: Array
 	# Convert to world_root space (which is transit_layer's space)
 	var exit_pos = board_root.transform * exit_local
 
+	# Dynamically calculate the parking scale to perfectly fit the slot bounds
+	var max_w = 88.0
+	var max_h = 180.0
+	var cells_w: float = float(vv.vehicle_footprint.size()) if vv.vehicle_dir == CarJamVehicleData.Direction.RIGHT or vv.vehicle_dir == CarJamVehicleData.Direction.LEFT else 1.0
+	var cells_h: float = float(vv.vehicle_footprint.size()) if vv.vehicle_dir == CarJamVehicleData.Direction.UP or vv.vehicle_dir == CarJamVehicleData.Direction.DOWN else 1.0
+	var pixel_w = cells_w * 78.0 - 10.0
+	var pixel_h = cells_h * 78.0 - 10.0
+	
+	var scale_w = max_w / pixel_w
+	var scale_h = max_h / pixel_h
+	var final_scale = clampf(min(scale_w, scale_h), 0.35, 0.9)
+	var final_scale_vec = Vector2(final_scale, final_scale)
+
 	VehicleMovement.animate_dispatch(
 		vv,
 		vv.position,
@@ -497,7 +510,8 @@ func _on_vehicle_dispatch_started(vehicle_id: int, slot_id: int, corridor: Array
 		controller.session_token,
 		controller,
 		vehicle_id,
-		slot_id
+		slot_id,
+		final_scale_vec
 	)
 
 func _on_vehicle_parked(vehicle_id: int, slot_id: int) -> void:
@@ -1006,12 +1020,19 @@ func _update_layout() -> void:
 	var board_pixel_h = board_pixel_w * 0.6
 	
 	# 2. Determine required margins and total logical dimensions
-	# We need extra width for buses to exit the board cleanly.
-	# A 3-cell bus takes ~234 pixels. We add 300 padding on each side.
-	var required_w = max(640.0, board_pixel_w + 200.0)
 	# Safe areas on screen (top header, bottom boosters)
 	var screen_safe_h = vp_size.y - 450.0 # leave 150 top, 300 bottom
 	var screen_safe_w = vp_size.x * 0.95
+
+	# Ensure we fit the parking strip which might be wider than the board
+	var slot_spacing = 94.0 # MATCHES what we set earlier
+	var parking_w = float(max(1, controller.level_data.parking_slots_count - 1)) * slot_spacing + 40.0
+	
+	# We need some extra width for buses to exit the board cleanly without clipping
+	var board_padded_w = board_pixel_w + 120.0 
+	
+	var required_w = maxf(parking_w, board_padded_w)
+	required_w = maxf(required_w, 600.0) # minimum width to ensure UI fits
 	
 	# Stack vertically with comfortable gaps
 	var scale_w = screen_safe_w / required_w
