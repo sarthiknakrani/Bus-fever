@@ -31,10 +31,27 @@ static func animate_dispatch(
 	
 	# Rotation sequence
 	var drive_dir = (slot_pos - exit_pos).angle()
-	var cur_dir = vehicle_node.vehicle_dir
-	var rot_target = 0.0 # Always preserve the original rotation (0.0 local to VehicleView)
-
 	
+	# The user wants ALL parked buses to use the exact same vertical parking convention.
+	# Let's orient them all to point DOWN (towards the passenger boarding area).
+	var rot_target = 0.0 
+	match vehicle_node.vehicle_dir:
+		CarJamVehicleData.Direction.DOWN:
+			rot_target = 0.0
+		CarJamVehicleData.Direction.UP:
+			rot_target = PI
+		CarJamVehicleData.Direction.LEFT:
+			rot_target = -PI/2.0
+		CarJamVehicleData.Direction.RIGHT:
+			rot_target = PI/2.0
+		
+	# Ensure smooth rotation by taking the shortest path
+	if abs(drive_dir - rot_target) > PI:
+		if drive_dir > rot_target:
+			rot_target += TAU
+		else:
+			rot_target -= TAU
+
 	tw.tween_property(vehicle_node, "rotation", drive_dir, 0.45).set_delay(0.65).set_trans(Tween.TRANS_SINE)
 	tw.tween_property(vehicle_node, "rotation", rot_target, 0.45).set_delay(0.65 + 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	

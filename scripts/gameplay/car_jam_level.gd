@@ -497,8 +497,16 @@ func _on_vehicle_dispatch_started(vehicle_id: int, slot_id: int, corridor: Array
 	var pixel_w = cells_w * 78.0 - 10.0
 	var pixel_h = cells_h * 78.0 - 10.0
 	
-	var scale_w = max_w / pixel_w
-	var scale_h = max_h / pixel_h
+	# WIDE buses (LEFT/RIGHT) will be rotated 90 degrees in parking!
+	# So their visual width becomes pixel_h and visual height becomes pixel_w
+	var parked_pixel_w = pixel_w
+	var parked_pixel_h = pixel_h
+	if vv.vehicle_dir == CarJamVehicleData.Direction.LEFT or vv.vehicle_dir == CarJamVehicleData.Direction.RIGHT:
+		parked_pixel_w = pixel_h
+		parked_pixel_h = pixel_w
+		
+	var scale_w = max_w / parked_pixel_w
+	var scale_h = max_h / parked_pixel_h
 	var final_scale = clampf(min(scale_w, scale_h), 0.35, 0.9)
 	var final_scale_vec = Vector2(final_scale, final_scale)
 
