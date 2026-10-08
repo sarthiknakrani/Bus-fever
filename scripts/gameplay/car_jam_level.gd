@@ -329,7 +329,7 @@ func _setup_visuals(lvl: CarJamLevelData) -> void:
 	parking_bg.z_index = -1
 	
 	var bg_w = total_span + 40.0
-	var bg_h = 130.0
+	var bg_h = 200.0
 	
 	parking_bg.draw.connect(func():
 		var style = StyleBoxFlat.new()
@@ -995,38 +995,53 @@ func _update_layout() -> void:
 	if vp_size.x <= 0 or vp_size.y <= 0:
 		return
 
-	# Calculate scale to fit the board comfortably with some padding
-	var board_pixel_width = 7 * 78.0 # 546.0
+	# 1. Determine local bounding sizes
+	var track_h = 180.0
+	var parking_h = 200.0
+	var board_cells_w = float(controller.level_data.board_size.x)
+	var board_cells_h = float(controller.level_data.board_size.y)
+	var board_local_size = max(board_cells_w, board_cells_h) * CELL_SIZE
+	# Rotated 45 deg, scale (1.0, 0.6)
+	var board_pixel_w = board_local_size * sqrt(2.0)
+	var board_pixel_h = board_pixel_w * 0.6
 	
+	# 2. Determine required margins and total logical dimensions
+	# We need extra width for buses to exit the board cleanly.
+	# A 3-cell bus takes ~234 pixels. We add 300 padding on each side.
+	var required_w = max(640.0, board_pixel_w + 600.0)
 	
-	# Scale to fit standard portrait width while leaving margin for bus exits
-	var scale_factor = clampf(vp_size.x / 900.0, 0.35, 2.0)
+	# Stack vertically with comfortable gaps
+	var gap = 60.0
+	var total_content_h = track_h + gap + parking_h + gap + board_pixel_h
 	
-	# Keep world centered at (0,0) which is where the Camera2D looks
+	# Safe areas on screen (top header, bottom boosters)
+	var screen_safe_h = vp_size.y - 450.0 # leave 150 top, 300 bottom
+	var screen_safe_w = vp_size.x * 0.95
+	
+	# 3. Calculate coherent scale factor to fit BOTH width and height
+	var scale_w = screen_safe_w / required_w
+	var scale_h = screen_safe_h / total_content_h
+	var scale_factor = min(scale_w, scale_h)
+	
+	# Prevent it from becoming microscopic or gigantic
+	scale_factor = clampf(scale_factor, 0.4, 2.0)
+	
+	# Apply scale to world root
 	world_root.scale = Vector2(scale_factor, scale_factor)
 	world_root.position = Vector2.ZERO
-
-	# Calculate half height of the screen in world coordinates
+	
+	# 4. Center the stacked layout around the middle of the safe area
 	var half_h = (vp_size.y / 2.0) / scale_factor
-
-	# Distribute elements dynamically so they look balanced on both standard and extremely tall screens.
-	# We'll map them from upper section to lower middle section.
-	# Safe area at the bottom for boosters (approx 300 world pixels).
-	var safe_bottom = half_h - 300.0
-	# Safe area at top for UI (approx 200 world pixels).
-	var safe_top = -half_h + 200.0
+	var top_y = -half_h + (150.0 / scale_factor) # Start drawing below the header
 	
-	var total_span = safe_bottom - safe_top
+	# Or dynamically center the content block vertically in the available space:
+	var available_local_h = (screen_safe_h / scale_factor)
+	var start_y = top_y + (available_local_h - total_content_h) / 2.0 + (track_h / 2.0)
 	
-	# Place passenger track at ~15% down from safe top
-	var track_y = safe_top + (total_span * 0.15)
+	var track_y = start_y
+	var parking_y = track_y + (track_h / 2.0) + gap + (parking_h / 2.0)
+	var board_y = parking_y + (parking_h / 2.0) + gap + (board_pixel_h / 2.0)
 	
-	# Place parking at ~45% down
-	var parking_y = safe_top + (total_span * 0.45)
-	
-	# Place board at ~75% down
-	var board_y = safe_top + (total_span * 0.75)
-
 	# Passenger track prominent in upper section
 	if passenger_track_root != null:
 		passenger_track_root.position = Vector2(0, track_y)

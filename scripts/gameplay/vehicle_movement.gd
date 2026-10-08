@@ -35,11 +35,8 @@ static func animate_dispatch(
 	# Rotation sequence
 	var drive_dir = (slot_pos - exit_pos).angle()
 	var cur_dir = vehicle_node.vehicle_dir
-	var rot_target = 0.0
-	if cur_dir == CarJamVehicleData.Direction.UP: rot_target = PI/2.0
-	elif cur_dir == CarJamVehicleData.Direction.DOWN: rot_target = -PI/2.0
-	elif cur_dir == CarJamVehicleData.Direction.LEFT: rot_target = 0.0
-	elif cur_dir == CarJamVehicleData.Direction.RIGHT: rot_target = 0.0
+	var rot_target = 0.0 # Always preserve the original rotation (0.0 local to VehicleView)
+
 	
 	tw.tween_property(vehicle_node, "rotation", drive_dir, 0.45).set_delay(0.65).set_trans(Tween.TRANS_SINE)
 	tw.tween_property(vehicle_node, "rotation", rot_target, 0.45).set_delay(0.65 + 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
