@@ -26,11 +26,7 @@ func _create_sprite(parent: Node, name: String, tex_name: String, pos: Vector2 =
     return s
 
 func _setup_plaza() -> void:
-    # 1. Base Paving
-    var floor = _create_sprite(self, "PlazaFloor", "plaza_floor_texture.png", Vector2.ZERO, 0)
-    
-    # 2. Border Stones
-    var border = _create_sprite(self, "PlazaBorder", "plaza_border_stones.png", Vector2.ZERO, 1)
+    # Floor and border replaced by the integrated artwork.
     
     # 3. Landscaping (Tasteful curved grass patches)
     _create_sprite(self, "FlowerBedTop", "flower_bed_top.png", Vector2(0, -55), 2)
