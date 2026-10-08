@@ -149,38 +149,48 @@ func on_vehicle_departed_from_slot(vehicle_id: int, slot_id: int, token: int) ->
 
 
 # -----------------------------------------------------------------
+
+# -----------------------------------------------------------------
 # NEW INDIVIDUAL BOARDING LOGIC
 # -----------------------------------------------------------------
 var pending_boarders: Dictionary = {} # vehicle_id -> int
 
-func mark_pending_boarding(vehicle_id: int) -> void:
-	pending_boarders[vehicle_id] = pending_boarders.get(vehicle_id, 0) + 1
+func try_reserve_boarding(vehicle_id: int, color_id: String) -> bool:
+	if state != GameState.PLAYING: return false
+	var v = vehicles.get(vehicle_id, null)
+	if v == null or v.state != VehicleModel.VehicleState.PARKED or v.color_id != color_id: return false
+	var pending = pending_boarders.get(vehicle_id, 0)
+	if v.passenger_occupancy + pending < v.capacity:
+		pending_boarders[vehicle_id] = pending + 1
+		return true
+	return false
 
-func execute_individual_boarding(vehicle_id: int, color_id: String) -> void:
+func commit_boarding(vehicle_id: int, color_id: String, token: int) -> void:
+	if token != session_token: return
 	if state != GameState.PLAYING: return
 	
 	var v = vehicles.get(vehicle_id, null)
-	if v != null:
-		v.board(1)
-		if pending_boarders.has(vehicle_id) and pending_boarders[vehicle_id] > 0:
-			pending_boarders[vehicle_id] -= 1
+	if v == null: return
+	
+	if pending_boarders.has(vehicle_id) and pending_boarders[vehicle_id] > 0:
+		pending_boarders[vehicle_id] -= 1
+		
+	v.board(1)
+	
+	var all_groups = queue.get_all_groups()
+	for g in all_groups:
+		if g.color_id == color_id and g.remaining_count > 0:
+			g.board(1)
+			break
 			
-		var was_filled = v.is_full()
-		if was_filled:
-			v.state = VehicleModel.VehicleState.FULL
-			vehicle_filled.emit(v.id, parking.get_vehicle_slot(v.id))
-			
-		# Reduce the color count in the queue logically
-		# Since it's no longer order-dependent, just find the first group with this color and decrement it
-		var all_groups = queue.get_all_groups()
-		for g in all_groups:
-			if g.color_id == color_id and g.remaining_count > 0:
-				g.board(1)
-				break
-				
-		boarding_started.emit(vehicle_id, color_id, 1, parking.get_vehicle_slot(v.id))
-		_check_terminal_states()
-
+	var slot_id = parking.get_slot_for_vehicle(v.id)
+	boarding_started.emit(vehicle_id, color_id, 1, slot_id)
+	
+	if v.is_full():
+		v.state = VehicleModel.VehicleState.FULL
+		vehicle_filled.emit(v.id, slot_id)
+		
+	_check_terminal_states()
 
 func _process_boarding_cycle(token: int) -> void:
 	if token != session_token:
