@@ -1,47 +1,62 @@
 extends Node2D
 class_name PassengerView
 
-## Chibi 2D Passenger Visual Node.
-## Renders stylized casual character with hoodie, jeans, sneakers, anime eyes, and cap.
-
-var color_id: String = "blue"
-var passenger_color: Color = Color("3b82f6")
+var _color_id: String = "red"
+var _color: Color = Color.RED
+var _visual_node: Node2D
+var _sprite_body: Sprite2D
+var _sprite_head: Sprite2D
 
 func setup(p_col_id: String) -> void:
-	color_id = p_col_id
-	passenger_color = CarJamVehicleData.color_to_rgb(p_col_id)
-	queue_redraw()
+	_color_id = p_col_id
+	_color = CarJamVehicleData.color_to_rgb(p_col_id)
+	
+	_visual_node = Node2D.new()
+	add_child(_visual_node)
+	
+	# Modular production sprites
+	var tex_head = _load_interim_sprite("res://assets/sprites/interim/passenger_head.png")
+	var tex_body = _load_interim_sprite("res://assets/sprites/interim/passenger_body.png")
+	var tex_shadow = _load_interim_sprite("res://assets/sprites/interim/passenger_head.png") # reusing round shape
+	
+	# Shadow
+	var s_shadow = Sprite2D.new()
+	s_shadow.texture = tex_shadow
+	s_shadow.modulate = Color(0,0,0,0.3)
+	s_shadow.scale = Vector2(0.6, 0.2)
+	s_shadow.position = Vector2(0, 16)
+	_visual_node.add_child(s_shadow)
+	
+	# Body
+	_sprite_body = Sprite2D.new()
+	_sprite_body.texture = tex_body
+	_sprite_body.modulate = _color
+	_sprite_body.scale = Vector2(0.4, 0.4)
+	_sprite_body.position = Vector2(0, 0)
+	_visual_node.add_child(_sprite_body)
+	
+	# Head
+	_sprite_head = Sprite2D.new()
+	_sprite_head.texture = tex_head
+	_sprite_head.modulate = _color.lightened(0.2) # Optional skin tone or just matched color
+	_sprite_head.scale = Vector2(0.4, 0.4)
+	_sprite_head.position = Vector2(0, -18)
+	_visual_node.add_child(_sprite_head)
 
-func _draw() -> void:
-	# 1. Ground shadow
-	draw_ellipse(Vector2(0, 13), 9.0, 3.5, Color(0, 0, 0, 0.28))
+func animate_jump(delay: float) -> void:
+	if not is_inside_tree(): return
+	var tw = create_tween()
+	tw.tween_interval(delay)
+	var orig_y = _visual_node.position.y
+	tw.tween_property(_visual_node, "position:y", orig_y - 12.0, 0.15).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(_visual_node, "position:y", orig_y, 0.15).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 
-	# 2. Sneakers
-	draw_circle(Vector2(-4, 11), 3.0, Color.WHITE)
-	draw_circle(Vector2(4, 11), 3.0, Color.WHITE)
-
-	# 3. Denim Pants
-	draw_rect(Rect2(-5, 4, 10, 7), Color("1e293b"), true)
-
-	# 4. Color Hoodie / Torso
-	draw_rect(Rect2(-7, -4, 14, 9), passenger_color, true, -1, true)
-	draw_circle(Vector2(0, -4), 2.8, Color.WHITE) # Collar
-
-	# 5. Head (Skin tone)
-	var skin_col := Color("fed7aa")
-	draw_circle(Vector2(0, -11), 8.5, skin_col)
-
-	# 6. Anime Eyes & Specular Highlights
-	draw_circle(Vector2(-3, -11), 1.5, Color("0f172a"))
-	draw_circle(Vector2(3, -11), 1.5, Color("0f172a"))
-	draw_circle(Vector2(-2.5, -11.5), 0.5, Color.WHITE)
-	draw_circle(Vector2(3.5, -11.5), 0.5, Color.WHITE)
-
-	# Blush
-	draw_circle(Vector2(-5, -8.5), 1.8, Color("fb7185"))
-	draw_circle(Vector2(5, -8.5), 1.8, Color("fb7185"))
-
-	# 7. Cap with Visor Brim
-	var cap_col := passenger_color.darkened(0.20)
-	draw_arc(Vector2(0, -11), 8.5, PI, 0.0, 16, cap_col, 3.5)
-	draw_rect(Rect2(-6, -13, 12, 2.5), cap_col.darkened(0.15), true)
+func _load_interim_sprite(path: String) -> Texture2D:
+	if ResourceLoader.exists(path):
+		return load(path)
+	# Fallback to direct image load if not imported
+	var img = Image.new()
+	var err = img.load(path)
+	if err == OK:
+		return ImageTexture.create_from_image(img)
+	return null

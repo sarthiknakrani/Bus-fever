@@ -17,6 +17,14 @@ var _badge_node: Node2D
 var _badge_label: Label
 var _touch_area: Area2D
 
+# Sprite nodes for modular art replacement
+var _shadow_sprite: NinePatchRect
+var _base_sprite: NinePatchRect
+var _roof_sprite: NinePatchRect
+var _glass_sprite: NinePatchRect
+var _arrow_sprite: Sprite2D
+var _wheels: Array[Sprite2D] = []
+
 func setup(p_id: int, p_code: String, p_col_id: String, p_dir: int, p_cap: int, p_footprint: Array[Vector2i] = [Vector2i.ZERO]) -> void:
 	vehicle_id = p_id
 	vehicle_code = p_code
@@ -27,7 +35,8 @@ func setup(p_id: int, p_code: String, p_col_id: String, p_dir: int, p_cap: int, 
 	passenger_occupancy = 0
 	is_in_parking = false
 	name = "Vehicle_%s" % p_code
-	queue_redraw()
+	
+	_build_visuals()
 
 func _ready() -> void:
 	_setup_touch_area()
@@ -39,15 +48,94 @@ func set_occupancy(occ: int) -> void:
 	if _badge_label != null:
 		var rem := maxi(0, vehicle_capacity - passenger_occupancy)
 		_badge_label.text = str(rem)
-	queue_redraw()
 
 func set_parking_mode(in_parking: bool) -> void:
 	is_in_parking = in_parking
 	if _badge_node != null:
 		_badge_node.visible = in_parking
-	queue_redraw()
+
+func _build_visuals() -> void:
+	var cells_w: float = float(vehicle_footprint.size()) if vehicle_dir == CarJamVehicleData.Direction.RIGHT or vehicle_dir == CarJamVehicleData.Direction.LEFT else 1.0
+	var cells_h: float = float(vehicle_footprint.size()) if vehicle_dir == CarJamVehicleData.Direction.UP or vehicle_dir == CarJamVehicleData.Direction.DOWN else 1.0
+
+	var pixel_w = cells_w * CELL_SIZE - 10.0
+	var pixel_h = cells_h * CELL_SIZE - 10.0
+	
+	var tex_body = _load_interim_sprite("res://assets/sprites/interim/bus_body.png")
+	var tex_roof = _load_interim_sprite("res://assets/sprites/interim/bus_roof.png")
+	var tex_glass = _load_interim_sprite("res://assets/sprites/interim/bus_window.png")
+	var tex_wheel = _load_interim_sprite("res://assets/sprites/interim/bus_wheel.png")
+	var tex_arrow = _load_interim_sprite("res://assets/sprites/interim/arrow.png")
+	
+	# Clear existing
+	for c in get_children():
+		if c is NinePatchRect or c is Sprite2D:
+			c.queue_free()
+	_wheels.clear()
+	
+	var create_np = func(tex, color, w, h, y_off):
+		var np = NinePatchRect.new()
+		if tex: np.texture = tex
+		np.modulate = color
+		np.patch_margin_left = 24
+		np.patch_margin_right = 24
+		np.patch_margin_top = 24
+		np.patch_margin_bottom = 24
+		np.size = Vector2(w, h)
+		np.position = Vector2(-w/2.0, -h/2.0 + y_off)
+		add_child(np)
+		return np
+
+	# 1. Shadow
+	_shadow_sprite = create_np.call(tex_body, Color(0,0,0,0.3), pixel_w, pixel_h, 8)
+	
+	# 2. Wheels
+	var wheel_w = 12.0
+	var wheel_h = 24.0
+	var wx = pixel_w/2.0 - 4
+	var wy = pixel_h/2.0 - 20
+	
+	var w_pts = []
+	if cells_h > cells_w: # Vertical
+		w_pts = [Vector2(-wx, -wy), Vector2(wx, -wy), Vector2(-wx, wy), Vector2(wx, wy)]
+	else:
+		w_pts = [Vector2(-wy, -wx), Vector2(wy, -wx), Vector2(-wy, wx), Vector2(wy, wx)]
+		
+	for p in w_pts:
+		var s = Sprite2D.new()
+		if tex_wheel: s.texture = tex_wheel
+		s.position = p
+		if cells_w > cells_h: s.rotation = PI/2.0
+		s.scale = Vector2(wheel_w / 32.0, wheel_h / 64.0)
+		add_child(s)
+		_wheels.append(s)
+		
+	# 3. Base Body
+	_base_sprite = create_np.call(tex_body, vehicle_color.darkened(0.2), pixel_w, pixel_h, 0)
+	
+	# 4. Glass
+	_glass_sprite = create_np.call(tex_glass, Color.WHITE, pixel_w - 8, pixel_h - 8, 0)
+	_glass_sprite.patch_margin_left = 8
+	_glass_sprite.patch_margin_top = 8
+	_glass_sprite.patch_margin_right = 8
+	_glass_sprite.patch_margin_bottom = 8
+	
+	# 5. Roof
+	_roof_sprite = create_np.call(tex_roof, vehicle_color, pixel_w - 16, pixel_h - 16, -6)
+	
+	# 6. Arrow
+	_arrow_sprite = Sprite2D.new()
+	if tex_arrow: _arrow_sprite.texture = tex_arrow
+	_arrow_sprite.position = Vector2(0, -6)
+	_arrow_sprite.scale = Vector2(0.4, 0.4)
+	if vehicle_dir == CarJamVehicleData.Direction.UP: _arrow_sprite.rotation = 0
+	elif vehicle_dir == CarJamVehicleData.Direction.DOWN: _arrow_sprite.rotation = PI
+	elif vehicle_dir == CarJamVehicleData.Direction.LEFT: _arrow_sprite.rotation = -PI/2.0
+	elif vehicle_dir == CarJamVehicleData.Direction.RIGHT: _arrow_sprite.rotation = PI/2.0
+	add_child(_arrow_sprite)
 
 func _setup_touch_area() -> void:
+	if _touch_area != null: return
 	_touch_area = Area2D.new()
 	_touch_area.name = "TouchArea"
 	var col_shape := CollisionShape2D.new()
@@ -91,120 +179,13 @@ func play_badge_pulse() -> void:
 		tw.tween_property(_badge_node, "scale", Vector2(1.25, 1.25), 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		tw.tween_property(_badge_node, "scale", Vector2(1.0, 1.0), 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 
-func _draw() -> void:
-	var cells_w: float = float(vehicle_footprint.size()) if vehicle_dir == CarJamVehicleData.Direction.RIGHT or vehicle_dir == CarJamVehicleData.Direction.LEFT else 1.0
-	var cells_h: float = float(vehicle_footprint.size()) if vehicle_dir == CarJamVehicleData.Direction.UP or vehicle_dir == CarJamVehicleData.Direction.DOWN else 1.0
-
-	var pixel_w = cells_w * CELL_SIZE - 10.0
-	var pixel_h = cells_h * CELL_SIZE - 10.0
-	var rect = Rect2(-pixel_w/2.0, -pixel_h/2.0, pixel_w, pixel_h)
-	
-	# Premium 2D Art Layering
-	
-	# 1. Soft Ground Shadow
-	var shadow_rect = rect
-	shadow_rect.position.y += 6
-	var shadow_style = StyleBoxFlat.new()
-	shadow_style.bg_color = Color(0, 0, 0, 0.35)
-	shadow_style.set_corner_radius_all(16)
-	shadow_style.shadow_color = Color(0, 0, 0, 0.2)
-	shadow_style.shadow_size = 12
-	draw_style_box(shadow_style, shadow_rect)
-	
-	# 2. Wheels
-	var wheel_color = Color("1e293b")
-	var wheel_w = 6.0
-	var wheel_h = 16.0
-	var wheel_inset_x = pixel_w / 2.0 - 4
-	var wheel_inset_y = pixel_h / 2.0 - 18
-	
-	# Adjust wheels based on orientation so they are on the sides
-	if cells_h > cells_w: # Vertical bus
-		draw_rect(Rect2(-wheel_inset_x - wheel_w, -wheel_inset_y, wheel_w, wheel_h), wheel_color, true)
-		draw_rect(Rect2(wheel_inset_x, -wheel_inset_y, wheel_w, wheel_h), wheel_color, true)
-		draw_rect(Rect2(-wheel_inset_x - wheel_w, wheel_inset_y - wheel_h, wheel_w, wheel_h), wheel_color, true)
-		draw_rect(Rect2(wheel_inset_x, wheel_inset_y - wheel_h, wheel_w, wheel_h), wheel_color, true)
-	else: # Horizontal bus
-		draw_rect(Rect2(-wheel_inset_x, -wheel_inset_y - wheel_w, wheel_h, wheel_w), wheel_color, true)
-		draw_rect(Rect2(-wheel_inset_x, wheel_inset_y, wheel_h, wheel_w), wheel_color, true)
-		draw_rect(Rect2(wheel_inset_x - wheel_h, -wheel_inset_y - wheel_w, wheel_h, wheel_w), wheel_color, true)
-		draw_rect(Rect2(wheel_inset_x - wheel_h, wheel_inset_y, wheel_h, wheel_w), wheel_color, true)
-
-	# 3. Side Body (Base)
-	var body_style = StyleBoxFlat.new()
-	body_style.bg_color = vehicle_color.darkened(0.2)
-	body_style.set_corner_radius_all(16)
-	body_style.border_width_bottom = 8
-	body_style.border_color = vehicle_color.darkened(0.35)
-	draw_style_box(body_style, rect)
-	
-	# 4. Windshields and Windows (Dark Glass)
-	var glass_style = StyleBoxFlat.new()
-	glass_style.bg_color = Color("0f172a") # Very dark blue/grey glass
-	glass_style.set_corner_radius_all(8)
-	var glass_rect = rect.grow(-4)
-	draw_style_box(glass_style, glass_rect)
-	
-	# 5. Roof Layer
-	var roof_rect = rect.grow(-10)
-	roof_rect.position.y -= 8 # 3D depth shift
-	var roof_style = StyleBoxFlat.new()
-	roof_style.bg_color = vehicle_color
-	roof_style.set_corner_radius_all(12)
-	
-	# Add glossy highlight to roof
-	roof_style.border_width_top = 4
-	roof_style.border_color = Color(1, 1, 1, 0.4)
-	roof_style.border_blend = true
-	draw_style_box(roof_style, roof_rect)
-	
-	# Roof details (AC unit / ridges)
-	var detail_rect = roof_rect.grow(-8)
-	var detail_style = StyleBoxFlat.new()
-	detail_style.bg_color = vehicle_color.lightened(0.15)
-	detail_style.set_corner_radius_all(6)
-	draw_style_box(detail_style, detail_rect)
-	
-	# 6. Directional Arrow
-	var center = roof_rect.get_center()
-	var arr_size = 14.0
-	var p1 = center
-	var p2 = center
-	var p3 = center
-	var arr_offset = 0.0
-	
-	if vehicle_dir == CarJamVehicleData.Direction.UP:
-		p1 += Vector2(0, -arr_size + arr_offset)
-		p2 += Vector2(-arr_size, arr_size + arr_offset)
-		p3 += Vector2(arr_size, arr_size + arr_offset)
-	elif vehicle_dir == CarJamVehicleData.Direction.DOWN:
-		p1 += Vector2(0, arr_size + arr_offset)
-		p2 += Vector2(-arr_size, -arr_size + arr_offset)
-		p3 += Vector2(arr_size, -arr_size + arr_offset)
-	elif vehicle_dir == CarJamVehicleData.Direction.LEFT:
-		p1 += Vector2(-arr_size + arr_offset, 0)
-		p2 += Vector2(arr_size + arr_offset, -arr_size)
-		p3 += Vector2(arr_size + arr_offset, arr_size)
-	elif vehicle_dir == CarJamVehicleData.Direction.RIGHT:
-		p1 += Vector2(arr_size + arr_offset, 0)
-		p2 += Vector2(-arr_size + arr_offset, -arr_size)
-		p3 += Vector2(-arr_size + arr_offset, arr_size)
-		
-	var arr_pts = PackedVector2Array([p1, p2, p3])
-	
-	# Arrow shadow
-	var arr_shadow = PackedVector2Array([p1 + Vector2(0, 2), p2 + Vector2(0, 2), p3 + Vector2(0, 2)])
-	draw_colored_polygon(arr_shadow, Color(0, 0, 0, 0.2))
-	
-	# Arrow body
-	draw_colored_polygon(arr_pts, Color.WHITE)
-
 func _setup_capacity_badge() -> void:
+	if _badge_node != null: return
 	_badge_node = Node2D.new()
 	_badge_node.name = "CapacityBadge"
 	_badge_node.position = Vector2(0, CELL_SIZE * 0.7)
 	_badge_node.visible = false
-	_badge_node.z_index = 10 # Keep above overlapping cars
+	_badge_node.z_index = 10 
 
 	var badge_draw := Node2D.new()
 	badge_draw.draw.connect(func():
@@ -218,11 +199,6 @@ func _setup_capacity_badge() -> void:
 		sb_shadow.set_corner_radius_all(14)
 		sb_shadow.draw(ci, Rect2(-bw/2.0, -bh/2.0 + 4, bw, bh))
 		
-		var sb_depth = StyleBoxFlat.new()
-		sb_depth.bg_color = vehicle_color.darkened(0.5)
-		sb_depth.set_corner_radius_all(14)
-		sb_depth.draw(ci, Rect2(-bw/2.0, -bh/2.0 + 2, bw, bh))
-
 		var sb_face = StyleBoxFlat.new()
 		sb_face.bg_color = vehicle_color
 		sb_face.set_corner_radius_all(14)
@@ -246,3 +222,13 @@ func _setup_capacity_badge() -> void:
 	_badge_node.add_child(_badge_label)
 
 	add_child(_badge_node)
+
+func _load_interim_sprite(path: String) -> Texture2D:
+	if ResourceLoader.exists(path):
+		return load(path)
+	# Fallback to direct image load if not imported
+	var img = Image.new()
+	var err = img.load(path)
+	if err == OK:
+		return ImageTexture.create_from_image(img)
+	return null

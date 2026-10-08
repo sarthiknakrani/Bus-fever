@@ -7,66 +7,95 @@ var slot_state: int = CarJamParkingManager.SlotState.EMPTY
 const SLOT_WIDTH: float = 72.0
 const SLOT_HEIGHT: float = 120.0
 
+var _bay_sprite: NinePatchRect
+var _vip_label: Label
+var _draw_node: Node2D
+
 func setup(id: int) -> void:
 	slot_id = id
 	name = "Slot_%d" % id
-	queue_redraw()
+	
+	_build_visuals()
 
 func set_state(p_state: int) -> void:
 	slot_state = p_state
-	queue_redraw()
+	_update_visual_state()
 
-func _draw() -> void:
+func _build_visuals() -> void:
+	var tex_bay = _load_interim_sprite("res://assets/sprites/interim/parking_bay.png")
+	
+	_bay_sprite = NinePatchRect.new()
+	if tex_bay: _bay_sprite.texture = tex_bay
+	_bay_sprite.modulate = Color("334155") # Dark Asphalt
+	_bay_sprite.patch_margin_left = 16
+	_bay_sprite.patch_margin_right = 16
+	_bay_sprite.patch_margin_top = 16
+	_bay_sprite.patch_margin_bottom = 16
+	_bay_sprite.size = Vector2(SLOT_WIDTH, SLOT_HEIGHT)
+	_bay_sprite.position = Vector2(-SLOT_WIDTH/2.0, -SLOT_HEIGHT/2.0)
+	add_child(_bay_sprite)
+	
+	_draw_node = Node2D.new()
+	add_child(_draw_node)
+	_draw_node.draw.connect(_on_draw_lines)
+	
+	_vip_label = Label.new()
+	_vip_label.text = "VIP"
+	_vip_label.add_theme_font_size_override("font_size", 22)
+	_vip_label.add_theme_color_override("font_color", Color("fbbf24"))
+	_vip_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_vip_label.position = Vector2(-36, 12)
+	_vip_label.size = Vector2(72, 30)
+	_vip_label.visible = false
+	add_child(_vip_label)
+
+	_update_visual_state()
+
+func _update_visual_state() -> void:
+	var is_vip = (slot_id == 0)
+	if slot_state == CarJamParkingManager.SlotState.EMPTY:
+		_vip_label.visible = is_vip
+	else:
+		_vip_label.visible = false
+	_draw_node.queue_redraw()
+
+func _on_draw_lines() -> void:
 	var is_vip = (slot_id == 0)
 	var is_locked = (slot_id >= 4)
-	
-	var rect = Rect2(-SLOT_WIDTH/2.0, -SLOT_HEIGHT/2.0, SLOT_WIDTH, SLOT_HEIGHT)
-	
-	# Draw Asphalt Base
-	var asphalt = StyleBoxFlat.new()
-	asphalt.bg_color = Color("475569") # Slate grey asphalt
-	asphalt.set_corner_radius_all(12)
-	draw_style_box(asphalt, rect)
-
-	# Draw border lines
 	var border_color = Color.WHITE
-	if is_vip:
-		border_color = Color("fbbf24") # VIP Yellow
-	elif is_locked:
-		border_color = Color(1, 1, 1, 0.4) # Faded white for locked
-
-	if is_locked:
-		# Fake dashed line by drawing multiple small lines or a faded box
-		var dashed_box = StyleBoxFlat.new()
-		dashed_box.bg_color = Color.TRANSPARENT
-		dashed_box.border_color = border_color
-		dashed_box.border_width_left = 3
-		dashed_box.border_width_right = 3
-		dashed_box.border_width_top = 3
-		dashed_box.border_width_bottom = 3
-		dashed_box.set_corner_radius_all(12)
-		draw_style_box(dashed_box, rect.grow(-4))
-	else:
-		var solid_box = StyleBoxFlat.new()
-		solid_box.bg_color = Color.TRANSPARENT
-		solid_box.border_color = border_color
-		solid_box.border_width_left = 4
-		solid_box.border_width_right = 4
-		solid_box.border_width_top = 4
-		solid_box.border_width_bottom = 4
-		solid_box.set_corner_radius_all(12)
-		draw_style_box(solid_box, rect.grow(-4))
-
-	# Icons
-	if is_vip and slot_state == CarJamParkingManager.SlotState.EMPTY:
-		# Draw Crown/VIP text
-		draw_string(ThemeDB.fallback_font, Vector2(-16, 12), "VIP", HORIZONTAL_ALIGNMENT_CENTER, -1, 22, border_color)
-		# Crown poly
-		var crown_c = Vector2(0, -12)
-		draw_colored_polygon(PackedVector2Array([crown_c+Vector2(-12,-6), crown_c+Vector2(-6,2), crown_c+Vector2(0,-10), crown_c+Vector2(6,2), crown_c+Vector2(12,-6), crown_c+Vector2(8,6), crown_c+Vector2(-8,6)]), border_color)
 	
-	if is_locked and slot_state == CarJamParkingManager.SlotState.EMPTY:
-		# Lock Icon
+	if is_vip:
+		border_color = Color("fbbf24")
+	elif is_locked:
+		border_color = Color(1, 1, 1, 0.4)
+		
+	var rect = Rect2(-SLOT_WIDTH/2.0 + 3, -SLOT_HEIGHT/2.0 + 3, SLOT_WIDTH - 6, SLOT_HEIGHT - 6)
+	
+	var sb = StyleBoxFlat.new()
+	sb.bg_color = Color.TRANSPARENT
+	sb.border_color = border_color
+	sb.border_width_left = 3
+	sb.border_width_right = 3
+	sb.border_width_top = 3
+	sb.border_width_bottom = 3
+	sb.set_corner_radius_all(12)
+	
+	if is_locked:
+		# Draw lock icon
 		var lock_c = border_color
-		draw_rect(Rect2(-8, 0, 16, 12), lock_c, true)
-		draw_polyline(PackedVector2Array([Vector2(-4, 0), Vector2(-4, -6), Vector2(4, -6), Vector2(4, 0)]), lock_c, 3.0, true)
+		_draw_node.draw_rect(Rect2(-8, 0, 16, 12), lock_c, true)
+		_draw_node.draw_polyline(PackedVector2Array([Vector2(-4, 0), Vector2(-4, -6), Vector2(4, -6), Vector2(4, 0)]), lock_c, 3.0, true)
+		# Fake dashed effect by drawing thick transparent over it?
+		# Or just stick to solid faded white as locked indicator
+		
+	sb.draw(_draw_node.get_canvas_item(), rect)
+
+func _load_interim_sprite(path: String) -> Texture2D:
+	if ResourceLoader.exists(path):
+		return load(path)
+	# Fallback to direct image load if not imported
+	var img = Image.new()
+	var err = img.load(path)
+	if err == OK:
+		return ImageTexture.create_from_image(img)
+	return null

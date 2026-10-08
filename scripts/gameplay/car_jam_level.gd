@@ -542,10 +542,12 @@ func _build_hud() -> void:
 
 	level_title_label = Label.new()
 	level_title_label.text = "Level 1"
-	level_title_label.add_theme_font_size_override("font_size", 32)
+	level_title_label.add_theme_font_size_override("font_size", 48)
 	level_title_label.add_theme_color_override("font_color", Color("ffffff"))
-	level_title_label.add_theme_color_override("font_outline_color", Color("000000"))
-	level_title_label.add_theme_constant_override("outline_size", 4)
+	level_title_label.add_theme_color_override("font_outline_color", Color("1e293b"))
+	level_title_label.add_theme_constant_override("outline_size", 8)
+	level_title_label.add_theme_color_override("font_shadow_color", Color(0,0,0,0.5))
+	level_title_label.add_theme_constant_override("shadow_offset_y", 4)
 	level_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	level_title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	level_title_label.anchor_left = 0.25
@@ -1039,3 +1041,13 @@ func _create_settings_icon_button(label_text: String, icon_text: String, is_on: 
 	vbox.add_child(lbl)
 	
 	return vbox
+
+func _load_interim_sprite(path: String) -> Texture2D:
+	if ResourceLoader.exists(path):
+		return load(path)
+	# Fallback to direct image load if not imported
+	var img = Image.new()
+	var err = img.load(path)
+	if err == OK:
+		return ImageTexture.create_from_image(img)
+	return null
