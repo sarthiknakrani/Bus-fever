@@ -26,9 +26,9 @@ static func animate_dispatch(
 		
 	var cur_dir = vehicle_node.vehicle_dir
 	var rot_target = 0.0
-	if cur_dir == 1: rot_target = -PI/2.0
-	elif cur_dir == 2: rot_target = PI
-	elif cur_dir == 3: rot_target = PI/2.0
+	if cur_dir == 1: rot_target = 0.0
+	elif cur_dir == 2: rot_target = PI/2.0
+	elif cur_dir == 3: rot_target = -PI/2.0
 
 	var tw := vehicle_node.create_tween().set_parallel(false)
 

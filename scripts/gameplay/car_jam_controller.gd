@@ -185,9 +185,14 @@ func _check_terminal_states() -> void:
 			var slot := parking.get_slot(i)
 			if slot != null and slot.vehicle_id != -1:
 				var v: VehicleModel = vehicles.get(slot.vehicle_id, null)
-				if v != null and v.color_id == head_color and v.remaining_capacity() > 0:
-					matching_parked = true
-					break
+				if v != null:
+					# If a vehicle is FULL, it is about to depart and free a slot. Not a softlock!
+					if v.state == VehicleModel.VehicleState.FULL:
+						matching_parked = true
+						break
+					if v.color_id == head_color and v.remaining_capacity() > 0:
+						matching_parked = true
+						break
 		if not matching_parked and not is_dispatching:
 			# True deadlock: all slots occupied, queue head blocked!
 			state = GameState.FAIL

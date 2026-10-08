@@ -1,4 +1,7 @@
-extends Node2D
+import re
+
+# 1. Update BoardView to draw Cartesian
+code_board = """extends Node2D
 class_name BoardView
 
 const CELL_SIZE: float = 78.0
@@ -28,3 +31,23 @@ func _draw() -> void:
 	for x in range(1, board_size.x):
 		var px = -total_w/2.0 + x * CELL_SIZE
 		draw_line(Vector2(px, -total_h/2.0), Vector2(px, total_h/2.0), Color("f1f5f9"), 4.0)
+"""
+with open("scripts/gameplay/board_view.gd", "w") as f:
+    f.write(code_board)
+
+# 2. Add Isometric Transform to board_root in car_jam_level.gd
+with open("scripts/gameplay/car_jam_level.gd", "r") as f:
+    lvl_code = f.read()
+
+replacement = """	# 1.1 BoardRoot
+	board_root = Node2D.new()
+	board_root.name = "BoardRoot"
+	board_root.rotation = deg_to_rad(45)
+	board_root.scale = Vector2(1.0, 0.6) # Isometric-ish tilt
+"""
+lvl_code = re.sub(r'\t# 1\.1 BoardRoot\n\tboard_root = Node2D\.new\(\)\n\tboard_root\.name = "BoardRoot"\n', replacement, lvl_code)
+
+with open("scripts/gameplay/car_jam_level.gd", "w") as f:
+    f.write(lvl_code)
+
+print("Applied Cartesian BoardView + parent Transform")

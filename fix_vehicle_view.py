@@ -1,4 +1,6 @@
-extends Node2D
+import re
+
+code = """extends Node2D
 class_name VehicleView
 
 var vehicle_id: int = 0
@@ -110,3 +112,9 @@ func _draw() -> void:
 			var b_rect = Rect2(center.x - 14, center.y - 14, 28, 28)
 			draw_style_box(badge, b_rect)
 			draw_string(ThemeDB.fallback_font, Vector2(center.x - 4, center.y + 6), str(rem), HORIZONTAL_ALIGNMENT_CENTER, -1, 16, vehicle_color.darkened(0.4))
+"""
+
+with open("scripts/gameplay/vehicle_view.gd", "w") as f:
+    f.write(code)
+
+print("Replaced vehicle_view.gd with 2D style boxes")

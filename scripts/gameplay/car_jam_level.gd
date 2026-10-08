@@ -128,6 +128,8 @@ func _build_scene_hierarchy() -> void:
 	# 1.1 BoardRoot
 	board_root = Node2D.new()
 	board_root.name = "BoardRoot"
+	board_root.rotation = deg_to_rad(45)
+	board_root.scale = Vector2(1.0, 0.6) # Isometric-ish tilt
 	
 	board_root.position = Vector2(0, BOARD_Y)
 	world_root.add_child(board_root)
