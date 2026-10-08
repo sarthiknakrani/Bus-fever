@@ -2,59 +2,70 @@ extends Node2D
 class_name PassengerView
 
 var _color_id: String = "red"
-var _color: Color = Color.RED
 var _visual_node: Node2D
-var _sprite_body: Sprite2D
-var _sprite_head: Sprite2D
+var _sprite: Sprite2D
+var _shadow: Sprite2D
+
+var _anim_time: float = 0.0
+var _is_boarding: bool = false
 
 func setup(p_col_id: String) -> void:
 	_color_id = p_col_id
-	_color = CarJamVehicleData.color_to_rgb(p_col_id)
 	
 	_visual_node = Node2D.new()
 	add_child(_visual_node)
 	
-	# Modular production sprites
-	var tex_head = _load_interim_sprite("res://assets/sprites/interim/passenger_head.png")
-	var tex_body = _load_interim_sprite("res://assets/sprites/interim/passenger_body.png")
-	var tex_shadow = _load_interim_sprite("res://assets/sprites/interim/passenger_head.png") # reusing round shape
+	# Modular premium sprites (Placeholders ready for final artist assets)
+	var tex_shadow = _load_interim_sprite("res://assets/sprites/premium_passengers/passenger_shadow.png")
+	var tex_walk = _load_interim_sprite("res://assets/sprites/premium_passengers/passenger_" + _color_id + "_walk.png")
 	
-	# Shadow
-	var s_shadow = Sprite2D.new()
-	s_shadow.texture = tex_shadow
-	s_shadow.modulate = Color(0,0,0,0.3)
-	s_shadow.scale = Vector2(0.6, 0.2)
-	s_shadow.position = Vector2(0, 16)
-	_visual_node.add_child(s_shadow)
+	# Soft shadow beneath character
+	_shadow = Sprite2D.new()
+	if tex_shadow:
+		_shadow.texture = tex_shadow
+	_shadow.position = Vector2(0, 16)
+	_visual_node.add_child(_shadow)
 	
-	# Body
-	_sprite_body = Sprite2D.new()
-	_sprite_body.texture = tex_body
-	_sprite_body.modulate = _color
-	_sprite_body.scale = Vector2(0.4, 0.4)
-	_sprite_body.position = Vector2(0, 0)
-	_visual_node.add_child(_sprite_body)
+	# Character Body (4-frame walk cycle)
+	_sprite = Sprite2D.new()
+	if tex_walk:
+		_sprite.texture = tex_walk
+		_sprite.hframes = 4
+	_sprite.scale = Vector2(0.6, 0.6)
+	_sprite.position = Vector2(0, -20)
+	_visual_node.add_child(_sprite)
 	
-	# Head
-	_sprite_head = Sprite2D.new()
-	_sprite_head.texture = tex_head
-	_sprite_head.modulate = _color.lightened(0.2) # Optional skin tone or just matched color
-	_sprite_head.scale = Vector2(0.4, 0.4)
-	_sprite_head.position = Vector2(0, -18)
-	_visual_node.add_child(_sprite_head)
+	# Add slight random offset to animation so they don't walk perfectly in sync
+	_anim_time = randf() * 1.0
+
+func _process(delta: float) -> void:
+	if not _is_boarding:
+		# Play walking animation
+		_anim_time += delta * 6.0 # 6 FPS
+		if _sprite and _sprite.texture:
+			_sprite.frame = int(_anim_time) % _sprite.hframes
 
 func animate_jump(delay: float) -> void:
 	if not is_inside_tree(): return
+	_is_boarding = true
+	# Reset frame to standing/jumping frame (frame 0)
+	if _sprite: _sprite.frame = 0
+	
 	var tw = create_tween()
 	tw.tween_interval(delay)
 	var orig_y = _visual_node.position.y
-	tw.tween_property(_visual_node, "position:y", orig_y - 12.0, 0.15).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	# Nice boarding leap animation
+	tw.tween_property(_visual_node, "position:y", orig_y - 20.0, 0.15).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tw.tween_property(_visual_node, "position:y", orig_y, 0.15).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	# Also squash and stretch slightly
+	var tw2 = create_tween()
+	tw2.tween_interval(delay)
+	tw2.tween_property(_sprite, "scale", Vector2(0.5, 0.7), 0.15)
+	tw2.tween_property(_sprite, "scale", Vector2(0.6, 0.6), 0.15)
 
 func _load_interim_sprite(path: String) -> Texture2D:
 	if ResourceLoader.exists(path):
 		return load(path)
-	# Fallback to direct image load if not imported
 	var img = Image.new()
 	var err = img.load(path)
 	if err == OK:
