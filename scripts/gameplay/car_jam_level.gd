@@ -910,26 +910,26 @@ func _update_layout() -> void:
 	# If the window is extremely tall (e.g. narrow phone), we might want to clamp scale
 	# so it doesn't get ridiculously huge. 
 	# Also ensure it fits vertically. The total gameplay area height is roughly 1100 pixels.
-	var gameplay_height = 1100.0
-	var scale_factor_y = (vp_size.y * 0.70) / gameplay_height
+	scale_factor = clampf(vp_size.x / 600.0, 0.5, 2.0)
 	
-	scale_factor = clampf(minf(scale_factor, scale_factor_y), 0.5, 2.5)
-
 	# Keep world centered at (0,0) which is where the Camera2D looks
 	world_root.scale = Vector2(scale_factor, scale_factor)
 	world_root.position = Vector2.ZERO
 
+	var half_h = (vp_size.y / 2.0) / scale_factor
+
 	# Parking between passenger track and board
 	if parking_root != null:
-		parking_root.position = Vector2(0, -200)
+		parking_root.position = Vector2(0, -half_h + 650)
 
 	# Board below parking
 	if board_root != null:
-		board_root.position = Vector2(0, 160)
+		board_root.position = Vector2(0, -half_h + 1050)
 
 	# Passenger track right above the parking
 	if passenger_track_root != null:
-		passenger_track_root.position = Vector2(0, -420)
+		passenger_track_root.position = Vector2(0, -half_h + 350)
+
 
 func _on_restart_pressed() -> void:
 	_play_sfx("ui")
