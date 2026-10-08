@@ -66,8 +66,8 @@ var slot_boarding_points: Dictionary = {}
 var _waiting_label: Label
 var track_time: float = 0.0
 const PASSENGER_SPACING := 50.0
-@export var passenger_normal_speed: float = 60.0
-@export var passenger_sprint_speed: float = 100.0
+@export var passenger_normal_speed: float = 150.0
+@export var passenger_sprint_speed: float = 250.0
 @export var bus_movement_duration_multiplier: float = 3.0
 const TRACK_SPEED := 40.0
 
@@ -1006,12 +1006,26 @@ func _update_layout() -> void:
 	world_root.scale = Vector2(scale_factor, scale_factor)
 	world_root.position = Vector2.ZERO
 
-	# Center everything vertically around the origin so it fills the screen
-	# instead of bunching up at the very top.
-	# Positive Y is down.
-	var track_y = -400.0
-	var parking_y = -80.0
-	var board_y = 350.0
+	# Calculate half height of the screen in world coordinates
+	var half_h = (vp_size.y / 2.0) / scale_factor
+
+	# Distribute elements dynamically so they look balanced on both standard and extremely tall screens.
+	# We'll map them from upper section to lower middle section.
+	# Safe area at the bottom for boosters (approx 300 world pixels).
+	var safe_bottom = half_h - 300.0
+	# Safe area at top for UI (approx 200 world pixels).
+	var safe_top = -half_h + 200.0
+	
+	var total_span = safe_bottom - safe_top
+	
+	# Place passenger track at ~15% down from safe top
+	var track_y = safe_top + (total_span * 0.15)
+	
+	# Place parking at ~45% down
+	var parking_y = safe_top + (total_span * 0.45)
+	
+	# Place board at ~75% down
+	var board_y = safe_top + (total_span * 0.75)
 
 	# Passenger track prominent in upper section
 	if passenger_track_root != null:
@@ -1146,8 +1160,10 @@ func _animate_individual_boarding(p: Dictionary, vehicle_id: int, slot_id: int, 
 	
 	if vv != null and is_instance_valid(vv) and vv.boarding_anchor != null:
 		var rot_target = 0.0
-		if vv.vehicle_dir == 2: rot_target = PI/2.0
-		elif vv.vehicle_dir == 3: rot_target = -PI/2.0
+		if vv.vehicle_dir == CarJamVehicleData.Direction.UP: rot_target = PI/2.0
+		elif vv.vehicle_dir == CarJamVehicleData.Direction.DOWN: rot_target = -PI/2.0
+		elif vv.vehicle_dir == CarJamVehicleData.Direction.LEFT: rot_target = 0.0
+		elif vv.vehicle_dir == CarJamVehicleData.Direction.RIGHT: rot_target = 0.0
 		var anchor_local = vv.boarding_anchor.position.rotated(rot_target) * 0.45
 		target_pos = transit_layer.to_global(final_local + anchor_local)
 	else:
