@@ -455,17 +455,33 @@ func _on_vehicle_dispatch_started(vehicle_id: int, slot_id: int, corridor: Array
 
 	# Reparent to TransitLayer preserving global position
 	var global_start := vv.global_position
+	var global_rot := vv.global_rotation
+	var global_scale := vv.global_scale
 	vv.get_parent().remove_child(vv)
 	transit_layer.add_child(vv)
 	vv.global_position = global_start
+	vv.global_rotation = global_rot
+	vv.global_scale = global_scale
 
 	var target_slot_pos := _get_slot_world_pos(slot_id)
-	var exit_cell: Vector2i = corridor.back() if not corridor.is_empty() else vv.position
-	var exit_pos := board_root.position + _cell_to_board_local(exit_cell, controller.level_data.board_size)
+	var exit_cell: Vector2i = corridor.back() if not corridor.is_empty() else vv.vehicle_footprint[0]
+	
+	# Calculate exactly how many cells to push forward to clear the board
+	var push_cells = float(vv.vehicle_footprint.size()) + 0.6
+	var dir_vec = CarJamVehicleData.dir_to_vector(vv.vehicle_dir)
+	var final_exit_coord = Vector2(exit_cell) + Vector2(dir_vec) * push_cells
+	
+	# Calculate local position on the board
+	var lx = final_exit_coord.x - float(controller.level_data.board_size.x - 1) / 2.0
+	var ly = final_exit_coord.y - float(controller.level_data.board_size.y - 1) / 2.0
+	var exit_local = Vector2(lx, ly) * CELL_SIZE
+	
+	# Convert to global utilizing the actual board transform (rotation/scale)
+	var exit_pos = board_root.to_global(exit_local)
 
 	VehicleMovement.animate_dispatch(
 		vv,
-		vv.position,
+		vv.global_position,
 		exit_pos,
 		target_slot_pos,
 		controller.session_token,
@@ -975,7 +991,7 @@ func _update_layout() -> void:
 	# If the window is extremely tall (e.g. narrow phone), we might want to clamp scale
 	# so it doesn't get ridiculously huge. 
 	# Also ensure it fits vertically. The total gameplay area height is roughly 1100 pixels.
-	scale_factor = clampf(vp_size.x / 600.0, 0.5, 2.0)
+	scale_factor = clampf(vp_size.x / 850.0, 0.35, 2.0)
 	
 	# Keep world centered at (0,0) which is where the Camera2D looks
 	world_root.scale = Vector2(scale_factor, scale_factor)

@@ -35,9 +35,18 @@ static func animate_dispatch(
 	
 	# Calculate driving angle for natural orientation
 	var drive_dir = (slot_pos - exit_pos).angle()
-	# Rotate to drive direction early, then snap/tween to 0.0 at the end
+	
+	# Determine final parking orientation to ensure bus sits horizontally
+	var cur_dir = vehicle_node.vehicle_dir
+	var rot_target = 0.0
+	# If bus is vertically drawn (UP or DOWN), we must rotate it 90 degrees to lay flat in parking
+	if cur_dir == 2: rot_target = PI/2.0
+	elif cur_dir == 3: rot_target = -PI/2.0
+	# LEFT (1) can be 0.0 or PI, let's keep it 0.0 so it faces right like the others
+	
+	# Rotate to drive direction early, then tween to horizontal parking orientation at the end
 	tw.tween_property(vehicle_node, "rotation", drive_dir, 0.06).set_delay(0.0865).set_trans(Tween.TRANS_SINE)
-	tw.tween_property(vehicle_node, "rotation", 0.0, 0.0665).set_delay(0.0865 + 0.06).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(vehicle_node, "rotation", rot_target, 0.0665).set_delay(0.0865 + 0.06).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	
 	# Scale down smoothly
 	tw.tween_property(vehicle_node, "scale", target_scale, 0.1265).set_delay(0.0865).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
