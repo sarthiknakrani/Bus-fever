@@ -185,6 +185,7 @@ func _build_scene_hierarchy() -> void:
 	var bg := ColorRect.new()
 	bg.color = Color("87CEEB") # Sharp sky blue
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bg_layer.add_child(bg)
 	add_child(bg_layer)
 

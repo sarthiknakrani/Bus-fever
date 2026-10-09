@@ -56,16 +56,16 @@ func _build_ui() -> void:
 	settings_btn.anchor_right = 1.0
 	settings_btn.anchor_top = 0.0
 	settings_btn.anchor_bottom = 0.0
-	settings_btn.offset_left = -84.0
-	settings_btn.offset_right = -12.0
-	settings_btn.offset_top = 12.0
-	settings_btn.offset_bottom = 84.0
+	settings_btn.offset_left = -70.0
+	settings_btn.offset_right = -16.0
+	settings_btn.offset_top = 16.0
+	settings_btn.offset_bottom = 70.0
 	settings_btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	# NO clip_children to fix shadow bug
 	
 	var sb_style = StyleBoxFlat.new()
 	sb_style.bg_color = Color("3b82f6")
-	sb_style.set_corner_radius_all(36)
+	sb_style.set_corner_radius_all(27)
 	sb_style.shadow_color = Color(0, 0, 0, 0.3)
 	sb_style.shadow_size = 8
 	sb_style.shadow_offset = Vector2(0, 4)
@@ -87,8 +87,8 @@ func _build_ui() -> void:
 	s_gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var sg_style = StyleBoxFlat.new()
 	sg_style.bg_color = Color(1, 1, 1, 0.25)
-	sg_style.corner_radius_top_left = 36
-	sg_style.corner_radius_top_right = 36
+	sg_style.corner_radius_top_left = 27
+	sg_style.corner_radius_top_right = 27
 	s_gloss.add_theme_stylebox_override("panel", sg_style)
 	settings_btn.add_child(s_gloss)
 	
@@ -98,7 +98,7 @@ func _build_ui() -> void:
 	s_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	s_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	var ls_s = LabelSettings.new()
-	ls_s.font_size = 48
+	ls_s.font_size = 36
 	ls_s.font_color = Color.WHITE
 	s_text.label_settings = ls_s
 	settings_btn.add_child(s_text)
@@ -130,9 +130,9 @@ func _build_ui() -> void:
 	bus_shadow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	bus_shadow.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var ls_shadow = LabelSettings.new()
-	ls_shadow.font_size = 110
+	ls_shadow.font_size = 80
 	ls_shadow.font_color = Color("b45309") # Dark orange
-	ls_shadow.outline_size = 28
+	ls_shadow.outline_size = 20
 	ls_shadow.outline_color = Color("b45309")
 	ls_shadow.shadow_size = 12
 	ls_shadow.shadow_color = Color(0, 0, 0, 0.4)
@@ -146,9 +146,9 @@ func _build_ui() -> void:
 	bus_front.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	bus_front.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var ls_front = LabelSettings.new()
-	ls_front.font_size = 110
+	ls_front.font_size = 80
 	ls_front.font_color = Color("f59e0b") # Yellow/Gold
-	ls_front.outline_size = 18
+	ls_front.outline_size = 16
 	ls_front.outline_color = Color.WHITE
 	bus_front.label_settings = ls_front
 	bus_box.add_child(bus_front)
@@ -163,9 +163,9 @@ func _build_ui() -> void:
 	fp_shadow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	fp_shadow.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var ls_fps = LabelSettings.new()
-	ls_fps.font_size = 62
+	ls_fps.font_size = 42
 	ls_fps.font_color = Color("0284c7") # Dark Blue
-	ls_fps.outline_size = 22
+	ls_fps.outline_size = 12
 	ls_fps.outline_color = Color("0284c7")
 	ls_fps.shadow_size = 12
 	ls_fps.shadow_color = Color(0, 0, 0, 0.4)
@@ -179,9 +179,9 @@ func _build_ui() -> void:
 	fp_front.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	fp_front.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var ls_fpf = LabelSettings.new()
-	ls_fpf.font_size = 62
+	ls_fpf.font_size = 42
 	ls_fpf.font_color = Color("38bdf8") # Light Blue
-	ls_fpf.outline_size = 14
+	ls_fpf.outline_size = 8
 	ls_fpf.outline_color = Color.WHITE
 	fp_front.label_settings = ls_fpf
 	fever_box.add_child(fp_front)
@@ -195,14 +195,14 @@ func _build_ui() -> void:
 	play_shadow.anchor_right = 0.5
 	play_shadow.anchor_top = 0.82
 	play_shadow.anchor_bottom = 0.82
-	play_shadow.offset_left = -140
-	play_shadow.offset_right = 140
-	play_shadow.offset_top = -100
+	play_shadow.offset_left = -110
+	play_shadow.offset_right = 110
+	play_shadow.offset_top = -80
 	play_shadow.offset_bottom = 0
 	play_shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var shadow_sb = StyleBoxFlat.new()
 	shadow_sb.bg_color = Color("22c55e")
-	shadow_sb.set_corner_radius_all(50)
+	shadow_sb.set_corner_radius_all(40)
 	shadow_sb.shadow_color = Color(0, 0, 0, 0.3)
 	shadow_sb.shadow_size = 12
 	shadow_sb.shadow_offset = Vector2(0, 6)
@@ -218,7 +218,7 @@ func _build_ui() -> void:
 	# Actual button has no shadow because clip_children breaks it
 	var p_style = StyleBoxFlat.new()
 	p_style.bg_color = Color("22c55e")
-	p_style.set_corner_radius_all(50)
+	p_style.set_corner_radius_all(40)
 	play_btn.add_theme_stylebox_override("normal", p_style)
 	
 	var p_hover = p_style.duplicate()
@@ -256,7 +256,7 @@ func _build_ui() -> void:
 	p_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	p_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	var ls_play = LabelSettings.new()
-	ls_play.font_size = 60
+	ls_play.font_size = 46
 	ls_play.font_color = Color.WHITE
 	ls_play.shadow_size = 6
 	ls_play.shadow_color = Color(0, 0, 0, 0.4)
