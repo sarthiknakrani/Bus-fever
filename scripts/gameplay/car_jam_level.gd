@@ -26,6 +26,7 @@ const FUNNEL_Y: float = 315.0
 var world_root: Node2D
 var board_root: Node2D
 var board_bg: BoardView
+var platform_bg: Node2D
 var vehicle_layer: Node2D
 var board_effects: Node2D
 
@@ -205,6 +206,11 @@ func _build_scene_hierarchy() -> void:
 	world_root.add_child(boarding_paths_root)
 	world_root.move_child(boarding_paths_root, 0)
 
+
+	platform_bg = load("res://scripts/gameplay/platform_view.gd").new()
+	platform_bg.name = "PlatformBackground"
+	platform_bg.z_index = -5
+	world_root.add_child(platform_bg)
 
 	board_bg = BoardView.new()
 	board_bg.name = "BoardBackground"
@@ -1079,6 +1085,23 @@ func _update_layout() -> void:
 	# Puzzle board in the lower middle area
 	if board_root != null:
 		board_root.position = Vector2(0, board_y)
+		
+	if platform_bg != null:
+		platform_bg.position = Vector2.ZERO # drawn relative to world_root
+		
+		# Full screen bounds in local space
+		var local_bottom = (vp_size.y / scale_factor) + 1000.0 # extend way down
+		
+		# Start platform slightly above the parking slots
+		var plat_top = parking_y - (parking_h / 2.0) - 40.0
+		
+		# Partition gap
+		var partition_y = parking_y + (parking_h / 2.0) + (gap / 2.0)
+		
+		# Width needs to cover entire screen width
+		var full_w = (vp_size.x / scale_factor) + 200.0
+		
+		platform_bg.setup_full(plat_top, local_bottom, full_w, partition_y)
 
 
 
