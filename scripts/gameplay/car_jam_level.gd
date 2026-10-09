@@ -623,21 +623,21 @@ func _build_hud() -> void:
 	top_bar.offset_left = 20.0
 	top_bar.offset_right = -20.0
 	top_bar.offset_top = 24.0
-	top_bar.offset_bottom = 90.0
+	top_bar.offset_bottom = 68.0
 	safe_area_root.add_child(top_bar)
 
 	# Restart (←) — simple 3D blue button in top-left
 	var btn_restart := Button.new()
 	btn_restart.text = "↻"
-	btn_restart.add_theme_font_size_override("font_size", 36)
+	btn_restart.add_theme_font_size_override("font_size", 24)
 	btn_restart.add_theme_color_override("font_color", Color.WHITE)
 	btn_restart.add_theme_stylebox_override("normal", SimpleStyle.make_extruded_style(
-		Color("60a5fa"), Color("1e3a8a"), 14, 7, 4))
+		Color("60a5fa"), Color("1e3a8a"), 12, 4, 2))
 	btn_restart.add_theme_stylebox_override("hover", SimpleStyle.make_extruded_style(
-		Color("93c5fd"), Color("1e3a8a"), 14, 7, 4))
+		Color("93c5fd"), Color("1e3a8a"), 12, 4, 2))
 	btn_restart.add_theme_stylebox_override("pressed", SimpleStyle.make_extruded_style(
-		Color("3b82f6"), Color("1e3a8a"), 14, 3, 2, 4))
-	btn_restart.custom_minimum_size = Vector2(60, 60)
+		Color("3b82f6"), Color("1e3a8a"), 12, 2, 1, 2))
+	btn_restart.custom_minimum_size = Vector2(44, 44)
 	btn_restart.button_down.connect(func(): btn_restart.position.y += 4)
 	btn_restart.button_up.connect(func(): btn_restart.position.y -= 4)
 	btn_restart.pressed.connect(_on_restart_pressed)
@@ -645,10 +645,10 @@ func _build_hud() -> void:
 
 	level_title_label = Label.new()
 	level_title_label.text = "Level 1"
-	level_title_label.add_theme_font_size_override("font_size", 48)
+	level_title_label.add_theme_font_size_override("font_size", 30)
 	level_title_label.add_theme_color_override("font_color", Color("ffffff"))
 	level_title_label.add_theme_color_override("font_outline_color", Color("1e293b"))
-	level_title_label.add_theme_constant_override("outline_size", 8)
+	level_title_label.add_theme_constant_override("outline_size", 6)
 	level_title_label.add_theme_color_override("font_shadow_color", Color(0,0,0,0.5))
 	level_title_label.add_theme_constant_override("shadow_offset_y", 4)
 	level_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -661,19 +661,19 @@ func _build_hud() -> void:
 
 	var btn_pause := Button.new()
 	btn_pause.text = "❚❚"
-	btn_pause.add_theme_font_size_override("font_size", 28)
+	btn_pause.add_theme_font_size_override("font_size", 18)
 	btn_pause.add_theme_color_override("font_color", Color.WHITE)
 	btn_pause.add_theme_stylebox_override("normal", SimpleStyle.make_extruded_style(
-		Color("60a5fa"), Color("1e3a8a"), 14, 7, 4))
+		Color("60a5fa"), Color("1e3a8a"), 12, 4, 2))
 	btn_pause.add_theme_stylebox_override("hover", SimpleStyle.make_extruded_style(
-		Color("93c5fd"), Color("1e3a8a"), 14, 7, 4))
+		Color("93c5fd"), Color("1e3a8a"), 12, 4, 2))
 	btn_pause.add_theme_stylebox_override("pressed", SimpleStyle.make_extruded_style(
-		Color("3b82f6"), Color("1e3a8a"), 14, 3, 2, 4))
-	btn_pause.custom_minimum_size = Vector2(60, 60)
+		Color("3b82f6"), Color("1e3a8a"), 12, 2, 1, 2))
+	btn_pause.custom_minimum_size = Vector2(44, 44)
 	btn_pause.button_down.connect(func(): btn_pause.position.y += 4)
 	btn_pause.button_up.connect(func(): btn_pause.position.y -= 4)
 	btn_pause.anchor_left = 1.0
-	btn_pause.offset_left = -76.0
+	btn_pause.offset_left = -44.0
 	btn_pause.pressed.connect(_on_pause_pressed)
 	top_bar.add_child(btn_pause)
 
