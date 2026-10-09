@@ -8,6 +8,7 @@ var _shadow: Sprite2D
 
 var _anim_time: float = 0.0
 var _is_boarding: bool = false
+var _last_pos: Vector2 = Vector2.ZERO
 
 func setup(p_col_id: String) -> void:
 	_color_id = p_col_id
@@ -44,6 +45,17 @@ func _process(delta: float) -> void:
 		_anim_time += delta * 6.0 # 6 FPS
 		if _sprite and _sprite.texture:
 			_sprite.frame = int(_anim_time) % _sprite.hframes
+			
+		# Handle natural 2D orientation (flip horizontal based on movement direction)
+		var current_pos = global_position
+		if _last_pos != Vector2.ZERO:
+			var dx = current_pos.x - _last_pos.x
+			# Use a small threshold to prevent jittering when standing still
+			if dx > 0.5:
+				_sprite.flip_h = false
+			elif dx < -0.5:
+				_sprite.flip_h = true
+		_last_pos = current_pos
 
 func animate_jump(delay: float) -> void:
 	if not is_inside_tree(): return
