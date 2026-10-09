@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cigr7tag7lb3v"
-path="res://.godot/imported/passenger_yellow_walk.png-447d2f463cd97c64a3b15548e9e09229.ctex"
+uid="uid://cuoa68jba3bt8"
+path="res://.godot/imported/body_blue.png-19dbad5e60be97d0a56880953c45200b.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/sprites/premium_passengers/passenger_yellow_walk.png"
-dest_files=["res://.godot/imported/passenger_yellow_walk.png-447d2f463cd97c64a3b15548e9e09229.ctex"]
+source_file="res://assets/sprites/premium_passengers/body_blue.png"
+dest_files=["res://.godot/imported/body_blue.png-19dbad5e60be97d0a56880953c45200b.ctex"]
 
 [params]
 

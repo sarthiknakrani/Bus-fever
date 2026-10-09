@@ -3,12 +3,19 @@ class_name PassengerView
 
 var _color_id: String = "red"
 var _visual_node: Node2D
-var _sprite: Sprite2D
+
+var _leg_l: Sprite2D
+var _leg_r: Sprite2D
+var _arm_l: Sprite2D
+var _arm_r: Sprite2D
+var _body: Sprite2D
+var _head: Sprite2D
 var _shadow: Sprite2D
 
 var _anim_time: float = 0.0
 var _is_boarding: bool = false
 var _last_pos: Vector2 = Vector2.ZERO
+var _facing_right: bool = true
 
 func setup(p_col_id: String) -> void:
 	_color_id = p_col_id
@@ -16,64 +23,118 @@ func setup(p_col_id: String) -> void:
 	_visual_node = Node2D.new()
 	add_child(_visual_node)
 	
-	# Modular premium sprites (Placeholders ready for final artist assets)
-	var tex_shadow = _load_interim_sprite("res://assets/sprites/premium_passengers/passenger_shadow.png")
-	var tex_walk = _load_interim_sprite("res://assets/sprites/premium_passengers/passenger_" + _color_id + "_walk.png")
+	# Load layered premium components
+	var t_head = _load_interim_sprite("res://assets/sprites/premium_passengers/head_" + _color_id + ".png")
+	var t_body = _load_interim_sprite("res://assets/sprites/premium_passengers/body_" + _color_id + ".png")
+	var t_arm  = _load_interim_sprite("res://assets/sprites/premium_passengers/arm_" + _color_id + ".png")
+	var t_leg  = _load_interim_sprite("res://assets/sprites/premium_passengers/leg_" + _color_id + ".png")
+	var t_shadow = _load_interim_sprite("res://assets/sprites/premium_passengers/passenger_shadow.png")
 	
-	# Soft shadow beneath character
+	# Soft shadow
 	_shadow = Sprite2D.new()
-	if tex_shadow:
-		_shadow.texture = tex_shadow
+	if t_shadow: _shadow.texture = t_shadow
 	_shadow.position = Vector2(0, 16)
-	_visual_node.add_child(_shadow)
+	add_child(_shadow) # Shadow stays un-flipped on the ground
 	
-	# Character Body (4-frame walk cycle)
-	_sprite = Sprite2D.new()
-	if tex_walk:
-		_sprite.texture = tex_walk
-		_sprite.hframes = 4
-	_sprite.scale = Vector2(0.6, 0.6)
-	_sprite.position = Vector2(0, -20)
-	_visual_node.add_child(_sprite)
+	# Right Arm (Back)
+	_arm_r = _create_limb(t_arm, Vector2(10, -18), Vector2(0, 10), -1)
 	
-	# Add slight random offset to animation so they don't walk perfectly in sync
+	# Right Leg (Back)
+	_leg_r = _create_limb(t_leg, Vector2(6, -8), Vector2(0, 12), -1)
+	
+	# Left Leg (Front)
+	_leg_l = _create_limb(t_leg, Vector2(-6, -8), Vector2(0, 12), 1)
+	
+	# Body
+	_body = Sprite2D.new()
+	if t_body: _body.texture = t_body
+	_body.position = Vector2(0, -20)
+	_body.z_index = 2
+	_visual_node.add_child(_body)
+	
+	# Left Arm (Front)
+	_arm_l = _create_limb(t_arm, Vector2(-12, -16), Vector2(0, 10), 3)
+	
+	# Head
+	_head = Sprite2D.new()
+	if t_head: _head.texture = t_head
+	_head.position = Vector2(0, -42)
+	_head.z_index = 4
+	_visual_node.add_child(_head)
+	
+	# Global scale tweak
+	_visual_node.scale = Vector2(0.85, 0.85)
+	if _shadow: _shadow.scale = Vector2(0.85, 0.85)
+	
 	_anim_time = randf() * 1.0
+
+func _create_limb(tex: Texture2D, pos: Vector2, offset: Vector2, z: int) -> Sprite2D:
+	var pivot = Node2D.new()
+	pivot.position = pos
+	pivot.z_index = z
+	_visual_node.add_child(pivot)
+	
+	var spr = Sprite2D.new()
+	if tex: spr.texture = tex
+	spr.position = offset # offset visual so rotation is from joint
+	pivot.add_child(spr)
+	return spr
 
 func _process(delta: float) -> void:
 	if not _is_boarding:
-		# Play walking animation
-		_anim_time += delta * 6.0 # 6 FPS
-		if _sprite and _sprite.texture:
-			_sprite.frame = int(_anim_time) % _sprite.hframes
-			
-		# Handle natural 2D orientation (flip horizontal based on movement direction)
+		_anim_time += delta * 12.0 # Walk cycle speed
+		
+		var leg_swing = sin(_anim_time) * 0.6
+		
+		# Animate limbs (pivot is the parent of the sprite)
+		_leg_l.get_parent().rotation = leg_swing
+		_leg_r.get_parent().rotation = -leg_swing
+		_arm_l.get_parent().rotation = -leg_swing * 0.4
+		_arm_r.get_parent().rotation = leg_swing * 0.4
+		
+		# Body bounce
+		var bounce = abs(sin(_anim_time)) * 3.0
+		_body.position.y = -20 - bounce
+		_head.position.y = -42 - bounce
+		
+		# Head bob
+		_head.rotation = sin(_anim_time * 0.5) * 0.05
+		
+		# Handle natural 2D orientation
 		var current_pos = global_position
 		if _last_pos != Vector2.ZERO:
 			var dx = current_pos.x - _last_pos.x
-			# Use a small threshold to prevent jittering when standing still
-			if dx > 0.5:
-				_sprite.flip_h = false
-			elif dx < -0.5:
-				_sprite.flip_h = true
+			if dx > 0.5 and not _facing_right:
+				_facing_right = true
+				_visual_node.scale.x = abs(_visual_node.scale.x)
+			elif dx < -0.5 and _facing_right:
+				_facing_right = false
+				_visual_node.scale.x = -abs(_visual_node.scale.x)
 		_last_pos = current_pos
 
 func animate_jump(delay: float) -> void:
 	if not is_inside_tree(): return
 	_is_boarding = true
-	# Reset frame to standing/jumping frame (frame 0)
-	if _sprite: _sprite.frame = 0
+	
+	# Reset walking rotations
+	_leg_l.get_parent().rotation = 0
+	_leg_r.get_parent().rotation = 0
+	_arm_l.get_parent().rotation = -0.5 # Arms up for jump!
+	_arm_r.get_parent().rotation = 0.5
+	_head.rotation = 0
 	
 	var tw = create_tween()
 	tw.tween_interval(delay)
 	var orig_y = _visual_node.position.y
 	# Nice boarding leap animation
-	tw.tween_property(_visual_node, "position:y", orig_y - 20.0, 0.15).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(_visual_node, "position:y", orig_y - 25.0, 0.15).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tw.tween_property(_visual_node, "position:y", orig_y, 0.15).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	# Also squash and stretch slightly
+	
 	var tw2 = create_tween()
 	tw2.tween_interval(delay)
-	tw2.tween_property(_sprite, "scale", Vector2(0.5, 0.7), 0.15)
-	tw2.tween_property(_sprite, "scale", Vector2(0.6, 0.6), 0.15)
+	var base_scale = _visual_node.scale
+	tw2.tween_property(_visual_node, "scale", Vector2(base_scale.x * 0.8, base_scale.y * 1.2), 0.15)
+	tw2.tween_property(_visual_node, "scale", base_scale, 0.15)
 
 func _load_interim_sprite(path: String) -> Texture2D:
 	if ResourceLoader.exists(path):
