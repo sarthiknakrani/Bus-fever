@@ -697,9 +697,9 @@ func _build_hud() -> void:
 	booster_bar.add_child(b_hbox)
 
 	var bst_style := SimpleStyle.make_extruded_style(
-		Color("38bdf8"), Color("1e3a8a"), 22, 10, 0)
+		Color("38bdf8"), Color("1e3a8a"), 16, 7, 0)
 	var bst_pressed := SimpleStyle.make_extruded_style(
-		Color("38bdf8"), Color("1e3a8a"), 22, 5, 6, 5)
+		Color("38bdf8"), Color("1e3a8a"), 16, 3, 4, 3)
 
 	for b_name in ["VIP", "Arrange", "Jumble"]:
 		var vbox = VBoxContainer.new()
@@ -712,40 +712,40 @@ func _build_hud() -> void:
 		btn.add_theme_stylebox_override("pressed", bst_pressed)
 		btn.add_theme_stylebox_override("disabled", bst_style)
 		btn.disabled = true
-		btn.custom_minimum_size = Vector2(70, 70)
+		btn.custom_minimum_size = Vector2(52, 52)
 		
 
 		
 		# Add a green '+' circle
 		var plus := Label.new()
 		plus.text = "✚"
-		plus.add_theme_font_size_override("font_size", 18)
+		plus.add_theme_font_size_override("font_size", 14)
 		plus.add_theme_color_override("font_color", Color("ffffff"))
 		plus.add_theme_color_override("font_outline_color", Color("166534"))
 		plus.add_theme_constant_override("outline_size", 4)
 		var p_style = StyleBoxFlat.new()
 		p_style.bg_color = Color("22c55e")
-		p_style.corner_radius_top_left = 20
-		p_style.corner_radius_top_right = 20
-		p_style.corner_radius_bottom_left = 20
-		p_style.corner_radius_bottom_right = 20
+		p_style.corner_radius_top_left = 12
+		p_style.corner_radius_top_right = 12
+		p_style.corner_radius_bottom_left = 12
+		p_style.corner_radius_bottom_right = 12
 		p_style.border_width_bottom = 2
 		p_style.border_color = Color("16a34a")
 		plus.add_theme_stylebox_override("normal", p_style)
 		plus.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		plus.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		plus.size = Vector2(28, 28)
-		plus.position = Vector2(56, -8)
+		plus.size = Vector2(21, 21)
+		plus.position = Vector2(41, -6)
 		btn.add_child(plus)
 		
 		vbox.add_child(btn)
 		
 		var lbl = Label.new()
 		lbl.text = b_name
-		lbl.add_theme_font_size_override("font_size", 20)
+		lbl.add_theme_font_size_override("font_size", 15)
 		lbl.add_theme_color_override("font_color", Color("ffffff"))
 		lbl.add_theme_color_override("font_outline_color", Color("1e293b"))
-		lbl.add_theme_constant_override("outline_size", 6)
+		lbl.add_theme_constant_override("outline_size", 4)
 		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		vbox.add_child(lbl)
 		
@@ -874,11 +874,11 @@ func _build_hud() -> void:
 	p_btn_home.add_theme_font_size_override("font_size", 26)
 	p_btn_home.add_theme_color_override("font_color", Color.WHITE)
 	p_btn_home.add_theme_stylebox_override("normal", SimpleStyle.make_extruded_style(
-		Color("f97316"), Color("9a3412"), 22, 10, 0))
+		Color("f97316"), Color("9a3412"), 16, 7, 0))
 	p_btn_home.add_theme_stylebox_override("hover", SimpleStyle.make_extruded_style(
-		Color("fb923c"), Color("9a3412"), 22, 10, 0))
+		Color("fb923c"), Color("9a3412"), 16, 7, 0))
 	p_btn_home.add_theme_stylebox_override("pressed", SimpleStyle.make_extruded_style(
-		Color("ea580c"), Color("7c2d12"), 22, 5, 6, 5))
+		Color("ea580c"), Color("7c2d12"), 16, 3, 4, 3))
 	p_btn_home.custom_minimum_size = Vector2(240, 60)
 	p_btn_home.button_down.connect(func(): p_btn_home.position.y += 3)
 	p_btn_home.button_up.connect(func(): p_btn_home.position.y -= 3)
@@ -890,11 +890,11 @@ func _build_hud() -> void:
 	p_btn_restart.add_theme_font_size_override("font_size", 26)
 	p_btn_restart.add_theme_color_override("font_color", Color.WHITE)
 	p_btn_restart.add_theme_stylebox_override("normal", SimpleStyle.make_extruded_style(
-		Color("22c55e"), Color("14532d"), 22, 10, 0))
+		Color("22c55e"), Color("14532d"), 16, 7, 0))
 	p_btn_restart.add_theme_stylebox_override("hover", SimpleStyle.make_extruded_style(
-		Color("4ade80"), Color("14532d"), 22, 10, 0))
+		Color("4ade80"), Color("14532d"), 16, 7, 0))
 	p_btn_restart.add_theme_stylebox_override("pressed", SimpleStyle.make_extruded_style(
-		Color("16a34a"), Color("14532d"), 22, 5, 6, 5))
+		Color("16a34a"), Color("14532d"), 16, 3, 4, 3))
 	p_btn_restart.custom_minimum_size = Vector2(240, 60)
 	p_btn_restart.button_down.connect(func(): p_btn_restart.position.y += 3)
 	p_btn_restart.button_up.connect(func(): p_btn_restart.position.y -= 3)
@@ -968,11 +968,11 @@ func _build_hud() -> void:
 	r_btn_home.add_theme_font_size_override("font_size", 36)
 	r_btn_home.add_theme_color_override("font_color", Color.WHITE)
 	r_btn_home.add_theme_stylebox_override("normal", SimpleStyle.make_extruded_style(
-		Color("f97316"), Color("9a3412"), 22, 10, 0))
+		Color("f97316"), Color("9a3412"), 16, 7, 0))
 	r_btn_home.add_theme_stylebox_override("hover", SimpleStyle.make_extruded_style(
-		Color("fb923c"), Color("9a3412"), 22, 10, 0))
+		Color("fb923c"), Color("9a3412"), 16, 7, 0))
 	r_btn_home.add_theme_stylebox_override("pressed", SimpleStyle.make_extruded_style(
-		Color("ea580c"), Color("7c2d12"), 22, 5, 6, 5))
+		Color("ea580c"), Color("7c2d12"), 16, 3, 4, 3))
 	r_btn_home.custom_minimum_size = Vector2(260, 100)
 	r_btn_home.button_down.connect(func(): r_btn_home.position.y += 6)
 	r_btn_home.button_up.connect(func(): r_btn_home.position.y -= 6)
