@@ -769,7 +769,7 @@ func _build_hud() -> void:
 	pause_overlay.add_child(p_center)
 	
 	var p_main := Control.new()
-	p_main.custom_minimum_size = Vector2(300, 480)
+	p_main.custom_minimum_size = Vector2(225, 360)
 	p_center.add_child(p_main)
 	
 	var p_vbox := VBoxContainer.new()
@@ -784,12 +784,12 @@ func _build_hud() -> void:
 	ph_style.corner_radius_top_left = 24
 	ph_style.corner_radius_top_right = 24
 	p_header.add_theme_stylebox_override("panel", ph_style)
-	p_header.custom_minimum_size = Vector2(300, 60)
+	p_header.custom_minimum_size = Vector2(225, 45)
 	p_vbox.add_child(p_header)
 	
 	var ph_lbl := Label.new()
 	ph_lbl.text = "SETTINGS"
-	ph_lbl.add_theme_font_size_override("font_size", 16)
+	ph_lbl.add_theme_font_size_override("font_size", 12)
 	ph_lbl.add_theme_color_override("font_color", Color("ffffff"))
 	ph_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ph_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -806,11 +806,11 @@ func _build_hud() -> void:
 		Color("f87171"), Color("991b1b"), 16, 6, 0))
 	p_close.add_theme_stylebox_override("pressed", SimpleStyle.make_extruded_style(
 		Color("dc2626"), Color("7f1d1d"), 16, 3, 4, 3))
-	p_close.custom_minimum_size = Vector2(44, 44)
+	p_close.custom_minimum_size = Vector2(33, 33)
 	p_close.anchor_left = 1.0
 	p_close.anchor_right = 1.0
-	p_close.offset_left = -52.0
-	p_close.offset_top = 8.0
+	p_close.offset_left = -39.0
+	p_close.offset_top = 6.0
 	p_close.pressed.connect(_on_resume_pressed)
 	p_main.add_child(p_close)
 
@@ -825,20 +825,20 @@ func _build_hud() -> void:
 	p_vbox.add_child(p_body)
 	
 	var pb_margin := MarginContainer.new()
-	pb_margin.add_theme_constant_override("margin_left", 32)
-	pb_margin.add_theme_constant_override("margin_right", 32)
-	pb_margin.add_theme_constant_override("margin_top", 32)
-	pb_margin.add_theme_constant_override("margin_bottom", 24)
+	pb_margin.add_theme_constant_override("margin_left", 24)
+	pb_margin.add_theme_constant_override("margin_right", 24)
+	pb_margin.add_theme_constant_override("margin_top", 24)
+	pb_margin.add_theme_constant_override("margin_bottom", 18)
 	p_body.add_child(pb_margin)
 	
 	var pb_vbox := VBoxContainer.new()
-	pb_vbox.add_theme_constant_override("separation", 24)
+	pb_vbox.add_theme_constant_override("separation", 18)
 	pb_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	pb_margin.add_child(pb_vbox)
 
 	# Icons Row
 	var p_icons := HBoxContainer.new()
-	p_icons.add_theme_constant_override("separation", 24)
+	p_icons.add_theme_constant_override("separation", 18)
 	p_icons.alignment = BoxContainer.ALIGNMENT_CENTER
 	pb_vbox.add_child(p_icons)
 	
@@ -871,7 +871,7 @@ func _build_hud() -> void:
 	# Action Buttons — simple 3D-styled (orange Home, green Restart)
 	var p_btn_home := Button.new()
 	p_btn_home.text = "Home"
-	p_btn_home.add_theme_font_size_override("font_size", 26)
+	p_btn_home.add_theme_font_size_override("font_size", 20)
 	p_btn_home.add_theme_color_override("font_color", Color.WHITE)
 	p_btn_home.add_theme_stylebox_override("normal", SimpleStyle.make_extruded_style(
 		Color("f97316"), Color("9a3412"), 16, 7, 0))
@@ -879,7 +879,7 @@ func _build_hud() -> void:
 		Color("fb923c"), Color("9a3412"), 16, 7, 0))
 	p_btn_home.add_theme_stylebox_override("pressed", SimpleStyle.make_extruded_style(
 		Color("ea580c"), Color("7c2d12"), 16, 3, 4, 3))
-	p_btn_home.custom_minimum_size = Vector2(240, 60)
+	p_btn_home.custom_minimum_size = Vector2(180, 45)
 	p_btn_home.button_down.connect(func(): p_btn_home.position.y += 3)
 	p_btn_home.button_up.connect(func(): p_btn_home.position.y -= 3)
 	p_btn_home.pressed.connect(_on_home_pressed)
@@ -887,7 +887,7 @@ func _build_hud() -> void:
 
 	var p_btn_restart := Button.new()
 	p_btn_restart.text = "Restart"
-	p_btn_restart.add_theme_font_size_override("font_size", 26)
+	p_btn_restart.add_theme_font_size_override("font_size", 20)
 	p_btn_restart.add_theme_color_override("font_color", Color.WHITE)
 	p_btn_restart.add_theme_stylebox_override("normal", SimpleStyle.make_extruded_style(
 		Color("22c55e"), Color("14532d"), 16, 7, 0))
@@ -895,7 +895,7 @@ func _build_hud() -> void:
 		Color("4ade80"), Color("14532d"), 16, 7, 0))
 	p_btn_restart.add_theme_stylebox_override("pressed", SimpleStyle.make_extruded_style(
 		Color("16a34a"), Color("14532d"), 16, 3, 4, 3))
-	p_btn_restart.custom_minimum_size = Vector2(240, 60)
+	p_btn_restart.custom_minimum_size = Vector2(180, 45)
 	p_btn_restart.button_down.connect(func(): p_btn_restart.position.y += 3)
 	p_btn_restart.button_up.connect(func(): p_btn_restart.position.y -= 3)
 	p_btn_restart.pressed.connect(_on_restart_pressed)
@@ -907,7 +907,7 @@ func _build_hud() -> void:
 	
 	var p_footer := Label.new()
 	p_footer.text = "Terms of Service  &  Privacy Policy"
-	p_footer.add_theme_font_size_override("font_size", 18)
+	p_footer.add_theme_font_size_override("font_size", 13)
 	p_footer.add_theme_color_override("font_color", Color("3b82f6"))
 	p_footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	pb_vbox.add_child(p_footer)
@@ -1191,14 +1191,14 @@ func _create_settings_icon_button(label_text: String, icon_text: String, is_on: 
 	vbox.add_theme_constant_override("separation", 8)
 	
 	var btn = Button.new()
-	btn.custom_minimum_size = Vector2(64, 64)
+	btn.custom_minimum_size = Vector2(48, 48)
 	var style = StyleBoxFlat.new()
 	style.bg_color = Color("4b7bec")
 	style.corner_radius_top_left = 16
 	style.corner_radius_top_right = 16
 	style.corner_radius_bottom_left = 16
 	style.corner_radius_bottom_right = 16
-	style.border_width_bottom = 6
+	style.border_width_bottom = 4
 	style.border_color = Color("3867d6")
 	btn.add_theme_stylebox_override("normal", style)
 	btn.add_theme_stylebox_override("hover", style)
@@ -1206,7 +1206,7 @@ func _create_settings_icon_button(label_text: String, icon_text: String, is_on: 
 	
 	var icon = Label.new()
 	icon.text = icon_text
-	icon.add_theme_font_size_override("font_size", 32)
+	icon.add_theme_font_size_override("font_size", 24)
 	icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	icon.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -1214,9 +1214,9 @@ func _create_settings_icon_button(label_text: String, icon_text: String, is_on: 
 	
 	var slash = ColorRect.new()
 	slash.color = Color("eb3b5a")
-	slash.size = Vector2(100, 8)
-	slash.pivot_offset = Vector2(50, 4)
-	slash.position = Vector2(-2, 44)
+	slash.size = Vector2(75, 6)
+	slash.pivot_offset = Vector2(37, 3)
+	slash.position = Vector2(-2, 33)
 	slash.rotation = deg_to_rad(45)
 	slash.visible = not is_on
 	btn.add_child(slash)
@@ -1231,7 +1231,7 @@ func _create_settings_icon_button(label_text: String, icon_text: String, is_on: 
 	
 	var lbl = Label.new()
 	lbl.text = label_text
-	lbl.add_theme_font_size_override("font_size", 22)
+	lbl.add_theme_font_size_override("font_size", 16)
 	lbl.add_theme_color_override("font_color", Color("64748b"))
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	
