@@ -37,13 +37,15 @@ func setup(p_col_id: String) -> void:
 	add_child(_shadow) # Shadow stays un-flipped on the ground
 	
 	# Right Arm (Back)
-	_arm_r = _create_limb(t_arm, Vector2(10, -18), Vector2(0, 10), -1)
+	_arm_r = _create_limb(t_arm, Vector2(12, -18), Vector2(0, 10), -1)
+	_arm_r.modulate = Color(0.6, 0.6, 0.6) # Darken back arm
 	
 	# Right Leg (Back)
-	_leg_r = _create_limb(t_leg, Vector2(6, -8), Vector2(0, 12), -1)
+	_leg_r = _create_limb(t_leg, Vector2(8, -8), Vector2(0, 12), -1)
+	_leg_r.modulate = Color(0.6, 0.6, 0.6) # Darken back leg
 	
 	# Left Leg (Front)
-	_leg_l = _create_limb(t_leg, Vector2(-6, -8), Vector2(0, 12), 1)
+	_leg_l = _create_limb(t_leg, Vector2(-8, -8), Vector2(0, 12), 1)
 	
 	# Body
 	_body = Sprite2D.new()
@@ -53,7 +55,7 @@ func setup(p_col_id: String) -> void:
 	_visual_node.add_child(_body)
 	
 	# Left Arm (Front)
-	_arm_l = _create_limb(t_arm, Vector2(-12, -16), Vector2(0, 10), 3)
+	_arm_l = _create_limb(t_arm, Vector2(-14, -16), Vector2(0, 10), 3)
 	
 	# Head
 	_head = Sprite2D.new()
@@ -84,7 +86,7 @@ func _process(delta: float) -> void:
 	if not _is_boarding:
 		_anim_time += delta * 12.0 # Walk cycle speed
 		
-		var leg_swing = sin(_anim_time) * 0.6
+		var leg_swing = sin(_anim_time) * 0.8
 		
 		# Animate limbs (pivot is the parent of the sprite)
 		_leg_l.get_parent().rotation = leg_swing

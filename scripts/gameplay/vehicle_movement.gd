@@ -19,21 +19,24 @@ static func animate_dispatch(
 	if vehicle_node == null or not is_instance_valid(vehicle_node):
 		return
 
+
 	var tw := vehicle_node.create_tween()
 	tw.set_parallel(true)
 
-	# Phase 1: Drive out of board (0.65s)
-	tw.tween_property(vehicle_node, "position", exit_pos, 0.65).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	var t1 = 0.65 * duration_mult
+
+	# Bump Z-index so moving vehicles overlap nicely
+	vehicle_node.z_index = 100 + slot_id
+
+	# Phase 1: Drive out of board
+	tw.tween_property(vehicle_node, "position", exit_pos, t1).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	
 	# Phase 2: Arc to slot (0.9s)
-	tw.tween_property(vehicle_node, "position:x", slot_pos.x, 0.9).set_delay(0.65).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	tw.tween_property(vehicle_node, "position:y", slot_pos.y, 0.9).set_delay(0.65).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(vehicle_node, "position:x", slot_pos.x, 0.9).set_delay(t1).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(vehicle_node, "position:y", slot_pos.y, 0.9).set_delay(t1).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	
 	# Rotation sequence
 	var drive_dir = (slot_pos - exit_pos).angle()
-	
-	# The user wants ALL parked buses to use the exact same vertical parking convention.
-	# Let's orient them all to point DOWN (towards the passenger boarding area).
 	var rot_target = 0.0 
 	match vehicle_node.vehicle_dir:
 		CarJamVehicleData.Direction.DOWN:
@@ -45,29 +48,28 @@ static func animate_dispatch(
 		CarJamVehicleData.Direction.RIGHT:
 			rot_target = PI/2.0
 		
-	# Ensure smooth rotation by taking the shortest path
 	if abs(drive_dir - rot_target) > PI:
 		if drive_dir > rot_target:
 			rot_target += TAU
 		else:
 			rot_target -= TAU
 
-	tw.tween_property(vehicle_node, "rotation", drive_dir, 0.45).set_delay(0.65).set_trans(Tween.TRANS_SINE)
-	tw.tween_property(vehicle_node, "rotation", rot_target, 0.45).set_delay(0.65 + 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(vehicle_node, "rotation", drive_dir, 0.45).set_delay(t1).set_trans(Tween.TRANS_SINE)
+	tw.tween_property(vehicle_node, "rotation", rot_target, 0.45).set_delay(t1 + 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	
-	# Scale down smoothly
-	tw.tween_property(vehicle_node, "scale", target_scale, 0.9).set_delay(0.65).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(vehicle_node, "scale", target_scale, 0.9).set_delay(t1).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
 
-	# Phase 3: Settle bounce (0.3s)
 	var lambda_func = func(v_node, t_scale, ctrl, v_id, s_id, tok):
 		if is_instance_valid(v_node):
 			v_node.set_parking_mode(true)
+			v_node.z_index = 10 # Normal parking z-index
 			var settle_tw = v_node.create_tween()
 			settle_tw.tween_property(v_node, "scale", t_scale * 1.05, 0.15).set_trans(Tween.TRANS_SINE)
 			settle_tw.tween_property(v_node, "scale", t_scale, 0.15).set_trans(Tween.TRANS_BOUNCE)
 		ctrl.on_vehicle_arrived_at_slot(v_id, s_id, tok)
 	
 	tw.chain().tween_callback(lambda_func.bind(vehicle_node, target_scale, controller, vehicle_id, slot_id, token))
+
 
 static func animate_departure(
 	vehicle_node: Node2D,

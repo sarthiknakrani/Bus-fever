@@ -33,7 +33,6 @@ var boarding_scheduler: CarJamBoardingController
 var vehicles: Dictionary = {} # int id -> VehicleModel
 
 var state: int = GameState.PLAYING
-var is_dispatching: bool = false
 var session_token: int = 0
 
 func load_level(lvl: CarJamLevelData) -> void:
@@ -59,7 +58,6 @@ func load_level(lvl: CarJamLevelData) -> void:
 		board.place_vehicle(vm)
 
 	state = GameState.PLAYING
-	is_dispatching = false
 
 	board_updated.emit()
 	parking_updated.emit()
@@ -70,7 +68,7 @@ func restart_level() -> void:
 		load_level(level_data)
 
 func tap_vehicle(vehicle_id: int) -> bool:
-	if state != GameState.PLAYING or is_dispatching:
+	if state != GameState.PLAYING:
 		return false
 
 	var v: VehicleModel = vehicles.get(vehicle_id, null)
@@ -99,7 +97,6 @@ func tap_vehicle(vehicle_id: int) -> bool:
 
 	# Clear from authoritative board grid
 	board.remove_vehicle(vehicle_id)
-	is_dispatching = true
 
 	board_updated.emit()
 	parking_updated.emit()
@@ -115,13 +112,11 @@ func on_vehicle_arrived_at_slot(vehicle_id: int, slot_id: int, token: int) -> vo
 
 	var v: VehicleModel = vehicles.get(vehicle_id, null)
 	if v == null:
-		is_dispatching = false
-		return
+			return
 
 	parking.confirm_arrival(slot_id, vehicle_id)
 	v.state = VehicleModel.VehicleState.PARKED
 	v.reserved_slot = slot_id
-	is_dispatching = false
 
 	vehicle_parked.emit(vehicle_id, slot_id)
 	parking_updated.emit()
