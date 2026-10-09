@@ -79,10 +79,17 @@ func _test_bus(b: Dictionary, board_size: Vector2i) -> void:
 	var local_pos: Vector2 = Vector2(lx, ly) * CELL_SIZE + center_offset
 
 	# Apply the board_root's 45-deg rotation + 0.6 Y-scale + (0, BOARD_Y) translate.
-	var board_root_xform := Transform2D(
-		deg_to_rad(45.0),
-		Vector2(0.0, BOARD_Y)
-	).scaled(Vector2(1.0, 0.6))
+	# Node2D's transform has a matrix of the form T * R_scaled, where
+	# the rotation is scaled per axis; we construct the same matrix
+	# directly so this offline test produces numbers that match the
+	# game (we can't use Transform2D().scaled() because that does
+	# per-cell scaling which differs from Node2D).
+	var rot := deg_to_rad(45.0)
+	var sx := 1.0
+	var sy := 0.6
+	var x_axis := Vector2(cos(rot) * sx, sin(rot) * sx)
+	var y_axis := Vector2(-sin(rot) * sy, cos(rot) * sy)
+	var board_root_xform := Transform2D(x_axis, y_axis, Vector2(0.0, BOARD_Y))
 	var start_pos: Vector2 = board_root_xform * local_pos
 
 	# Compute exit point a few cells past the bus along its puzzle arrow.
@@ -98,14 +105,21 @@ func _test_bus(b: Dictionary, board_size: Vector2i) -> void:
 	var slot_pos := Vector2(slot_x, PARKING_Y)
 	var corridor_pos := Vector2(slot_x, CORRIDOR_Y)
 
-	# Build the same Curve2D animate_dispatch builds.
+	# Build the same 4-point Curve2D animate_dispatch builds.
 	var forward_world: Vector2 = (exit_pos - start_pos).normalized()
 	if forward_world.length_squared() < 0.0001:
 		forward_world = Vector2(0, -1)
 
+	var P1: Vector2 = start_pos + forward_world * 130.0
+	var P2: Vector2 = corridor_pos
+	if P2.distance_to(start_pos) < 80.0:
+		P2 = Vector2(slot_pos.x, slot_pos.y + 100.0)
+
 	var curve := Curve2D.new()
-	curve.add_point(start_pos, Vector2.ZERO, forward_world * 200.0)
-	curve.add_point(slot_pos, Vector2(0.0, 160.0), Vector2.ZERO)
+	curve.add_point(start_pos, Vector2.ZERO, forward_world * 120.0)
+	curve.add_point(P1, -forward_world * 100.0, forward_world * 100.0)
+	curve.add_point(P2, Vector2(0.0, 100.0), Vector2(0.0, -100.0))
+	curve.add_point(slot_pos, Vector2(0.0, 130.0), Vector2.ZERO)
 
 	# Front vector for tangent-aligned rotation.
 	var front_native := Vector2(0, -1)
@@ -115,15 +129,21 @@ func _test_bus(b: Dictionary, board_size: Vector2i) -> void:
 		CarJamVehicleData.Direction.LEFT: front_native = Vector2(-1, 0)
 		CarJamVehicleData.Direction.RIGHT: front_native = Vector2(1, 0)
 
-	# Sample 24 points along the baked curve.
+	# Sample 48 points along the baked curve.
 	var total_len: float = curve.get_baked_length()
-	var samples := 24
+	var samples := 48
 	var max_corridor_y_above_parking: float = 0.0
 	var min_corridor_y: float = 1e9
+	var max_y_below_board: float = 1e9
 	var crosses_corridor_zone := false
 	var start_tan := Vector2.ZERO
 	var end_tan := Vector2.ZERO
 	var endpoint_pos: Vector2 = Vector2.ZERO
+	var max_x_drift: float = 0.0  # how far past parking rect (PARKING_Y +/- 74) we go
+
+	# Parking outer rect (same as in car_jam_level.gd)
+	var parking_top_y: float = PARKING_Y - 74.0
+	var parking_bot_y: float = PARKING_Y + 74.0
 
 	for i in range(samples + 1):
 		var t: float = float(i) / float(samples)
@@ -142,9 +162,13 @@ func _test_bus(b: Dictionary, board_size: Vector2i) -> void:
 		if pos.y >= PARKING_Y - 4.0 and pos.y <= PARKING_Y + 80.0:
 			crosses_corridor_zone = true
 		min_corridor_y = min(min_corridor_y, pos.y)
+		# Track X drift at parking-strip Y range — if the curve ever
+		# passes through the parking strip at an X different from the
+		# assigned slot, it is crossing other bays horizontally.
+		if pos.y >= parking_top_y and pos.y <= parking_bot_y:
+			max_x_drift = max(max_x_drift, absf(pos.x - slot_x))
 
-	# Also explicitly sample the curve's analytical end-tangent (last 2 px
-	# back toward the start) to confirm the curve truly ends vertical.
+	# Analytical end-tangent (last 4 px back toward start).
 	if total_len > 4.0:
 		var end_pos: Vector2 = curve.sample_baked(total_len)
 		var end_back: Vector2 = curve.sample_baked(total_len - 4.0)
@@ -179,6 +203,7 @@ func _test_bus(b: Dictionary, board_size: Vector2i) -> void:
 		[ang_diff_deg, center_err])
 	print("  bus dips into corridor zone = %s (min y = %.0f)" %
 		[str(crosses_corridor_zone), min_corridor_y])
+	print("  max X drift inside parking strip = %.1f px" % max_x_drift)
 
 	var ok := true
 	if absf(start_tan_err_deg) > 5.0:
@@ -190,6 +215,28 @@ func _test_bus(b: Dictionary, board_size: Vector2i) -> void:
 	if center_err > 2.0:
 		printerr("  FAIL bus does not settle at slot center")
 		ok = false
+	# The curve must not slice horizontally across other parking bays at
+	# the parking-strip Y range. Some X drift is unavoidable (the bus
+	# has to enter the bay), but it should be tight (a few px of slot
+	# width slack). Allow SLOT_WIDTH tolerance.
+	if max_x_drift > 30.0 and ok:
+		# Only flag as a violation if the curve is passing through a
+		# different X within the parking rect while not yet arriving
+		# at the slot.
+		var crosses_other_bays := false
+		# Sweep samples again checking X position at parking Y-range.
+		for i in range(samples + 1):
+			var t2: float = float(i) / float(samples)
+			var ofs2: float = t2 * total_len
+			var p2_pos: Vector2 = curve.sample_baked(ofs2)
+			if p2_pos.y >= parking_top_y and p2_pos.y <= parking_bot_y:
+				if absf(p2_pos.x - slot_x) > 6.0:
+					crosses_other_bays = true
+					break
+		if crosses_other_bays:
+			printerr("  FAIL curve crosses through other parking bays (max drift %.1f px)" %
+				max_x_drift)
+			ok = false
 
 	if ok:
 		print("  PASS\n")

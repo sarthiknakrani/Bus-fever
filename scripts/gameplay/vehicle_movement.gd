@@ -25,46 +25,72 @@ static func animate_dispatch(
 	# -----------------------------------------------------------------
 	# BOARD-TO-PARKING DRIVING SEQUENCE
 	#
-	# Stage A: Drive along the puzzle arrow direction (transformed to
-	#          world space via board_root) to leave the board.
-	# Stage B: Curve through a CORRIDOR below the parking strip until
-	#          the bus is directly below its target slot.
-	# Stage C: Finish the turn inside the corridor and approach the bay
-	#          vertically, front up.
-	# Stage D: Settle exactly on slot_pos with no further rotation.
+	# Stage A: Drive STRAIGHT along the puzzle arrow direction (in world
+	#          space, after the board's 45-deg rotation) to clear the
+	#          puzzle footprint. Front follows forward direction.
+	# Stage B: Curve through the explicit corridor waypoint, sitting
+	#          BELOW the parking strip, until the bus is directly under
+	#          its target slot. The turn is gradual, not a snap.
+	# Stage C: From the corridor waypoint, drive STRAIGHT VERTICALLY UP
+	#          into the bay. Front faces passengers.
+	# Stage D: Settle exactly on slot_pos, no further rotation.
 	#
-	# Implemented as a 2-point Curve2D (one cubic Bézier) driven by a
-	# single tween_method that updates BOTH position and rotation. No
-	# competing tweens, no forced rotation blend — the curve geometry
-	# itself ends with the tangent pointing straight up so the bus
-	# arrives vertical naturally.
+	# Implemented as a 4-point Curve2D driven by a single tween_method
+	# that updates BOTH position and rotation. No competing tweens, no
+	# forced rotation blend — the curve geometry itself produces three
+	# distinct phases (drive, turn, dock) with smooth tangents between
+	# them.
 	# -----------------------------------------------------------------
 	var tw := vehicle_node.create_tween()
 
 	# Puzzle-arrow direction expressed in world space (after the
 	# 45-degree board rotation + 0.6 Y-scale). This is the direction
-	# the bus drives along in Stage A. It is computed in the caller
-	# from the swept-corridor exit point and passed in as
-	# _legacy_exit_pos.
+	# the bus drives along in Stage A. Passed in by the caller as
+	# _legacy_exit_pos so this static function never depends on
+	# board_root transform.
 	var forward_world: Vector2 = (_legacy_exit_pos - start_pos)
 	if forward_world.length_squared() < 0.0001:
 		forward_world = Vector2(0, -1)
 	forward_world = forward_world.normalized()
 
 	# -------------------------------------------------------------------------
-	# Two-point cubic Bézier:
-	#   - Tangent at start: puzzle world direction (drives along arrow)
-	#   - Tangent at end:   (0, -1) vertical UP (enters bay vertically)
-	# The curve naturally passes BELOW the parking strip (in the corridor
-	# zone) on its way from the board to the bay, regardless of which
-	# direction the puzzle arrow originally pointed.
+	# 4-point cubic Bézier chain:
+	#
+	#   P0 = bus on the board (start)
+	#   P1 = 130 px ALONG the puzzle arrow past P0 (Stage A exit)
+	#   P2 = corridor waypoint, BELOW the parking strip and under slot
+	#   P3 = slot center (final destination, tangent = vertical UP)
+	#
+	# Tangent strategy:
+	#   - Segment P0 -> P1: both endpoints tangent to forward_world so
+	#     this segment is essentially a straight line along the puzzle
+	#     arrow (bus drives the way the puzzle intended).
+	#   - Segment P1 -> P2: enter at forward_world, leave at forward_world
+	#     so the bus continues straight until the corridor. Tangent
+	#     transition to vertical happens in segment P2 -> P3.
+	#   - Segment P2 -> P3: enter at vertical UP, leave at vertical UP
+	#     so this segment is a straight vertical dock into the bay.
 	# -------------------------------------------------------------------------
+	var P1: Vector2 = start_pos + forward_world * 130.0
+	# corridor_pos is the waypoint supplied by the caller; if it is too
+	# close to start_pos (degenerate), fall back to a synthetic corridor.
+	var P2: Vector2 = corridor_pos
+	if P2.distance_to(start_pos) < 80.0:
+		# Caller did not supply a corridor we trust — synthesize one
+		# directly under the slot, well clear of the parking rect.
+		P2 = Vector2(slot_pos.x, slot_pos.y + 100.0)
+
 	var curve := Curve2D.new()
-	curve.add_point(start_pos, Vector2.ZERO, forward_world * 200.0)
-	curve.add_point(slot_pos, Vector2(0.0, 160.0), Vector2.ZERO)
-	# corridor_pos is reserved for future, debug visualization, or
-	# collision-safe multi-segment routing.
-	var _corridor_pos_unused := corridor_pos
+	# P0 - bus on the board; out tangent = puzzle direction.
+	curve.add_point(start_pos, Vector2.ZERO, forward_world * 120.0)
+	# P1 - driven-out waypoint; smooth continuation of puzzle direction.
+	curve.add_point(P1, -forward_world * 100.0, forward_world * 100.0)
+	# P2 - corridor below parking strip; in tangent = vertical UP, out
+	# tangent = vertical UP, so segment P2->P3 is straight.
+	curve.add_point(P2, Vector2(0.0, 100.0), Vector2(0.0, -100.0))
+	# P3 - slot center; in tangent = vertical UP, so the bus enters the
+	# bay driving straight up with its front facing passengers.
+	curve.add_point(slot_pos, Vector2(0.0, 130.0), Vector2.ZERO)
 
 	# Derive front vector (the bus sprite's "front" in its NATIVE puzzle orientation).
 	var front_native := Vector2(0, -1)
