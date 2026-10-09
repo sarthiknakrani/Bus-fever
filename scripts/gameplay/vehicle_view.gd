@@ -18,10 +18,10 @@ var _badge_label: Label
 var _touch_area: Area2D
 
 # Sprite nodes for modular art replacement
-var _shadow_sprite: NinePatchRect
-var _base_sprite: NinePatchRect
-var _roof_sprite: NinePatchRect
-var _glass_sprite: NinePatchRect
+var _shadow_sprite: Sprite2D
+var _base_sprite: Sprite2D
+var _roof_sprite: Sprite2D
+var _glass_sprite: Sprite2D
 var _arrow_sprite: Sprite2D
 var _wheels: Array[Sprite2D] = []
 var boarding_anchor: Marker2D
@@ -57,63 +57,36 @@ func set_parking_mode(in_parking: bool) -> void:
 		_badge_node.visible = in_parking
 
 func _build_visuals() -> void:
-	var cells_w: float = float(vehicle_footprint.size()) if vehicle_dir == CarJamVehicleData.Direction.RIGHT or vehicle_dir == CarJamVehicleData.Direction.LEFT else 1.0
-	var cells_h: float = float(vehicle_footprint.size()) if vehicle_dir == CarJamVehicleData.Direction.UP or vehicle_dir == CarJamVehicleData.Direction.DOWN else 1.0
-
-	var pixel_w = cells_w * CELL_SIZE - 10.0
-	var pixel_h = cells_h * CELL_SIZE - 10.0
-	
-	var tex_body = _load_interim_sprite("res://assets/sprites/interim/bus_body.png")
-	var tex_roof = _load_interim_sprite("res://assets/sprites/interim/bus_roof.png")
-	var tex_glass = _load_interim_sprite("res://assets/sprites/interim/bus_window.png")
-	var tex_wheel = _load_interim_sprite("res://assets/sprites/interim/bus_wheel.png")
-	var tex_arrow = _load_interim_sprite("res://assets/sprites/interim/arrow.png")
-	
-	# Clear existing
+	# Clear existing interim visuals
 	for c in get_children():
 		if c is NinePatchRect or c is Sprite2D:
 			c.queue_free()
 	_wheels.clear()
 	
-	var create_np = func(tex, color, w, h, y_off):
-		var np = NinePatchRect.new()
-		if tex: np.texture = tex
-		np.modulate = color
-		np.patch_margin_left = 24
-		np.patch_margin_right = 24
-		np.patch_margin_top = 24
-		np.patch_margin_bottom = 24
-		np.size = Vector2(w, h)
-		np.position = Vector2(-w/2.0, -h/2.0 + y_off)
-		add_child(np)
-		return np
-
-	# 1. Shadow
-	_shadow_sprite = create_np.call(tex_body, Color(0,0,0,0.3), pixel_w, pixel_h, 8)
-	
-	# 2. Wheels
-	var wheel_w = 12.0
-	var wheel_h = 24.0
-	var wx = pixel_w/2.0 - 4
-	var wy = pixel_h/2.0 - 20
-	
-	var w_pts = []
-	if cells_h > cells_w: # Vertical
-		w_pts = [Vector2(-wx, -wy), Vector2(wx, -wy), Vector2(-wx, wy), Vector2(wx, wy)]
-	else:
-		w_pts = [Vector2(-wy, -wx), Vector2(wy, -wx), Vector2(-wy, wx), Vector2(wy, wx)]
+	# Determine Premium Asset
+	var length_str = "short"
+	if vehicle_footprint.size() > 2:
+		length_str = "long"
 		
-	for p in w_pts:
-		var s = Sprite2D.new()
-		if tex_wheel: s.texture = tex_wheel
-		s.position = p
-		if cells_w > cells_h: s.rotation = PI/2.0
-		s.scale = Vector2(wheel_w / 32.0, wheel_h / 64.0)
-		add_child(s)
-		_wheels.append(s)
-		
-	# 3. Base Body
-	_base_sprite = create_np.call(tex_body, vehicle_color.darkened(0.2), pixel_w, pixel_h, 0)
+	var dir_str = "down"
+	if vehicle_dir == CarJamVehicleData.Direction.UP: dir_str = "up"
+	elif vehicle_dir == CarJamVehicleData.Direction.LEFT: dir_str = "left"
+	elif vehicle_dir == CarJamVehicleData.Direction.RIGHT: dir_str = "right"
+	
+	var col_str = "red"
+	if vehicle_color.is_equal_approx(CarJamVehicleData.color_to_rgb("blue")): col_str = "blue"
+	elif vehicle_color.is_equal_approx(CarJamVehicleData.color_to_rgb("yellow")): col_str = "yellow"
+	
+	var tex_path = "res://assets/sprites/premium_buses/bus_%s_%s_%s.png" % [length_str, col_str, dir_str]
+	var tex_bus = _load_interim_sprite(tex_path)
+	
+	_base_sprite = Sprite2D.new()
+	if tex_bus:
+		_base_sprite.texture = tex_bus
+	
+	# The asset is pre-scaled accurately to the WxH grid, we just center it.
+	# The default Sprite2D is centered on its origin, which matches the node's center.
+	add_child(_base_sprite)
 	
 	# Boarding Layer and Anchor
 	if not boarding_layer:
@@ -129,29 +102,7 @@ func _build_visuals() -> void:
 	else:
 		boarding_anchor.get_parent().remove_child(boarding_anchor)
 	boarding_layer.add_child(boarding_anchor)
-	boarding_anchor.position = Vector2(0, 0) # Center of the bus body
-	
-	# 4. Glass
-	_glass_sprite = create_np.call(tex_glass, Color.WHITE, pixel_w - 8, pixel_h - 8, 0)
-	_glass_sprite.patch_margin_left = 8
-	_glass_sprite.patch_margin_top = 8
-	_glass_sprite.patch_margin_right = 8
-	_glass_sprite.patch_margin_bottom = 8
-	
-	# 5. Roof
-	_roof_sprite = create_np.call(tex_roof, vehicle_color, pixel_w - 16, pixel_h - 16, -6)
-	
-	# 6. Arrow
-	_arrow_sprite = Sprite2D.new()
-	if tex_arrow: _arrow_sprite.texture = tex_arrow
-	_arrow_sprite.position = Vector2(0, -6)
-	_arrow_sprite.scale = Vector2(0.4, 0.4)
-	if vehicle_dir == CarJamVehicleData.Direction.UP: _arrow_sprite.rotation = 0
-	elif vehicle_dir == CarJamVehicleData.Direction.DOWN: _arrow_sprite.rotation = PI
-	elif vehicle_dir == CarJamVehicleData.Direction.LEFT: _arrow_sprite.rotation = -PI/2.0
-	elif vehicle_dir == CarJamVehicleData.Direction.RIGHT: _arrow_sprite.rotation = PI/2.0
-	add_child(_arrow_sprite)
-
+	boarding_anchor.position = Vector2(0, 0)
 func _setup_touch_area() -> void:
 	if _touch_area != null: return
 	_touch_area = Area2D.new()
