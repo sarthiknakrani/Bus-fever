@@ -686,8 +686,8 @@ func _build_hud() -> void:
 	booster_bar.anchor_bottom = 1.0
 	booster_bar.offset_left = 20.0
 	booster_bar.offset_right = -20.0
-	booster_bar.offset_top = -160.0
-	booster_bar.offset_bottom = -20.0
+	booster_bar.offset_top = -90.0
+	booster_bar.offset_bottom = -10.0
 	safe_area_root.add_child(booster_bar)
 
 	var b_hbox := HBoxContainer.new()
@@ -1060,7 +1060,7 @@ func _update_layout() -> void:
 	
 	var track_y = start_y
 	var parking_y = track_y + (track_h / 2.0) + gap + (parking_h / 2.0)
-	var bottom_ui_top_y = half_h - (240.0 / scale_factor)
+	var bottom_ui_top_y = half_h - (120.0 / scale_factor)
 	var parking_bottom_y = parking_y + (parking_h / 2.0)
 	var board_y = (parking_bottom_y + bottom_ui_top_y) / 2.0
 	
