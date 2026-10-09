@@ -23,29 +23,27 @@ func setup(p_col_id: String) -> void:
 	_visual_node = Node2D.new()
 	add_child(_visual_node)
 	
-	# Load layered premium components
 	var t_head = _load_interim_sprite("res://assets/sprites/premium_passengers/head_" + _color_id + ".png")
 	var t_body = _load_interim_sprite("res://assets/sprites/premium_passengers/body_" + _color_id + ".png")
 	var t_arm  = _load_interim_sprite("res://assets/sprites/premium_passengers/arm_" + _color_id + ".png")
 	var t_leg  = _load_interim_sprite("res://assets/sprites/premium_passengers/leg_" + _color_id + ".png")
 	var t_shadow = _load_interim_sprite("res://assets/sprites/premium_passengers/passenger_shadow.png")
 	
-	# Soft shadow
 	_shadow = Sprite2D.new()
 	if t_shadow: _shadow.texture = t_shadow
 	_shadow.position = Vector2(0, 16)
-	add_child(_shadow) # Shadow stays un-flipped on the ground
+	add_child(_shadow)
 	
-	# Right Arm (Back)
-	_arm_r = _create_limb(t_arm, Vector2(12, -18), Vector2(0, 10), -1)
-	_arm_r.modulate = Color(0.6, 0.6, 0.6) # Darken back arm
+	# Right Arm (Back) - pushed out and darkened
+	_arm_r = _create_limb(t_arm, Vector2(16, -18), Vector2(0, 10), -1)
+	_arm_r.modulate = Color(0.4, 0.4, 0.4)
 	
-	# Right Leg (Back)
-	_leg_r = _create_limb(t_leg, Vector2(8, -8), Vector2(0, 12), -1)
-	_leg_r.modulate = Color(0.6, 0.6, 0.6) # Darken back leg
+	# Right Leg (Back) - pushed out and darkened
+	_leg_r = _create_limb(t_leg, Vector2(10, -8), Vector2(0, 12), -1)
+	_leg_r.modulate = Color(0.4, 0.4, 0.4)
 	
-	# Left Leg (Front)
-	_leg_l = _create_limb(t_leg, Vector2(-8, -8), Vector2(0, 12), 1)
+	# Left Leg (Front) - pushed out and brought to front (z=4)
+	_leg_l = _create_limb(t_leg, Vector2(-10, -8), Vector2(0, 12), 4)
 	
 	# Body
 	_body = Sprite2D.new()
@@ -54,17 +52,16 @@ func setup(p_col_id: String) -> void:
 	_body.z_index = 2
 	_visual_node.add_child(_body)
 	
-	# Left Arm (Front)
-	_arm_l = _create_limb(t_arm, Vector2(-14, -16), Vector2(0, 10), 3)
+	# Left Arm (Front) - pushed out and brought to front (z=5)
+	_arm_l = _create_limb(t_arm, Vector2(-16, -16), Vector2(0, 10), 5)
 	
 	# Head
 	_head = Sprite2D.new()
 	if t_head: _head.texture = t_head
 	_head.position = Vector2(0, -42)
-	_head.z_index = 4
+	_head.z_index = 6
 	_visual_node.add_child(_head)
 	
-	# Global scale tweak
 	_visual_node.scale = Vector2(0.85, 0.85)
 	if _shadow: _shadow.scale = Vector2(0.85, 0.85)
 	
@@ -86,13 +83,13 @@ func _process(delta: float) -> void:
 	if not _is_boarding:
 		_anim_time += delta * 12.0 # Walk cycle speed
 		
-		var leg_swing = sin(_anim_time) * 0.8
+		var leg_swing = sin(_anim_time) * 1.2
 		
 		# Animate limbs (pivot is the parent of the sprite)
 		_leg_l.get_parent().rotation = leg_swing
 		_leg_r.get_parent().rotation = -leg_swing
-		_arm_l.get_parent().rotation = -leg_swing * 0.4
-		_arm_r.get_parent().rotation = leg_swing * 0.4
+		_arm_l.get_parent().rotation = -leg_swing * 0.7
+		_arm_r.get_parent().rotation = leg_swing * 0.7
 		
 		# Body bounce
 		var bounce = abs(sin(_anim_time)) * 3.0
