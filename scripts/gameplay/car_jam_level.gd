@@ -712,21 +712,9 @@ func _build_hud() -> void:
 		btn.add_theme_stylebox_override("pressed", bst_pressed)
 		btn.add_theme_stylebox_override("disabled", bst_style)
 		btn.disabled = true
-		btn.custom_minimum_size = Vector2(100, 100)
+		btn.custom_minimum_size = Vector2(70, 70)
 		
-		# Clean icon
-		var icon_name = "icon_car_clean.png" if b_name == "VIP" else ("icon_bus_clean.png" if b_name == "Arrange" else "icon_ball_clean.png")
-		var icon_rect = TextureRect.new()
-		icon_rect.texture = load("res://assets/" + icon_name)
-		icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		icon_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
-		# slightly smaller to fit in the box nicely
-		icon_rect.offset_left = 12
-		icon_rect.offset_right = -12
-		icon_rect.offset_top = 12
-		icon_rect.offset_bottom = -16
-		btn.add_child(icon_rect)
+
 		
 		# Add a green '+' circle
 		var plus := Label.new()
@@ -747,7 +735,7 @@ func _build_hud() -> void:
 		plus.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		plus.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		plus.size = Vector2(28, 28)
-		plus.position = Vector2(80, -8)
+		plus.position = Vector2(56, -8)
 		btn.add_child(plus)
 		
 		vbox.add_child(btn)
@@ -1072,7 +1060,9 @@ func _update_layout() -> void:
 	
 	var track_y = start_y
 	var parking_y = track_y + (track_h / 2.0) + gap + (parking_h / 2.0)
-	var board_y = parking_y + (parking_h / 2.0) + gap + (board_pixel_h / 2.0)
+	var bottom_ui_top_y = half_h - (240.0 / scale_factor)
+	var parking_bottom_y = parking_y + (parking_h / 2.0)
+	var board_y = (parking_bottom_y + bottom_ui_top_y) / 2.0
 	
 	# Passenger track prominent in upper section
 	if passenger_track_root != null:
