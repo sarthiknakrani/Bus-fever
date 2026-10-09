@@ -4,8 +4,8 @@ class_name ParkingSlotView
 var slot_id: int = 0
 var slot_state: int = CarJamParkingManager.SlotState.EMPTY
 
-const SLOT_WIDTH: float = 72.0
-const SLOT_HEIGHT: float = 120.0
+const SLOT_WIDTH: float = 62.0
+const SLOT_HEIGHT: float = 104.0
 
 var _bay_sprite: NinePatchRect
 var _vip_label: Label
@@ -41,11 +41,11 @@ func _build_visuals() -> void:
 	
 	_vip_label = Label.new()
 	_vip_label.text = "VIP"
-	_vip_label.add_theme_font_size_override("font_size", 22)
+	_vip_label.add_theme_font_size_override("font_size", 18)
 	_vip_label.add_theme_color_override("font_color", Color("fbbf24"))
 	_vip_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_vip_label.position = Vector2(-36, 12)
-	_vip_label.size = Vector2(72, 30)
+	_vip_label.position = Vector2(-31, 10)
+	_vip_label.size = Vector2(62, 30)
 	_vip_label.visible = false
 	add_child(_vip_label)
 

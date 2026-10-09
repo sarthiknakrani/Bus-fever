@@ -320,7 +320,7 @@ func _setup_visuals(lvl: CarJamLevelData) -> void:
 	board_bg.setup(lvl.board_size)
 
 	# 2. Parking Slots
-	var slot_spacing := 94.0
+	var slot_spacing := 76.0
 	var total_span: float = float(lvl.parking_slots_count - 1) * slot_spacing
 	
 	# Draw a thick rounded asphalt background for parking
@@ -328,8 +328,9 @@ func _setup_visuals(lvl: CarJamLevelData) -> void:
 	parking_bg.name = "ParkingBase"
 	parking_bg.z_index = -1
 	
-	var bg_w = total_span + 40.0
-	var bg_h = 200.0
+
+	var bg_w = total_span + 62.0 + 32.0 # total_span + SLOT_WIDTH + padding
+	var bg_h = 104.0 + 32.0 # SLOT_HEIGHT + padding
 	
 	parking_bg.draw.connect(func():
 		var style = StyleBoxFlat.new()
@@ -1031,7 +1032,7 @@ func _update_layout() -> void:
 	var screen_safe_w = vp_size.x * 0.95
 
 	# Ensure we fit the parking strip which might be wider than the board
-	var slot_spacing = 94.0 # MATCHES what we set earlier
+	var slot_spacing = 76.0 # MATCHES what we set earlier
 	var parking_w = float(max(1, controller.level_data.parking_slots_count - 1)) * slot_spacing + 40.0
 	
 	# We need some extra width for buses to exit the board cleanly without clipping
