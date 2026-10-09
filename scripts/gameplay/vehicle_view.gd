@@ -152,7 +152,7 @@ func _setup_capacity_badge() -> void:
 	if _badge_node != null: return
 	_badge_node = Node2D.new()
 	_badge_node.name = "CapacityBadge"
-	_badge_node.position = Vector2(0, CELL_SIZE * 0.7)
+	_badge_node.position = Vector2.ZERO # Centered perfectly on the geometric center of the bus footprint
 	_badge_node.visible = false
 	_badge_node.z_index = 10 
 

@@ -34,16 +34,16 @@ func setup(p_col_id: String) -> void:
 	_shadow.position = Vector2(0, 16)
 	add_child(_shadow)
 	
-	# Right Arm (Back) - pushed out and darkened
-	_arm_r = _create_limb(t_arm, Vector2(16, -18), Vector2(0, 10), -1)
+	# Right Arm (Back) - closer for side-profile
+	_arm_r = _create_limb(t_arm, Vector2(4, -18), Vector2(0, 10), -1)
 	_arm_r.modulate = Color(0.4, 0.4, 0.4)
 	
-	# Right Leg (Back) - pushed out and darkened
-	_leg_r = _create_limb(t_leg, Vector2(10, -8), Vector2(0, 12), -1)
+	# Right Leg (Back) - closer for side-profile, offset slightly to be visible
+	_leg_r = _create_limb(t_leg, Vector2(3, -8), Vector2(0, 12), -1)
 	_leg_r.modulate = Color(0.4, 0.4, 0.4)
 	
-	# Left Leg (Front) - pushed out and brought to front (z=4)
-	_leg_l = _create_limb(t_leg, Vector2(-10, -8), Vector2(0, 12), 4)
+	# Left Leg (Front)
+	_leg_l = _create_limb(t_leg, Vector2(-3, -8), Vector2(0, 12), 4)
 	
 	# Body
 	_body = Sprite2D.new()
@@ -52,8 +52,8 @@ func setup(p_col_id: String) -> void:
 	_body.z_index = 2
 	_visual_node.add_child(_body)
 	
-	# Left Arm (Front) - pushed out and brought to front (z=5)
-	_arm_l = _create_limb(t_arm, Vector2(-16, -16), Vector2(0, 10), 5)
+	# Left Arm (Front)
+	_arm_l = _create_limb(t_arm, Vector2(-2, -18), Vector2(0, 10), 5)
 	
 	# Head
 	_head = Sprite2D.new()

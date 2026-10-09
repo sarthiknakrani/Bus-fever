@@ -16,6 +16,7 @@ signal level_completed()
 signal puzzle_failed()
 signal board_updated()
 signal parking_updated()
+signal parking_full_warning()
 signal queue_updated()
 
 enum GameState {
@@ -68,6 +69,21 @@ func restart_level() -> void:
 		load_level(level_data)
 
 func tap_vehicle(vehicle_id: int) -> bool:
+	var t0 = Time.get_ticks_msec()
+	var v_log = vehicles.get(vehicle_id, null)
+	var state_str = "NULL" if v_log == null else str(v_log.state)
+	var can_disp = false if v_log == null else v_log.can_dispatch()
+	var slots_str = "["
+	for s in parking._slots: slots_str += "U" if s.is_unlocked else "L" ; slots_str += str(s.state) + ":" + str(s.vehicle_id) + ", "
+	slots_str += "]"
+	
+	if state != GameState.PLAYING:
+		print("[QA %d] Tap Bus %d | State: %s | Legal: %s | Slots: %s | REJECTED: Game not playing" % [t0, vehicle_id, state_str, str(can_disp), slots_str])
+		return false
+
+	if v_log == null or not v_log.can_dispatch():
+		print("[QA %d] Tap Bus %d | State: %s | Legal: %s | Slots: %s | REJECTED: Invalid state" % [t0, vehicle_id, state_str, str(can_disp), slots_str])
+		return false
 	if state != GameState.PLAYING:
 		return false
 
@@ -80,18 +96,21 @@ func tap_vehicle(vehicle_id: int) -> bool:
 	# 1. Swept corridor collision check
 	var escape_res := board.check_swept_escape(v)
 	if not escape_res["can_escape"]:
+		print("[QA %d] Tap Bus %d | State: %s | Legal: %s | Slots: %s | REJECTED: Physically Blocked by %d" % [Time.get_ticks_msec(), vehicle_id, state_str, str(can_disp), slots_str, escape_res["blocker_id"]])
 		vehicle_blocked.emit(vehicle_id, escape_res["blocker_id"])
 		return false
 
 	# 2. Parking slot capacity check
 	var slot_id := parking.find_available_slot()
 	if slot_id == -1:
+		print("[QA %d] Tap Bus %d | State: %s | Legal: %s | Slots: %s | REJECTED: No Spot Available (Toast Triggered)" % [Time.get_ticks_msec(), vehicle_id, state_str, str(can_disp), slots_str])
 		# Parking is completely full!
-		vehicle_blocked.emit(vehicle_id, -1)
+		parking_full_warning.emit()
 		return false
 
 	# 3. Commit atomic dispatch
 	slot_id = parking.reserve_slot(vehicle_id)
+	print("[QA %d] Tap Bus %d | State: %s | Legal: %s | Slots: %s | ACCEPTED: Reserved Slot %d" % [Time.get_ticks_msec(), vehicle_id, state_str, str(can_disp), slots_str, slot_id])
 	v.state = VehicleModel.VehicleState.EXITING
 	v.reserved_slot = slot_id
 
@@ -125,20 +144,36 @@ func on_vehicle_arrived_at_slot(vehicle_id: int, slot_id: int, token: int) -> vo
 	_process_boarding_cycle(token)
 	_check_terminal_states()
 
+func on_vehicle_cleared_slot(vehicle_id: int, slot_id: int, token: int) -> void:
+	print("[QA %d] Bus %d cleared parking bounds. Slot %d released." % [Time.get_ticks_msec(), vehicle_id, slot_id])
+	if token != session_token:
+		return
+	
+	var v: VehicleModel = vehicles.get(vehicle_id, null)
+	if v != null:
+		v.state = VehicleModel.VehicleState.DEPARTING
+		v.reserved_slot = -1
+		
+	# Release the bay atomically as soon as bus physically clears it
+	parking.release_slot(slot_id)
+	parking_updated.emit()
+	
+	# Try boarding cycle just in case
+	_process_boarding_cycle(token)
+
 func on_vehicle_departed_from_slot(vehicle_id: int, slot_id: int, token: int) -> void:
+	print("[QA %d] Bus %d final exit completed off-screen." % [Time.get_ticks_msec(), vehicle_id])
 	if token != session_token:
 		return
 
 	var v: VehicleModel = vehicles.get(vehicle_id, null)
 	if v != null:
 		v.state = VehicleModel.VehicleState.COMPLETED
-		v.reserved_slot = -1
-
-	parking.release_slot(slot_id)
+		
+	# Parking is already released by on_vehicle_cleared_slot, do not double-release
 	vehicle_departed.emit(vehicle_id, slot_id)
-	parking_updated.emit()
 
-	# Re-evaluate boarding in case subsequent passenger groups can now board
+	# Re-evaluate boarding and check level clear
 	_process_boarding_cycle(token)
 	_check_terminal_states()
 

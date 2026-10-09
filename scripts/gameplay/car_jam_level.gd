@@ -13,6 +13,7 @@ const VehicleView := preload("res://scripts/gameplay/vehicle_view.gd")
 const ParkingSlotView := preload("res://scripts/gameplay/parking_slot_view.gd")
 const PassengerView := preload("res://scripts/gameplay/passenger_view.gd")
 const VehicleMovement := preload("res://scripts/gameplay/vehicle_movement.gd")
+const SimpleStyle := preload("res://scripts/ui/style_helpers.gd")
 
 # Metrics
 const CELL_SIZE: float = 78.0
@@ -51,6 +52,9 @@ var result_overlay: Control
 var level_title_label: Label
 var result_title_label: Label
 var result_btn: TextureButton
+
+var _toast_panel: PanelContainer
+var _toast_tween: Tween
 
 # Authoritative Controller
 var controller: CarJamController
@@ -178,16 +182,8 @@ func _build_scene_hierarchy() -> void:
 	# World Background
 	var bg_layer := CanvasLayer.new()
 	bg_layer.layer = -1
-	var bg := TextureRect.new()
-	var grad_tex := GradientTexture2D.new()
-	var grad := Gradient.new()
-	grad.add_point(0.0, Color("e0f2fe"))
-	grad.add_point(0.5, Color("bae6fd"))
-	grad.add_point(1.0, Color("7dd3fc"))
-	grad_tex.gradient = grad
-	grad_tex.fill_to = Vector2(0, 1)
-	grad_tex.fill_from = Vector2(0, 0)
-	bg.texture = grad_tex
+	var bg := ColorRect.new()
+	bg.color = Color("87CEEB") # Sharp sky blue
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	bg_layer.add_child(bg)
 	add_child(bg_layer)
@@ -274,6 +270,7 @@ func _setup_controller() -> void:
 	controller.vehicle_filled.connect(_on_vehicle_filled)
 	controller.vehicle_departed.connect(_on_vehicle_departed)
 	controller.parking_updated.connect(_on_parking_updated)
+	controller.parking_full_warning.connect(_show_parking_full_toast)
 	controller.queue_updated.connect(_on_queue_updated)
 	controller.level_completed.connect(_on_level_completed)
 	controller.puzzle_failed.connect(_on_puzzle_failed)
@@ -548,6 +545,7 @@ func _on_boarding_started(vehicle_id: int, color_id: String, count: int, slot_id
 		vv.play_badge_pulse()
 
 func _on_vehicle_filled(vehicle_id: int, slot_id: int) -> void:
+	print("[QA %d] Bus %d boarding completed." % [Time.get_ticks_msec(), vehicle_id])
 	var vv: VehicleView = vehicle_views.get(vehicle_id, null)
 	if vv == null:
 		return
@@ -621,10 +619,18 @@ func _build_hud() -> void:
 	top_bar.offset_bottom = 90.0
 	safe_area_root.add_child(top_bar)
 
-	var btn_restart := TextureButton.new()
-	btn_restart.texture_normal = load("res://assets/btn_back.png")
-	btn_restart.stretch_mode = TextureButton.STRETCH_SCALE
-	btn_restart.custom_minimum_size = Vector2(77, 81)
+	# Restart (←) — simple 3D blue button in top-left
+	var btn_restart := Button.new()
+	btn_restart.text = "↻"
+	btn_restart.add_theme_font_size_override("font_size", 36)
+	btn_restart.add_theme_color_override("font_color", Color.WHITE)
+	btn_restart.add_theme_stylebox_override("normal", SimpleStyle.make_extruded_style(
+		Color("60a5fa"), Color("1e3a8a"), 14, 7, 4))
+	btn_restart.add_theme_stylebox_override("hover", SimpleStyle.make_extruded_style(
+		Color("93c5fd"), Color("1e3a8a"), 14, 7, 4))
+	btn_restart.add_theme_stylebox_override("pressed", SimpleStyle.make_extruded_style(
+		Color("3b82f6"), Color("1e3a8a"), 14, 3, 2, 4))
+	btn_restart.custom_minimum_size = Vector2(60, 60)
 	btn_restart.button_down.connect(func(): btn_restart.position.y += 4)
 	btn_restart.button_up.connect(func(): btn_restart.position.y -= 4)
 	btn_restart.pressed.connect(_on_restart_pressed)
@@ -646,14 +652,21 @@ func _build_hud() -> void:
 	level_title_label.anchor_bottom = 1.0
 	top_bar.add_child(level_title_label)
 
-	var btn_pause := TextureButton.new()
-	btn_pause.texture_normal = load("res://assets/btn_pause.png")
-	btn_pause.stretch_mode = TextureButton.STRETCH_SCALE
-	btn_pause.custom_minimum_size = Vector2(80, 81)
+	var btn_pause := Button.new()
+	btn_pause.text = "❚❚"
+	btn_pause.add_theme_font_size_override("font_size", 28)
+	btn_pause.add_theme_color_override("font_color", Color.WHITE)
+	btn_pause.add_theme_stylebox_override("normal", SimpleStyle.make_extruded_style(
+		Color("60a5fa"), Color("1e3a8a"), 14, 7, 4))
+	btn_pause.add_theme_stylebox_override("hover", SimpleStyle.make_extruded_style(
+		Color("93c5fd"), Color("1e3a8a"), 14, 7, 4))
+	btn_pause.add_theme_stylebox_override("pressed", SimpleStyle.make_extruded_style(
+		Color("3b82f6"), Color("1e3a8a"), 14, 3, 2, 4))
+	btn_pause.custom_minimum_size = Vector2(60, 60)
 	btn_pause.button_down.connect(func(): btn_pause.position.y += 4)
 	btn_pause.button_up.connect(func(): btn_pause.position.y -= 4)
 	btn_pause.anchor_left = 1.0
-	btn_pause.offset_left = -80.0
+	btn_pause.offset_left = -76.0
 	btn_pause.pressed.connect(_on_pause_pressed)
 	top_bar.add_child(btn_pause)
 
@@ -676,31 +689,15 @@ func _build_hud() -> void:
 	b_hbox.add_theme_constant_override("separation", 24)
 	booster_bar.add_child(b_hbox)
 
-	var bst_style = StyleBoxFlat.new()
-	bst_style.bg_color = Color("38bdf8") # light blue
-	bst_style.border_width_bottom = 12
-	bst_style.border_color = Color("ffffff") # white rim
-	bst_style.corner_radius_top_left = 24
-	bst_style.corner_radius_top_right = 24
-	bst_style.corner_radius_bottom_left = 24
-	bst_style.corner_radius_bottom_right = 24
-	bst_style.shadow_color = Color("0284c7") # dark blue shadow
-	bst_style.shadow_size = 1
-	bst_style.shadow_offset = Vector2(0, 12)
-
-	bst_style.border_width_top = 8
-	bst_style.border_blend = true
-
-	
-	var bst_pressed = bst_style.duplicate()
-	bst_pressed.border_width_bottom = 6
-	bst_pressed.shadow_offset = Vector2(0, 6)
-	bst_pressed.content_margin_top = 6
+	var bst_style := SimpleStyle.make_extruded_style(
+		Color("38bdf8"), Color("1e3a8a"), 22, 10, 0)
+	var bst_pressed := SimpleStyle.make_extruded_style(
+		Color("38bdf8"), Color("1e3a8a"), 22, 5, 6, 5)
 
 	for b_name in ["VIP", "Arrange", "Jumble"]:
 		var vbox = VBoxContainer.new()
 		vbox.add_theme_constant_override("separation", 8)
-		
+
 		# Base button uses procedural style to remain crisp and clean
 		var btn := Button.new()
 		btn.add_theme_stylebox_override("normal", bst_style)
@@ -805,20 +802,15 @@ func _build_hud() -> void:
 	
 	# Close button inside header
 	var p_close := Button.new()
-	var pc_style := StyleBoxFlat.new()
-	pc_style.bg_color = Color("eb3b5a")
-	pc_style.border_width_bottom = 6
-	pc_style.border_color = Color("b71540")
-	pc_style.corner_radius_top_left = 16
-	pc_style.corner_radius_top_right = 16
-	pc_style.corner_radius_bottom_left = 16
-	pc_style.corner_radius_bottom_right = 16
-	p_close.add_theme_stylebox_override("normal", pc_style)
-	p_close.add_theme_stylebox_override("hover", pc_style)
-	p_close.add_theme_stylebox_override("pressed", pc_style)
 	p_close.text = "✖"
 	p_close.add_theme_font_size_override("font_size", 28)
-	p_close.add_theme_color_override("font_color", Color("ffffff"))
+	p_close.add_theme_color_override("font_color", Color.WHITE)
+	p_close.add_theme_stylebox_override("normal", SimpleStyle.make_extruded_style(
+		Color("ef4444"), Color("991b1b"), 16, 6, 0))
+	p_close.add_theme_stylebox_override("hover", SimpleStyle.make_extruded_style(
+		Color("f87171"), Color("991b1b"), 16, 6, 0))
+	p_close.add_theme_stylebox_override("pressed", SimpleStyle.make_extruded_style(
+		Color("dc2626"), Color("7f1d1d"), 16, 3, 4, 3))
 	p_close.custom_minimum_size = Vector2(64, 64)
 	p_close.anchor_left = 1.0
 	p_close.anchor_right = 1.0
@@ -881,38 +873,38 @@ func _build_hud() -> void:
 			get_tree().root.get_node("SettingsManager").set_haptics(on)
 	))
 	
-	# Action Buttons
-	var p_btn_home := TextureButton.new()
-	p_btn_home.texture_normal = load("res://assets/btn_home.png")
-	p_btn_home.stretch_mode = TextureButton.STRETCH_SCALE
-	p_btn_home.custom_minimum_size = Vector2(264, 118)
-	p_btn_home.button_down.connect(func(): p_btn_home.position.y += 8)
-	p_btn_home.button_up.connect(func(): p_btn_home.position.y -= 8)
+	# Action Buttons — simple 3D-styled (orange Home, green Restart)
+	var p_btn_home := Button.new()
+	p_btn_home.text = "Home"
+	p_btn_home.add_theme_font_size_override("font_size", 36)
+	p_btn_home.add_theme_color_override("font_color", Color.WHITE)
+	p_btn_home.add_theme_stylebox_override("normal", SimpleStyle.make_extruded_style(
+		Color("f97316"), Color("9a3412"), 22, 10, 0))
+	p_btn_home.add_theme_stylebox_override("hover", SimpleStyle.make_extruded_style(
+		Color("fb923c"), Color("9a3412"), 22, 10, 0))
+	p_btn_home.add_theme_stylebox_override("pressed", SimpleStyle.make_extruded_style(
+		Color("ea580c"), Color("7c2d12"), 22, 5, 6, 5))
+	p_btn_home.custom_minimum_size = Vector2(260, 100)
+	p_btn_home.button_down.connect(func(): p_btn_home.position.y += 6)
+	p_btn_home.button_up.connect(func(): p_btn_home.position.y -= 6)
 	p_btn_home.pressed.connect(_on_home_pressed)
-	
-	var home_center = CenterContainer.new()
-	home_center.custom_minimum_size = Vector2(270, 120)
-	var hc_wrap = Control.new()
-	hc_wrap.custom_minimum_size = p_btn_home.custom_minimum_size
-	hc_wrap.add_child(p_btn_home)
-	home_center.add_child(hc_wrap)
-	pb_vbox.add_child(home_center)
-	
-	var p_btn_restart := TextureButton.new()
-	p_btn_restart.texture_normal = load("res://assets/btn_restart.png")
-	p_btn_restart.stretch_mode = TextureButton.STRETCH_SCALE
-	p_btn_restart.custom_minimum_size = Vector2(296, 102)
-	p_btn_restart.button_down.connect(func(): p_btn_restart.position.y += 8)
-	p_btn_restart.button_up.connect(func(): p_btn_restart.position.y -= 8)
+	pb_vbox.add_child(p_btn_home)
+
+	var p_btn_restart := Button.new()
+	p_btn_restart.text = "Restart"
+	p_btn_restart.add_theme_font_size_override("font_size", 36)
+	p_btn_restart.add_theme_color_override("font_color", Color.WHITE)
+	p_btn_restart.add_theme_stylebox_override("normal", SimpleStyle.make_extruded_style(
+		Color("22c55e"), Color("14532d"), 22, 10, 0))
+	p_btn_restart.add_theme_stylebox_override("hover", SimpleStyle.make_extruded_style(
+		Color("4ade80"), Color("14532d"), 22, 10, 0))
+	p_btn_restart.add_theme_stylebox_override("pressed", SimpleStyle.make_extruded_style(
+		Color("16a34a"), Color("14532d"), 22, 5, 6, 5))
+	p_btn_restart.custom_minimum_size = Vector2(260, 100)
+	p_btn_restart.button_down.connect(func(): p_btn_restart.position.y += 6)
+	p_btn_restart.button_up.connect(func(): p_btn_restart.position.y -= 6)
 	p_btn_restart.pressed.connect(_on_restart_pressed)
-	
-	var restart_center = CenterContainer.new()
-	restart_center.custom_minimum_size = Vector2(300, 110)
-	var rc_wrap = Control.new()
-	rc_wrap.custom_minimum_size = p_btn_restart.custom_minimum_size
-	rc_wrap.add_child(p_btn_restart)
-	restart_center.add_child(rc_wrap)
-	pb_vbox.add_child(restart_center)
+	pb_vbox.add_child(p_btn_restart)
 	
 	var p_spacer2 := Control.new()
 	p_spacer2.custom_minimum_size = Vector2(0, 4)
@@ -976,21 +968,21 @@ func _build_hud() -> void:
 	r_vbox.add_child(result_title_label)
 	
 	# Action Buttons (Home and Restart)
-	var r_btn_home := TextureButton.new()
-	r_btn_home.texture_normal = load("res://assets/btn_home.png")
-	r_btn_home.stretch_mode = TextureButton.STRETCH_SCALE
-	r_btn_home.custom_minimum_size = Vector2(264, 118)
-	r_btn_home.button_down.connect(func(): r_btn_home.position.y += 8)
-	r_btn_home.button_up.connect(func(): r_btn_home.position.y -= 8)
+	var r_btn_home := Button.new()
+	r_btn_home.text = "Home"
+	r_btn_home.add_theme_font_size_override("font_size", 36)
+	r_btn_home.add_theme_color_override("font_color", Color.WHITE)
+	r_btn_home.add_theme_stylebox_override("normal", SimpleStyle.make_extruded_style(
+		Color("f97316"), Color("9a3412"), 22, 10, 0))
+	r_btn_home.add_theme_stylebox_override("hover", SimpleStyle.make_extruded_style(
+		Color("fb923c"), Color("9a3412"), 22, 10, 0))
+	r_btn_home.add_theme_stylebox_override("pressed", SimpleStyle.make_extruded_style(
+		Color("ea580c"), Color("7c2d12"), 22, 5, 6, 5))
+	r_btn_home.custom_minimum_size = Vector2(260, 100)
+	r_btn_home.button_down.connect(func(): r_btn_home.position.y += 6)
+	r_btn_home.button_up.connect(func(): r_btn_home.position.y -= 6)
 	r_btn_home.pressed.connect(_on_home_pressed)
-	
-	var r_home_center = CenterContainer.new()
-	r_home_center.custom_minimum_size = Vector2(270, 120)
-	var rhc_wrap = Control.new()
-	rhc_wrap.custom_minimum_size = r_btn_home.custom_minimum_size
-	rhc_wrap.add_child(r_btn_home)
-	r_home_center.add_child(rhc_wrap)
-	r_vbox.add_child(r_home_center)
+	r_vbox.add_child(r_btn_home)
 	
 	result_btn = TextureButton.new()
 	result_btn.stretch_mode = TextureButton.STRETCH_SCALE
@@ -1096,6 +1088,62 @@ func _on_restart_pressed() -> void:
 	var gc = get_tree().root.get_node_or_null("GameController")
 	if gc:
 		gc.start_level(1)
+
+func _show_parking_full_toast() -> void:
+	if _toast_panel == null:
+		_toast_panel = PanelContainer.new()
+		var sb = StyleBoxFlat.new()
+		sb.bg_color = Color(0, 0, 0, 0.7)
+		sb.set_corner_radius_all(20)
+		_toast_panel.add_theme_stylebox_override("panel", sb)
+		
+		var m = MarginContainer.new()
+		m.add_theme_constant_override("margin_left", 20)
+		m.add_theme_constant_override("margin_right", 20)
+		m.add_theme_constant_override("margin_top", 10)
+		m.add_theme_constant_override("margin_bottom", 10)
+		_toast_panel.add_child(m)
+		
+		var hb = HBoxContainer.new()
+		m.add_child(hb)
+		
+		var icon = Label.new()
+		icon.text = "!"
+		icon.add_theme_font_size_override("font_size", 24)
+		icon.add_theme_color_override("font_color", Color(1, 0.3, 0.3))
+		hb.add_child(icon)
+		
+		var lbl = Label.new()
+		lbl.text = "NO SPOT AVAILABLE"
+		lbl.add_theme_font_size_override("font_size", 24)
+		lbl.add_theme_color_override("font_color", Color.WHITE)
+		hb.add_child(lbl)
+		
+		_toast_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		m.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		hb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		
+		hud.add_child(_toast_panel)
+		
+	# Center it visually on screen
+	_toast_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	# Push it slightly up so it's not strictly covering center interaction
+	_toast_panel.position.y -= 150
+	
+	if _toast_tween:
+		_toast_tween.kill()
+		
+	_toast_panel.visible = true
+	
+	_toast_tween = create_tween()
+	# Only fade in if it's not already fully visible
+	if _toast_panel.modulate.a < 1.0:
+		_toast_tween.tween_property(_toast_panel, "modulate:a", 1.0, 0.15).set_trans(Tween.TRANS_SINE)
+	_toast_tween.tween_interval(1.0)
+	_toast_tween.tween_property(_toast_panel, "modulate:a", 0.0, 0.25).set_trans(Tween.TRANS_SINE)
+	_toast_tween.tween_callback(func(): _toast_panel.visible = false)
 
 func _on_home_pressed() -> void:
 	_play_sfx("ui")
