@@ -405,7 +405,7 @@ func _show_settings_overlay() -> void:
 	var title := Label.new()
 	title.text = "Settings"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 28)
+	title.add_theme_font_size_override("font_size", 24)
 	title.add_theme_color_override("font_color", Color("9e7655"))
 	vbox.add_child(title)
 
@@ -432,9 +432,9 @@ func _show_settings_overlay() -> void:
 	# --- Premium 2D Glossy Close button ---
 	var close_btn := Button.new()
 	close_btn.text = "✖"
-	close_btn.add_theme_font_size_override("font_size", 24)
+	close_btn.add_theme_font_size_override("font_size", 18)
 	close_btn.add_theme_color_override("font_color", Color.WHITE)
-	close_btn.custom_minimum_size = Vector2(48, 48)
+	close_btn.custom_minimum_size = Vector2(40, 40)
 	close_btn.anchor_left = 1.0
 	close_btn.anchor_right = 1.0
 	close_btn.anchor_top = 0.0
@@ -488,7 +488,7 @@ func _create_custom_toggle(text: String, icon_text: String, is_on: bool, on_togg
 
 	var icon := Label.new()
 	icon.text = icon_text
-	icon.add_theme_font_size_override("font_size", 20)
+	icon.add_theme_font_size_override("font_size", 16)
 	icon.add_theme_color_override("font_color", Color("9e7655"))
 	icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	row.add_child(icon)
@@ -499,7 +499,7 @@ func _create_custom_toggle(text: String, icon_text: String, is_on: bool, on_togg
 
 	var lbl := Label.new()
 	lbl.text = text
-	lbl.add_theme_font_size_override("font_size", 20)
+	lbl.add_theme_font_size_override("font_size", 16)
 	lbl.add_theme_color_override("font_color", Color("9e7655"))
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL

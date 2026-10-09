@@ -775,7 +775,7 @@ func _build_hud() -> void:
 	pause_overlay.add_child(p_center)
 	
 	var p_main := Control.new()
-	p_main.custom_minimum_size = Vector2(460, 520)
+	p_main.custom_minimum_size = Vector2(300, 480)
 	p_center.add_child(p_main)
 	
 	var p_vbox := VBoxContainer.new()
@@ -790,12 +790,12 @@ func _build_hud() -> void:
 	ph_style.corner_radius_top_left = 24
 	ph_style.corner_radius_top_right = 24
 	p_header.add_theme_stylebox_override("panel", ph_style)
-	p_header.custom_minimum_size = Vector2(460, 80)
+	p_header.custom_minimum_size = Vector2(300, 60)
 	p_vbox.add_child(p_header)
 	
 	var ph_lbl := Label.new()
 	ph_lbl.text = "SETTINGS"
-	ph_lbl.add_theme_font_size_override("font_size", 36)
+	ph_lbl.add_theme_font_size_override("font_size", 16)
 	ph_lbl.add_theme_color_override("font_color", Color("ffffff"))
 	ph_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ph_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -804,7 +804,7 @@ func _build_hud() -> void:
 	# Close button inside header
 	var p_close := Button.new()
 	p_close.text = "✖"
-	p_close.add_theme_font_size_override("font_size", 28)
+	p_close.add_theme_font_size_override("font_size", 20)
 	p_close.add_theme_color_override("font_color", Color.WHITE)
 	p_close.add_theme_stylebox_override("normal", SimpleStyle.make_extruded_style(
 		Color("ef4444"), Color("991b1b"), 16, 6, 0))
@@ -812,10 +812,10 @@ func _build_hud() -> void:
 		Color("f87171"), Color("991b1b"), 16, 6, 0))
 	p_close.add_theme_stylebox_override("pressed", SimpleStyle.make_extruded_style(
 		Color("dc2626"), Color("7f1d1d"), 16, 3, 4, 3))
-	p_close.custom_minimum_size = Vector2(64, 64)
+	p_close.custom_minimum_size = Vector2(44, 44)
 	p_close.anchor_left = 1.0
 	p_close.anchor_right = 1.0
-	p_close.offset_left = -76.0
+	p_close.offset_left = -52.0
 	p_close.offset_top = 8.0
 	p_close.pressed.connect(_on_resume_pressed)
 	p_main.add_child(p_close)
@@ -877,7 +877,7 @@ func _build_hud() -> void:
 	# Action Buttons — simple 3D-styled (orange Home, green Restart)
 	var p_btn_home := Button.new()
 	p_btn_home.text = "Home"
-	p_btn_home.add_theme_font_size_override("font_size", 36)
+	p_btn_home.add_theme_font_size_override("font_size", 26)
 	p_btn_home.add_theme_color_override("font_color", Color.WHITE)
 	p_btn_home.add_theme_stylebox_override("normal", SimpleStyle.make_extruded_style(
 		Color("f97316"), Color("9a3412"), 22, 10, 0))
@@ -885,15 +885,15 @@ func _build_hud() -> void:
 		Color("fb923c"), Color("9a3412"), 22, 10, 0))
 	p_btn_home.add_theme_stylebox_override("pressed", SimpleStyle.make_extruded_style(
 		Color("ea580c"), Color("7c2d12"), 22, 5, 6, 5))
-	p_btn_home.custom_minimum_size = Vector2(260, 100)
-	p_btn_home.button_down.connect(func(): p_btn_home.position.y += 6)
-	p_btn_home.button_up.connect(func(): p_btn_home.position.y -= 6)
+	p_btn_home.custom_minimum_size = Vector2(240, 60)
+	p_btn_home.button_down.connect(func(): p_btn_home.position.y += 3)
+	p_btn_home.button_up.connect(func(): p_btn_home.position.y -= 3)
 	p_btn_home.pressed.connect(_on_home_pressed)
 	pb_vbox.add_child(p_btn_home)
 
 	var p_btn_restart := Button.new()
 	p_btn_restart.text = "Restart"
-	p_btn_restart.add_theme_font_size_override("font_size", 36)
+	p_btn_restart.add_theme_font_size_override("font_size", 26)
 	p_btn_restart.add_theme_color_override("font_color", Color.WHITE)
 	p_btn_restart.add_theme_stylebox_override("normal", SimpleStyle.make_extruded_style(
 		Color("22c55e"), Color("14532d"), 22, 10, 0))
@@ -901,9 +901,9 @@ func _build_hud() -> void:
 		Color("4ade80"), Color("14532d"), 22, 10, 0))
 	p_btn_restart.add_theme_stylebox_override("pressed", SimpleStyle.make_extruded_style(
 		Color("16a34a"), Color("14532d"), 22, 5, 6, 5))
-	p_btn_restart.custom_minimum_size = Vector2(260, 100)
-	p_btn_restart.button_down.connect(func(): p_btn_restart.position.y += 6)
-	p_btn_restart.button_up.connect(func(): p_btn_restart.position.y -= 6)
+	p_btn_restart.custom_minimum_size = Vector2(240, 60)
+	p_btn_restart.button_down.connect(func(): p_btn_restart.position.y += 3)
+	p_btn_restart.button_up.connect(func(): p_btn_restart.position.y -= 3)
 	p_btn_restart.pressed.connect(_on_restart_pressed)
 	pb_vbox.add_child(p_btn_restart)
 	
@@ -1116,7 +1116,7 @@ func _show_parking_full_toast() -> void:
 		
 		var lbl = Label.new()
 		lbl.text = "NO SPOT AVAILABLE"
-		lbl.add_theme_font_size_override("font_size", 24)
+		lbl.add_theme_font_size_override("font_size", 16)
 		lbl.add_theme_color_override("font_color", Color.WHITE)
 		hb.add_child(lbl)
 		
@@ -1178,7 +1178,7 @@ func _create_settings_icon_button(label_text: String, icon_text: String, is_on: 
 	vbox.add_theme_constant_override("separation", 8)
 	
 	var btn = Button.new()
-	btn.custom_minimum_size = Vector2(96, 96)
+	btn.custom_minimum_size = Vector2(64, 64)
 	var style = StyleBoxFlat.new()
 	style.bg_color = Color("4b7bec")
 	style.corner_radius_top_left = 16
@@ -1193,7 +1193,7 @@ func _create_settings_icon_button(label_text: String, icon_text: String, is_on: 
 	
 	var icon = Label.new()
 	icon.text = icon_text
-	icon.add_theme_font_size_override("font_size", 48)
+	icon.add_theme_font_size_override("font_size", 32)
 	icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	icon.set_anchors_preset(Control.PRESET_FULL_RECT)
