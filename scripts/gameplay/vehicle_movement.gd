@@ -7,7 +7,8 @@ class_name VehicleMovement
 static func animate_dispatch(
 	vehicle_node: Node2D,
 	start_pos: Vector2,
-	exit_pos: Vector2,
+	_legacy_exit_pos: Vector2,
+	corridor_pos: Vector2,
 	slot_pos: Vector2,
 	token: int,
 	controller: Node,
@@ -19,75 +20,122 @@ static func animate_dispatch(
 	if vehicle_node == null or not is_instance_valid(vehicle_node):
 		return
 
-
 	vehicle_node.z_index = 100 + slot_id
 
-	# Create sequential tween for strict orthogonal movement
+	# -----------------------------------------------------------------
+	# BOARD-TO-PARKING DRIVING SEQUENCE
+	#
+	# Stage A: Drive along the puzzle arrow direction (transformed to
+	#          world space via board_root) to leave the board.
+	# Stage B: Curve through a CORRIDOR below the parking strip until
+	#          the bus is directly below its target slot.
+	# Stage C: Finish the turn inside the corridor and approach the bay
+	#          vertically, front up.
+	# Stage D: Settle exactly on slot_pos with no further rotation.
+	#
+	# Implemented as a 2-point Curve2D (one cubic Bézier) driven by a
+	# single tween_method that updates BOTH position and rotation. No
+	# competing tweens, no forced rotation blend — the curve geometry
+	# itself ends with the tangent pointing straight up so the bus
+	# arrives vertical naturally.
+	# -----------------------------------------------------------------
 	var tw := vehicle_node.create_tween()
-	var t_board_exit = 0.65 * duration_mult
-	
-	# Phase 1: Drive straight out of board (along original puzzle arrow)
-	# Extend exit_pos slightly to guarantee full visual clearance of board before curving
-	var out_dir = (exit_pos - start_pos).normalized()
-	var safe_exit_pos = exit_pos + (out_dir * 30.0)
-	
-	tw.tween_property(vehicle_node, "position", safe_exit_pos, t_board_exit).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	
-	# Phase 2: Smooth continuous curve to parking bay
-	var curve = Curve2D.new()
-	# Start point: safe_exit_pos. Out handle extends along the travel direction.
-	curve.add_point(safe_exit_pos, Vector2.ZERO, out_dir * 180.0)
-	
-	# End point: slot_pos. In handle pulls from directly below (buses park UP).
-	var in_handle = Vector2(0, 180.0)
-	curve.add_point(slot_pos, in_handle, Vector2.ZERO)
-	
-	var total_transit = 1.3 * duration_mult
-	var start_scale = vehicle_node.scale
-	
-	# Derive the actual native physical front vector based on the sprite
-	var front_native = Vector2(0, -1)
+
+	# Puzzle-arrow direction expressed in world space (after the
+	# 45-degree board rotation + 0.6 Y-scale). This is the direction
+	# the bus drives along in Stage A. It is computed in the caller
+	# from the swept-corridor exit point and passed in as
+	# _legacy_exit_pos.
+	var forward_world: Vector2 = (_legacy_exit_pos - start_pos)
+	if forward_world.length_squared() < 0.0001:
+		forward_world = Vector2(0, -1)
+	forward_world = forward_world.normalized()
+
+	# -------------------------------------------------------------------------
+	# Two-point cubic Bézier:
+	#   - Tangent at start: puzzle world direction (drives along arrow)
+	#   - Tangent at end:   (0, -1) vertical UP (enters bay vertically)
+	# The curve naturally passes BELOW the parking strip (in the corridor
+	# zone) on its way from the board to the bay, regardless of which
+	# direction the puzzle arrow originally pointed.
+	# -------------------------------------------------------------------------
+	var curve := Curve2D.new()
+	curve.add_point(start_pos, Vector2.ZERO, forward_world * 200.0)
+	curve.add_point(slot_pos, Vector2(0.0, 160.0), Vector2.ZERO)
+	# corridor_pos is reserved for future, debug visualization, or
+	# collision-safe multi-segment routing.
+	var _corridor_pos_unused := corridor_pos
+
+	# Derive front vector (the bus sprite's "front" in its NATIVE puzzle orientation).
+	var front_native := Vector2(0, -1)
 	match vehicle_node.vehicle_dir:
 		CarJamVehicleData.Direction.DOWN: front_native = Vector2(0, 1)
 		CarJamVehicleData.Direction.UP: front_native = Vector2(0, -1)
 		CarJamVehicleData.Direction.LEFT: front_native = Vector2(-1, 0)
 		CarJamVehicleData.Direction.RIGHT: front_native = Vector2(1, 0)
-	
-	# Calculate exact final rotation to face UP (0, -1)
-	var final_rot_target = 0.0
+
+	# Final rotation the bus should be in when parked vertical-front-UP.
+	# When the tangent at curve end is (0, -1), the rotation that aligns
+	# front_native onto (0, -1) is exactly this:
+	var final_rot_target := 0.0
 	match vehicle_node.vehicle_dir:
 		CarJamVehicleData.Direction.DOWN: final_rot_target = PI
 		CarJamVehicleData.Direction.UP: final_rot_target = 0.0
-		CarJamVehicleData.Direction.LEFT: final_rot_target = PI/2.0
-		CarJamVehicleData.Direction.RIGHT: final_rot_target = -PI/2.0
-	
-	var curve_callable = Callable(VehicleMovement, "_update_curve").bind(curve, vehicle_node, target_scale, start_scale, true, front_native, true, final_rot_target)
-	tw.tween_method(curve_callable, 0.0, 1.0, total_transit).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		CarJamVehicleData.Direction.LEFT: final_rot_target = PI / 2.0
+		CarJamVehicleData.Direction.RIGHT: final_rot_target = -PI / 2.0
 
-	var lambda_func = func(v_node, t_scale, ctrl, v_id, s_id, tok):
+	var start_scale: Vector2 = vehicle_node.scale
+	var duration: float = 1.55 * duration_mult
+
+	var curve_callable := Callable(
+		VehicleMovement, "_update_curve"
+	).bind(
+		curve,
+		vehicle_node,
+		target_scale,
+		start_scale,
+		true,            # drive_forward
+		front_native,
+		false,           # force_final_rot  (curve geometry handles this)
+		final_rot_target
+	)
+	tw.tween_method(curve_callable, 0.0, 1.0, duration) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+	var lambda_func := func(v_node, t_scale, ctrl, v_id, s_id, tok):
 		if is_instance_valid(v_node):
 			v_node.set_parking_mode(true)
-			
-			# QA LOGGING: Mandatory parking arrival check
-			var dir_str = CarJamVehicleData.dir_to_string(v_node.vehicle_dir)
-			var front_vec = front_native.rotated(v_node.rotation)
-			var bay_axis = Vector2(0, -1) # Bay faces UP
-			var ang_diff = rad_to_deg(front_vec.angle_to(bay_axis))
-			
-			# We can approximate bounds center alignment (position is slot_pos)
-			var bounds_diff = v_node.global_position.distance_to(slot_pos)
-			
-			print("[QA] ARRIVAL | Bus %d (Orig Dir: %s) -> Slot %d" % [v_id, dir_str, s_id])
-			print("      | Front Vector: (%.2f, %.2f) | Bay Axis: (0, -1)" % [front_vec.x, front_vec.y])
-			print("      | Angular Error: %.1f deg | Center Error: %.1f px" % [ang_diff, bounds_diff])
-			
-			v_node.z_index = 10 # Normal parking z-index
-			var settle_tw = v_node.create_tween()
-			settle_tw.tween_property(v_node, "scale", t_scale * 1.05, 0.15).set_trans(Tween.TRANS_SINE)
-			settle_tw.tween_property(v_node, "scale", t_scale, 0.15).set_trans(Tween.TRANS_BOUNCE)
+
+			# QA arrival check
+			var dir_str: String = CarJamVehicleData.dir_to_string(v_node.vehicle_dir)
+			var front_vec: Vector2 = front_native.rotated(v_node.rotation)
+			var bay_axis: Vector2 = Vector2(0, -1)
+			var ang_diff: float = rad_to_deg(front_vec.angle_to(bay_axis))
+			var center_err: float = v_node.global_position.distance_to(slot_pos)
+
+			print("[QA] ARRIVAL | Bus %d (Orig Dir: %s) -> Slot %d" %
+				[v_id, dir_str, s_id])
+			print("      | Front: (%.2f, %.2f) | BayAxis: (0,-1)" %
+				[front_vec.x, front_vec.y])
+			print("      | Angular err: %.1f deg | Center err: %.1f px" %
+				[ang_diff, center_err])
+
+			v_node.z_index = 10
+			# Settle bounce — ONLY touches scale. Position and rotation
+			# must remain frozen at slot_pos / final_rot_target from here on.
+			var settle_tw: Tween = v_node.create_tween()
+			settle_tw.tween_property(v_node, "scale", t_scale * 1.05, 0.12) \
+				.set_trans(Tween.TRANS_SINE)
+			settle_tw.tween_property(v_node, "scale", t_scale, 0.18) \
+				.set_trans(Tween.TRANS_BOUNCE)
+			# Snap rotation to target so it never drifts from frame
+			# quantization noise during the settle.
+			v_node.rotation = final_rot_target
 		ctrl.on_vehicle_arrived_at_slot(v_id, s_id, tok)
-	
-	tw.chain().tween_callback(lambda_func.bind(vehicle_node, target_scale, controller, vehicle_id, slot_id, token))
+
+	tw.tween_callback(lambda_func.bind(
+		vehicle_node, target_scale, controller, vehicle_id, slot_id, token
+	))
 
 
 static func animate_departure(
@@ -156,30 +204,21 @@ static func animate_departure(
 	tw.tween_callback(lambda_func2.bind(vehicle_node, controller, vehicle_id, slot_id, token))
 
 
-static func _update_curve(t: float, curve: Curve2D, v_node: Node2D, target_scale: Vector2, start_scale: Vector2, drive_forward: bool, front_native: Vector2, force_final_rot: bool = false, final_rot_target: float = 0.0) -> void:
+static func _update_curve(t: float, curve: Curve2D, v_node: Node2D, target_scale: Vector2, start_scale: Vector2, drive_forward: bool, front_native: Vector2, _force_final_rot: bool = false, _final_rot_target: float = 0.0) -> void:
 	if not is_instance_valid(v_node): return
 	var total_len = curve.get_baked_length()
 	var offset = t * total_len
 	var pos = curve.sample_baked(offset)
 	v_node.position = pos
-	
-	# Sample slightly ahead for tangent (rotation)
+
+	# Sample slightly ahead for tangent-based rotation
 	var offset_ahead = min(total_len, offset + 2.0)
 	var pos_ahead = curve.sample_baked(offset_ahead)
-	
-	var curve_rot = v_node.rotation
+
 	if pos.distance_to(pos_ahead) > 0.1:
 		var dir = (pos_ahead - pos).normalized()
 		if not drive_forward:
 			dir = -dir
-		curve_rot = dir.angle() - front_native.angle()
-	
-	if force_final_rot and t > 0.8:
-		# Smoothly blend into the final vertical alignment during the last 20%
-		var blend = (t - 0.8) / 0.2
-		# Use lerp_angle to avoid spinning the wrong way
-		v_node.rotation = lerp_angle(curve_rot, final_rot_target, blend)
-	else:
-		v_node.rotation = curve_rot
-		
+		v_node.rotation = dir.angle() - front_native.angle()
+
 	v_node.scale = start_scale.lerp(target_scale, t)

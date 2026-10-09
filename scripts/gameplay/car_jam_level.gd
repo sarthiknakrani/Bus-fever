@@ -478,19 +478,27 @@ func _on_vehicle_dispatch_started(vehicle_id: int, slot_id: int, corridor: Array
 
 	var target_slot_pos := _get_slot_world_pos(slot_id)
 	var exit_cell: Vector2i = corridor.back() if not corridor.is_empty() else vv.vehicle_footprint[0]
-	
+
 	# Calculate exactly how many cells to push forward to clear the board
 	var push_cells = float(vv.vehicle_footprint.size()) + 0.6
 	var dir_vec = CarJamVehicleData.dir_to_vector(vv.vehicle_dir)
 	var final_exit_coord = Vector2(exit_cell) + Vector2(dir_vec) * push_cells
-	
+
 	# Calculate local position on the board
 	var lx = final_exit_coord.x - float(controller.level_data.board_size.x - 1) / 2.0
 	var ly = final_exit_coord.y - float(controller.level_data.board_size.y - 1) / 2.0
 	var exit_local = Vector2(lx, ly) * CELL_SIZE
-	
+
 	# Convert to world_root space (which is transit_layer's space)
 	var exit_pos = board_root.transform * exit_local
+
+	# CORRIDOR WAYPOINT — directly below the assigned parking slot, in
+	# the clear approach zone BELOW the parking strip. The bus drives
+	# straight along its puzzle arrow to this waypoint, then makes its
+	# full turn inside the corridor before entering the bay vertically.
+	# This guarantees the bus never sweeps sideways across VIP or other
+	# parking slots.
+	var corridor_pos := Vector2(target_slot_pos.x, PARKING_Y + 100.0)
 
 	# Dynamically calculate the parking scale to perfectly fit the slot bounds
 	var max_w = 88.0
@@ -499,7 +507,7 @@ func _on_vehicle_dispatch_started(vehicle_id: int, slot_id: int, corridor: Array
 	var cells_h: float = float(vv.vehicle_footprint.size()) if vv.vehicle_dir == CarJamVehicleData.Direction.UP or vv.vehicle_dir == CarJamVehicleData.Direction.DOWN else 1.0
 	var pixel_w = cells_w * 78.0 - 10.0
 	var pixel_h = cells_h * 78.0 - 10.0
-	
+
 	# WIDE buses (LEFT/RIGHT) will be rotated 90 degrees in parking!
 	# So their visual width becomes pixel_h and visual height becomes pixel_w
 	var parked_pixel_w = pixel_w
@@ -507,7 +515,7 @@ func _on_vehicle_dispatch_started(vehicle_id: int, slot_id: int, corridor: Array
 	if vv.vehicle_dir == CarJamVehicleData.Direction.LEFT or vv.vehicle_dir == CarJamVehicleData.Direction.RIGHT:
 		parked_pixel_w = pixel_h
 		parked_pixel_h = pixel_w
-		
+
 	var scale_w = max_w / parked_pixel_w
 	var scale_h = max_h / parked_pixel_h
 	var final_scale = clampf(min(scale_w, scale_h), 0.35, 0.9)
@@ -517,6 +525,7 @@ func _on_vehicle_dispatch_started(vehicle_id: int, slot_id: int, corridor: Array
 		vv,
 		vv.position,
 		exit_pos,
+		corridor_pos,
 		target_slot_pos,
 		controller.session_token,
 		controller,
