@@ -61,14 +61,11 @@ func _build_ui() -> void:
 	settings_btn.offset_top = 12.0
 	settings_btn.offset_bottom = 84.0
 	settings_btn.mouse_filter = Control.MOUSE_FILTER_STOP
-	settings_btn.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
+	# NO clip_children to fix shadow bug
 	
 	var sb_style = StyleBoxFlat.new()
 	sb_style.bg_color = Color("3b82f6")
-	sb_style.corner_radius_top_left = 36
-	sb_style.corner_radius_top_right = 36
-	sb_style.corner_radius_bottom_left = 36
-	sb_style.corner_radius_bottom_right = 36
+	sb_style.set_corner_radius_all(36)
 	sb_style.shadow_color = Color(0, 0, 0, 0.3)
 	sb_style.shadow_size = 8
 	sb_style.shadow_offset = Vector2(0, 4)
@@ -80,6 +77,8 @@ func _build_ui() -> void:
 	
 	var sb_pressed = sb_style.duplicate()
 	sb_pressed.bg_color = Color("2563eb")
+	sb_pressed.shadow_size = 2
+	sb_pressed.shadow_offset = Vector2(0, 1)
 	settings_btn.add_theme_stylebox_override("pressed", sb_pressed)
 	
 	var s_gloss = Panel.new()
@@ -88,6 +87,8 @@ func _build_ui() -> void:
 	s_gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var sg_style = StyleBoxFlat.new()
 	sg_style.bg_color = Color(1, 1, 1, 0.25)
+	sg_style.corner_radius_top_left = 36
+	sg_style.corner_radius_top_right = 36
 	s_gloss.add_theme_stylebox_override("panel", sg_style)
 	settings_btn.add_child(s_gloss)
 	
@@ -188,27 +189,36 @@ func _build_ui() -> void:
 	hud.add_child(logo_container)
 
 	# --- Premium 2D Glossy Play Button ---
+	# Separate shadow panel behind to avoid clip_children shadow bugs
+	var play_shadow = Panel.new()
+	play_shadow.anchor_left = 0.5
+	play_shadow.anchor_right = 0.5
+	play_shadow.anchor_top = 0.82
+	play_shadow.anchor_bottom = 0.82
+	play_shadow.offset_left = -140
+	play_shadow.offset_right = 140
+	play_shadow.offset_top = -100
+	play_shadow.offset_bottom = 0
+	play_shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var shadow_sb = StyleBoxFlat.new()
+	shadow_sb.bg_color = Color("22c55e")
+	shadow_sb.set_corner_radius_all(50)
+	shadow_sb.shadow_color = Color(0, 0, 0, 0.3)
+	shadow_sb.shadow_size = 12
+	shadow_sb.shadow_offset = Vector2(0, 6)
+	play_shadow.add_theme_stylebox_override("panel", shadow_sb)
+	hud.add_child(play_shadow)
+
 	var play_btn := Button.new()
-	play_btn.anchor_left = 0.5
-	play_btn.anchor_right = 0.5
-	play_btn.anchor_top = 0.82
-	play_btn.anchor_bottom = 0.82
-	play_btn.offset_left = -140
-	play_btn.offset_right = 140
-	play_btn.offset_top = -100
-	play_btn.offset_bottom = 0
+	play_btn.set_anchors_preset(Control.PRESET_FULL_RECT)
 	play_btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	play_btn.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
+	play_shadow.add_child(play_btn)
 	
+	# Actual button has no shadow because clip_children breaks it
 	var p_style = StyleBoxFlat.new()
 	p_style.bg_color = Color("22c55e")
-	p_style.corner_radius_top_left = 50
-	p_style.corner_radius_top_right = 50
-	p_style.corner_radius_bottom_left = 50
-	p_style.corner_radius_bottom_right = 50
-	p_style.shadow_color = Color(0, 0, 0, 0.3)
-	p_style.shadow_size = 12
-	p_style.shadow_offset = Vector2(0, 6)
+	p_style.set_corner_radius_all(50)
 	play_btn.add_theme_stylebox_override("normal", p_style)
 	
 	var p_hover = p_style.duplicate()
@@ -252,10 +262,20 @@ func _build_ui() -> void:
 	ls_play.shadow_color = Color(0, 0, 0, 0.4)
 	ls_play.shadow_offset = Vector2(0, 3)
 	p_text.label_settings = ls_play
+	p_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	play_btn.add_child(p_text)
 	
+	play_btn.button_down.connect(func():
+		shadow_sb.shadow_size = 2
+		shadow_sb.shadow_offset = Vector2(0, 2)
+		play_btn.position.y += 4
+	)
+	play_btn.button_up.connect(func():
+		shadow_sb.shadow_size = 12
+		shadow_sb.shadow_offset = Vector2(0, 6)
+		play_btn.position.y -= 4
+	)
 	play_btn.pressed.connect(_on_play_pressed)
-	hud.add_child(play_btn)
 
 func _on_play_pressed() -> void:
 	AudioManager.play(AudioManager.SFX_UI)
@@ -351,22 +371,25 @@ func _show_settings_overlay() -> void:
 	ps.bg_color = Color("fcf8ef")
 	ps.border_width_bottom = 6
 	ps.border_color = Color("e0d2b8")
-	ps.corner_radius_all = 32
+	ps.set_corner_radius_all(32)
 	ps.shadow_color = Color(0,0,0,0.3)
 	ps.shadow_size = 12
 	ps.shadow_offset = Vector2(0, 8)
 	_settings_panel.add_theme_stylebox_override("panel", ps)
-	_settings_panel.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
+	# REMOVED clip_children because it breaks the shadow and layout!
 	wrapper.add_child(_settings_panel)
 	
+	# Add the gloss Panel OVER the settings panel as a sibling so it doesn't break PanelContainer layout
 	var pop_gloss = Panel.new()
-	pop_gloss.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	pop_gloss.set_anchors_preset(Control.PRESET_FULL_RECT)
 	pop_gloss.anchor_bottom = 0.5
 	pop_gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var pg_style = StyleBoxFlat.new()
 	pg_style.bg_color = Color(1, 1, 1, 0.4)
+	pg_style.corner_radius_top_left = 32
+	pg_style.corner_radius_top_right = 32
 	pop_gloss.add_theme_stylebox_override("panel", pg_style)
-	_settings_panel.add_child(pop_gloss)
+	wrapper.add_child(pop_gloss)
 
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 28)
@@ -420,11 +443,10 @@ func _show_settings_overlay() -> void:
 	close_btn.offset_top = -16.0
 	close_btn.offset_right = 24.0
 	close_btn.offset_bottom = 32.0
-	close_btn.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
-	
+	# NO clip_children to prevent shadow bug
 	var c_style = StyleBoxFlat.new()
 	c_style.bg_color = Color("ef4444")
-	c_style.corner_radius_all = 24
+	c_style.set_corner_radius_all(24)
 	c_style.shadow_color = Color(0, 0, 0, 0.3)
 	c_style.shadow_size = 6
 	c_style.shadow_offset = Vector2(0, 4)
@@ -436,6 +458,8 @@ func _show_settings_overlay() -> void:
 	
 	var c_pressed = c_style.duplicate()
 	c_pressed.bg_color = Color("dc2626")
+	c_pressed.shadow_size = 0
+	c_pressed.shadow_offset = Vector2(0,0)
 	close_btn.add_theme_stylebox_override("pressed", c_pressed)
 	
 	var cg = Panel.new()
@@ -444,6 +468,8 @@ func _show_settings_overlay() -> void:
 	cg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var cgs = StyleBoxFlat.new()
 	cgs.bg_color = Color(1, 1, 1, 0.3)
+	cgs.corner_radius_top_left = 24
+	cgs.corner_radius_top_right = 24
 	cg.add_theme_stylebox_override("panel", cgs)
 	close_btn.add_child(cg)
 	
