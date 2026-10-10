@@ -926,15 +926,34 @@ func _build_hud() -> void:
 	pb_vbox.add_child(btm_hbox)
 
 	var p_btn_restart := TextureButton.new()
-	p_btn_restart.texture_normal = load("res://assets/btn_restart.png")
+	p_btn_restart.texture_normal = load("res://assets/ui/settings_buttons/restart_normal.svg")
+	p_btn_restart.texture_pressed = load("res://assets/ui/settings_buttons/restart_pressed.svg")
 	p_btn_restart.ignore_texture_size = true
 	p_btn_restart.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
 	p_btn_restart.custom_minimum_size = Vector2(130, 56)
+	
+	var r_lbl = Label.new()
+	r_lbl.text = "Restart"
+	r_lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
+	r_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	r_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	r_lbl.add_theme_font_size_override("font_size", 20)
+	r_lbl.add_theme_color_override("font_color", Color.WHITE)
+	r_lbl.add_theme_color_override("font_outline_color", Color("14532d"))
+	r_lbl.add_theme_constant_override("outline_size", 6)
+	r_lbl.offset_top = -4
+	r_lbl.offset_bottom = -4
+	p_btn_restart.add_child(r_lbl)
+	
 	p_btn_restart.button_down.connect(func():
+		r_lbl.offset_top = 2
+		r_lbl.offset_bottom = 2
 		var tw = p_btn_restart.create_tween()
-		tw.tween_property(p_btn_restart, "scale", Vector2(0.9, 0.9), 0.05)
+		tw.tween_property(p_btn_restart, "scale", Vector2(0.96, 0.96), 0.05)
 	)
 	p_btn_restart.button_up.connect(func():
+		r_lbl.offset_top = -4
+		r_lbl.offset_bottom = -4
 		var tw = p_btn_restart.create_tween()
 		tw.tween_property(p_btn_restart, "scale", Vector2.ONE, 0.1)
 	)
@@ -943,15 +962,34 @@ func _build_hud() -> void:
 	btm_hbox.add_child(p_btn_restart)
 
 	var p_btn_home := TextureButton.new()
-	p_btn_home.texture_normal = load("res://assets/btn_home.png")
+	p_btn_home.texture_normal = load("res://assets/ui/settings_buttons/home_normal.svg")
+	p_btn_home.texture_pressed = load("res://assets/ui/settings_buttons/home_pressed.svg")
 	p_btn_home.ignore_texture_size = true
 	p_btn_home.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
 	p_btn_home.custom_minimum_size = Vector2(130, 56)
+	
+	var h_lbl = Label.new()
+	h_lbl.text = "Home"
+	h_lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
+	h_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	h_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	h_lbl.add_theme_font_size_override("font_size", 20)
+	h_lbl.add_theme_color_override("font_color", Color.WHITE)
+	h_lbl.add_theme_color_override("font_outline_color", Color("9a3412"))
+	h_lbl.add_theme_constant_override("outline_size", 6)
+	h_lbl.offset_top = -4
+	h_lbl.offset_bottom = -4
+	p_btn_home.add_child(h_lbl)
+	
 	p_btn_home.button_down.connect(func():
+		h_lbl.offset_top = 2
+		h_lbl.offset_bottom = 2
 		var tw = p_btn_home.create_tween()
-		tw.tween_property(p_btn_home, "scale", Vector2(0.9, 0.9), 0.05)
+		tw.tween_property(p_btn_home, "scale", Vector2(0.96, 0.96), 0.05)
 	)
 	p_btn_home.button_up.connect(func():
+		h_lbl.offset_top = -4
+		h_lbl.offset_bottom = -4
 		var tw = p_btn_home.create_tween()
 		tw.tween_property(p_btn_home, "scale", Vector2.ONE, 0.1)
 	)
@@ -1351,10 +1389,88 @@ func _update_layout() -> void:
 
 func _on_restart_pressed() -> void:
 	_play_sfx("ui")
+	_was_paused_before_confirm = get_tree().paused
+	get_tree().paused = true
+	restart_confirm_overlay.visible = true
+
+func _confirm_restart_yes() -> void:
+	if not restart_confirm_overlay.visible: return
+	_play_sfx("ui")
+	restart_confirm_overlay.visible = false
 	get_tree().paused = false
 	var gc = get_tree().root.get_node_or_null("GameController")
-	if gc:
-		gc.start_level(gc.current_level_number)
+	if gc: gc.start_level(gc.current_level_number)
+
+func _confirm_restart_no() -> void:
+	if not restart_confirm_overlay.visible: return
+	_play_sfx("ui")
+	restart_confirm_overlay.visible = false
+	get_tree().paused = _was_paused_before_confirm
+
+func _create_procedural_glossy_button(btn_text: String, bg_color: Color, border_color: Color, on_click: Callable) -> Control:
+	var wrapper = Control.new()
+	wrapper.custom_minimum_size = Vector2(110, 50)
+	
+	var panel = PanelContainer.new()
+	panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var style = StyleBoxFlat.new()
+	style.bg_color = bg_color
+	style.corner_radius_top_left = 16
+	style.corner_radius_top_right = 16
+	style.corner_radius_bottom_left = 16
+	style.corner_radius_bottom_right = 16
+	style.border_width_bottom = 6
+	style.border_color = border_color
+	style.shadow_color = Color(0,0,0,0.2)
+	style.shadow_size = 4
+	style.shadow_offset = Vector2(0, 4)
+	panel.add_theme_stylebox_override("panel", style)
+	wrapper.add_child(panel)
+	
+	var gloss = Panel.new()
+	gloss.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	gloss.anchor_bottom = 0.5
+	gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var g_style = StyleBoxFlat.new()
+	g_style.bg_color = Color(1, 1, 1, 0.3)
+	g_style.corner_radius_top_left = 16
+	g_style.corner_radius_top_right = 16
+	gloss.add_theme_stylebox_override("panel", g_style)
+	wrapper.add_child(gloss)
+	
+	var lbl = Label.new()
+	lbl.text = btn_text
+	lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lbl.add_theme_font_size_override("font_size", 20)
+	lbl.add_theme_color_override("font_color", Color.WHITE)
+	lbl.add_theme_color_override("font_outline_color", border_color)
+	lbl.add_theme_constant_override("outline_size", 4)
+	wrapper.add_child(lbl)
+	
+	var btn = Button.new()
+	btn.set_anchors_preset(Control.PRESET_FULL_RECT)
+	btn.flat = true
+	btn.modulate = Color(1,1,1,0.01)
+	btn.button_down.connect(func():
+		var tw = wrapper.create_tween()
+		tw.tween_property(wrapper, "position:y", 4.0, 0.05)
+		tw.parallel().tween_property(panel, "theme_override_styles/panel:border_width_bottom", 2, 0.05)
+		tw.parallel().tween_property(panel, "theme_override_styles/panel:shadow_size", 0, 0.05)
+		tw.parallel().tween_property(panel, "theme_override_styles/panel:shadow_offset", Vector2(0,0), 0.05)
+	)
+	btn.button_up.connect(func():
+		var tw = wrapper.create_tween()
+		tw.tween_property(wrapper, "position:y", 0.0, 0.1)
+		tw.parallel().tween_property(panel, "theme_override_styles/panel:border_width_bottom", 6, 0.1)
+		tw.parallel().tween_property(panel, "theme_override_styles/panel:shadow_size", 4, 0.1)
+		tw.parallel().tween_property(panel, "theme_override_styles/panel:shadow_offset", Vector2(0,4), 0.1)
+	)
+	btn.pressed.connect(on_click)
+	wrapper.add_child(btn)
+	
+	return wrapper
 
 func _show_parking_full_toast() -> void:
 	if _toast_panel == null:
