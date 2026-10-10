@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://cdb0l3qscja64"
+path="res://.godot/imported/btn_56x56.obj-8d1a9391b6942e477b5e4d20d7d329e1.mesh"
+
+[deps]
+
+files=["res://.godot/imported/btn_56x56.obj-8d1a9391b6942e477b5e4d20d7d329e1.mesh"]
+
+source_file="res://assets/models/btn_56x56.obj"
+dest_files=["res://.godot/imported/btn_56x56.obj-8d1a9391b6942e477b5e4d20d7d329e1.mesh", "res://.godot/imported/btn_56x56.obj-8d1a9391b6942e477b5e4d20d7d329e1.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

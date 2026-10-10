@@ -1,6 +1,8 @@
 extends Node2D
 class_name CarJamLevel
 
+const Button3D = preload("res://scripts/ui/button_3d.gd")
+
 ## Production-quality Car Jam single-level gameplay scene.
 ## Pure Godot 2D architecture with 2.5D pseudo-3D layered buses,
 ## exactly 4 parking slots, swept-footprint collision, and ordered passenger queue.
@@ -695,25 +697,10 @@ func _build_hud() -> void:
 	level_title_label.anchor_bottom = 1.0
 	top_bar.add_child(level_title_label)
 
-	var btn_pause := TextureButton.new()
-	btn_pause.texture_normal = load("res://assets/ui/gameplay_buttons/pause_normal.svg")
-	btn_pause.texture_pressed = load("res://assets/ui/gameplay_buttons/pause_pressed.svg")
-	btn_pause.ignore_texture_size = true
-	btn_pause.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
-	btn_pause.custom_minimum_size = Vector2(50, 50)
+	var btn_pause := Button3D.new()
+	btn_pause.setup_3d("res://assets/models/btn_50x50.obj", Color("3b82f6"), "res://assets/ui/gameplay_buttons/pause_normal.svg", "", Vector2(50, 50), false, 8.0)
 	btn_pause.anchor_left = 1.0
 	btn_pause.offset_left = -50.0
-	var bp_orig_y = btn_pause.position.y
-	btn_pause.button_down.connect(func():
-		var tw = btn_pause.create_tween()
-		tw.tween_property(btn_pause, "position:y", bp_orig_y + 4.0, 0.05).set_trans(Tween.TRANS_QUAD)
-		tw.parallel().tween_property(btn_pause, "modulate", Color(0.85, 0.85, 0.85), 0.05)
-	)
-	btn_pause.button_up.connect(func():
-		var tw = btn_pause.create_tween()
-		tw.tween_property(btn_pause, "position:y", bp_orig_y, 0.1).set_trans(Tween.TRANS_QUAD)
-		tw.parallel().tween_property(btn_pause, "modulate", Color.WHITE, 0.1)
-	)
 	btn_pause.pressed.connect(_on_pause_pressed)
 	top_bar.add_child(btn_pause)
 
@@ -862,84 +849,18 @@ func _build_hud() -> void:
 	pb_vbox.add_theme_constant_override("separation", 16)
 	p_panel.add_child(pb_vbox)
 
-	var p_title := Label.new()
-	p_title.text = "Paused"
-	p_title.add_theme_font_size_override("font_size", 28)
-	p_title.add_theme_color_override("font_color", Color("334155"))
-	p_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	pb_vbox.add_child(p_title)
-
-	var p_spacer1 := Control.new()
-	p_spacer1.custom_minimum_size = Vector2(0, 16)
-	pb_vbox.add_child(p_spacer1)
-
-	var p_btn_resume := TextureButton.new()
-	p_btn_resume.texture_normal = load("res://assets/btn_play.png")
-	p_btn_resume.ignore_texture_size = true
-	p_btn_resume.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
-	p_btn_resume.custom_minimum_size = Vector2(180, 56)
-	p_btn_resume.button_down.connect(func():
-		var tw = p_btn_resume.create_tween()
-		tw.tween_property(p_btn_resume, "position:y", 4.0, 0.05).set_trans(Tween.TRANS_QUAD)
-		tw.parallel().tween_property(p_btn_resume, "modulate", Color(0.85, 0.85, 0.85), 0.05)
-	)
-	p_btn_resume.button_up.connect(func():
-		var tw = p_btn_resume.create_tween()
-		tw.tween_property(p_btn_resume, "position:y", 0.0, 0.1).set_trans(Tween.TRANS_QUAD)
-		tw.parallel().tween_property(p_btn_resume, "modulate", Color.WHITE, 0.1)
-	)
+	var p_btn_resume := Button3D.new()
+	p_btn_resume.setup_3d("res://assets/models/btn_180x56.obj", Color("22c55e"), "", "Play", Vector2(180, 56), false, 12.0)
 	p_btn_resume.pressed.connect(_on_resume_pressed)
 	pb_vbox.add_child(p_btn_resume)
 	
-	var p_btn_restart := TextureButton.new()
-	p_btn_restart.texture_normal = load("res://assets/btn_restart.png")
-	p_btn_restart.ignore_texture_size = true
-	p_btn_restart.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
-	p_btn_restart.custom_minimum_size = Vector2(180, 56)
-	p_btn_restart.button_down.connect(func():
-		var tw = p_btn_restart.create_tween()
-		tw.tween_property(p_btn_restart, "position:y", 4.0, 0.05).set_trans(Tween.TRANS_QUAD)
-		tw.parallel().tween_property(p_btn_restart, "modulate", Color(0.85, 0.85, 0.85), 0.05)
-	)
-	p_btn_restart.button_up.connect(func():
-		var tw = p_btn_restart.create_tween()
-		tw.tween_property(p_btn_restart, "position:y", 0.0, 0.1).set_trans(Tween.TRANS_QUAD)
-		tw.parallel().tween_property(p_btn_restart, "modulate", Color.WHITE, 0.1)
-	)
-	p_btn_restart.pressed.connect(_on_restart_pressed)
-	pb_vbox.add_child(p_btn_restart)
-	
-	var p_btn_home := TextureButton.new()
-	p_btn_home.texture_normal = load("res://assets/btn_home.png")
-	p_btn_home.ignore_texture_size = true
-	p_btn_home.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
-	p_btn_home.custom_minimum_size = Vector2(180, 56)
-	p_btn_home.button_down.connect(func():
-		var tw = p_btn_home.create_tween()
-		tw.tween_property(p_btn_home, "position:y", 4.0, 0.05).set_trans(Tween.TRANS_QUAD)
-		tw.parallel().tween_property(p_btn_home, "modulate", Color(0.85, 0.85, 0.85), 0.05)
-	)
-	p_btn_home.button_up.connect(func():
-		var tw = p_btn_home.create_tween()
-		tw.tween_property(p_btn_home, "position:y", 0.0, 0.1).set_trans(Tween.TRANS_QUAD)
-		tw.parallel().tween_property(p_btn_home, "modulate", Color.WHITE, 0.1)
-	)
+	var p_btn_home := Button3D.new()
+	p_btn_home.setup_3d("res://assets/models/btn_180x56.obj", Color("f97316"), "", "Home", Vector2(180, 56), false, 12.0)
 	p_btn_home.pressed.connect(func():
 		get_tree().paused = false
 		if GameController: GameController.go_home()
 	)
 	pb_vbox.add_child(p_btn_home)
-	
-	var p_spacer2 := Control.new()
-	p_spacer2.custom_minimum_size = Vector2(0, 4)
-	pb_vbox.add_child(p_spacer2)
-	
-	var p_footer := Label.new()
-	p_footer.text = "Terms of Service  &  Privacy Policy"
-	p_footer.add_theme_font_size_override("font_size", 13)
-	p_footer.add_theme_color_override("font_color", Color("3b82f6"))
-	p_footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	pb_vbox.add_child(p_footer)
 
 	# ResultOverlay
 	result_overlay = Control.new()
