@@ -165,7 +165,7 @@ func _process(delta: float) -> void:
 func _ready() -> void:
 	_build_scene_hierarchy()
 	_setup_controller()
-	_load_level_1()
+	_load_current_level()
 
 	var vp := get_viewport()
 	if vp != null:
@@ -282,12 +282,22 @@ func _setup_controller() -> void:
 	controller.level_completed.connect(_on_level_completed)
 	controller.puzzle_failed.connect(_on_puzzle_failed)
 
-func _load_level_1() -> void:
+func _load_current_level() -> void:
+	var lvl_num = 1
+	if GameController:
+		lvl_num = GameController.current_level_number
+		
 	var lvl: CarJamLevelData = null
-	if ResourceLoader.exists("res://levels/level_001.tres"):
-		lvl = ResourceLoader.load("res://levels/level_001.tres") as CarJamLevelData
+	var path = "res://levels/level_%03d.tres" % lvl_num
+	if ResourceLoader.exists(path):
+		lvl = ResourceLoader.load(path) as CarJamLevelData
+	
 	if lvl == null:
-		lvl = CarJamLevelFactory.create_level_1()
+		push_error("Level resource not found: " + path)
+		if ResourceLoader.exists("res://levels/level_001.tres"):
+			lvl = ResourceLoader.load("res://levels/level_001.tres") as CarJamLevelData
+		else:
+			lvl = CarJamLevelFactory.create_level_1()
 
 	controller.load_level(lvl)
 	_setup_visuals(lvl)
@@ -653,7 +663,7 @@ func _build_hud() -> void:
 	top_bar.add_child(btn_restart)
 
 	level_title_label = Label.new()
-	level_title_label.text = "Level 1"
+	level_title_label.text = "Level " + str(GameController.current_level_number if GameController else 1)
 	level_title_label.add_theme_font_size_override("font_size", 30)
 	level_title_label.add_theme_color_override("font_color", Color("ffffff"))
 	level_title_label.add_theme_color_override("font_outline_color", Color("1e293b"))
@@ -971,7 +981,27 @@ func _build_hud() -> void:
 	result_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	r_vbox.add_child(result_title_label)
 	
-	# Action Buttons (Home and Restart)
+	# Action Buttons
+	var gc = get_tree().root.get_node_or_null("GameController")
+	var is_level_1 = (gc != null and gc.current_level_number == 1)
+	if is_level_1:
+		var r_btn_next := Button.new()
+		r_btn_next.text = "NEXT LEVEL ➔"
+		r_btn_next.add_theme_font_size_override("font_size", 24)
+		r_btn_next.add_theme_color_override("font_color", Color.WHITE)
+		r_btn_next.add_theme_stylebox_override("normal", SimpleStyle.make_extruded_style(
+			Color("22c55e"), Color("15803d"), 16, 7, 0))
+		r_btn_next.add_theme_stylebox_override("hover", SimpleStyle.make_extruded_style(
+			Color("4ade80"), Color("15803d"), 16, 7, 0))
+		r_btn_next.add_theme_stylebox_override("pressed", SimpleStyle.make_extruded_style(
+			Color("16a34a"), Color("14532d"), 16, 0, 7))
+		r_btn_next.custom_minimum_size = Vector2(240, 60)
+		r_btn_next.pressed.connect(func():
+			_play_sfx("ui")
+			if gc: gc.next_level()
+		)
+		r_vbox.add_child(r_btn_next)
+
 	var r_btn_home := Button.new()
 	r_btn_home.text = "Home"
 	r_btn_home.add_theme_font_size_override("font_size", 24)
@@ -1110,7 +1140,7 @@ func _on_restart_pressed() -> void:
 	get_tree().paused = false
 	var gc = get_tree().root.get_node_or_null("GameController")
 	if gc:
-		gc.start_level(1)
+		gc.start_level(gc.current_level_number)
 
 func _show_parking_full_toast() -> void:
 	if _toast_panel == null:

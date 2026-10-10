@@ -148,7 +148,7 @@ func _build_ui() -> void:
 
 func _on_play_pressed() -> void:
 	AudioManager.play(AudioManager.SFX_UI)
-	GameController.start_level(1)
+	GameController.start_level(GameController.current_level_number)
 
 
 func _on_settings_pressed() -> void:
