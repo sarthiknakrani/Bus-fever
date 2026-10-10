@@ -958,7 +958,7 @@ func _build_hud() -> void:
 		tw.tween_property(p_btn_restart, "scale", Vector2.ONE, 0.1)
 	)
 	p_btn_restart.pivot_offset = Vector2(49, 21)
-	p_btn_restart.pressed.connect(_on_restart_pressed)
+	p_btn_restart.pressed.connect(_direct_restart)
 	btm_hbox.add_child(p_btn_restart)
 
 	var p_btn_home := TextureButton.new()
@@ -1137,7 +1137,7 @@ func _build_hud() -> void:
 	restart_confirm_overlay.add_child(rc_center)
 
 	var rc_wrapper := Control.new()
-	rc_wrapper.custom_minimum_size = Vector2(340, 360)
+	rc_wrapper.custom_minimum_size = Vector2(255, 270)
 	rc_center.add_child(rc_wrapper)
 
 	var rc_panel := PanelContainer.new()
@@ -1195,26 +1195,26 @@ func _build_hud() -> void:
 	var rc_inner_panel := PanelContainer.new()
 	var rc_inner_style = StyleBoxFlat.new()
 	rc_inner_style.bg_color = Color("f1f5f9")
-	rc_inner_style.corner_radius_top_left = 16
-	rc_inner_style.corner_radius_top_right = 16
-	rc_inner_style.corner_radius_bottom_left = 16
-	rc_inner_style.corner_radius_bottom_right = 16
-	rc_inner_style.border_width_bottom = 4
+	rc_inner_style.corner_radius_top_left = 12
+	rc_inner_style.corner_radius_top_right = 12
+	rc_inner_style.corner_radius_bottom_left = 12
+	rc_inner_style.corner_radius_bottom_right = 12
+	rc_inner_style.border_width_bottom = 3
 	rc_inner_style.border_color = Color("e2e8f0")
 	rc_inner_panel.add_theme_stylebox_override("panel", rc_inner_style)
 	rc_inner_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	rc_vbox.add_child(rc_inner_panel)
 
 	var rc_inner_margin = MarginContainer.new()
-	rc_inner_margin.add_theme_constant_override("margin_left", 16)
-	rc_inner_margin.add_theme_constant_override("margin_right", 16)
-	rc_inner_margin.add_theme_constant_override("margin_top", 16)
-	rc_inner_margin.add_theme_constant_override("margin_bottom", 16)
+	rc_inner_margin.add_theme_constant_override("margin_left", 12)
+	rc_inner_margin.add_theme_constant_override("margin_right", 12)
+	rc_inner_margin.add_theme_constant_override("margin_top", 12)
+	rc_inner_margin.add_theme_constant_override("margin_bottom", 12)
 	rc_inner_panel.add_child(rc_inner_margin)
 
 	var rc_inner_vbox = VBoxContainer.new()
 	rc_inner_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	rc_inner_vbox.add_theme_constant_override("separation", 12)
+	rc_inner_vbox.add_theme_constant_override("separation", 9)
 	rc_inner_margin.add_child(rc_inner_vbox)
 
 	var rc_icon = TextureRect.new()
@@ -1235,7 +1235,7 @@ func _build_hud() -> void:
 	# YES / NO buttons
 	var rc_btns = HBoxContainer.new()
 	rc_btns.alignment = BoxContainer.ALIGNMENT_CENTER
-	rc_btns.add_theme_constant_override("separation", 16)
+	rc_btns.add_theme_constant_override("separation", 12)
 	rc_vbox.add_child(rc_btns)
 
 	rc_btns.add_child(_create_procedural_glossy_button("Yes", Color("22c55e"), Color("166534"), _confirm_restart_yes))
@@ -1244,23 +1244,23 @@ func _build_hud() -> void:
 	# Close button (top right)
 	var rc_close_btn := Button.new()
 	rc_close_btn.text = "✖"
-	rc_close_btn.add_theme_font_size_override("font_size", 18)
+	rc_close_btn.add_theme_font_size_override("font_size", 14)
 	rc_close_btn.add_theme_color_override("font_color", Color.WHITE)
-	rc_close_btn.custom_minimum_size = Vector2(40, 40)
+	rc_close_btn.custom_minimum_size = Vector2(30, 30)
 	rc_close_btn.anchor_left = 1.0
 	rc_close_btn.anchor_right = 1.0
 	rc_close_btn.anchor_top = 0.0
 	rc_close_btn.anchor_bottom = 0.0
-	rc_close_btn.offset_left = -24.0
-	rc_close_btn.offset_top = -16.0
-	rc_close_btn.offset_right = 24.0
-	rc_close_btn.offset_bottom = 32.0
+	rc_close_btn.offset_left = -18.0
+	rc_close_btn.offset_top = -12.0
+	rc_close_btn.offset_right = 18.0
+	rc_close_btn.offset_bottom = 24.0
 	var rcc_style = StyleBoxFlat.new()
 	rcc_style.bg_color = Color("ef4444")
-	rcc_style.set_corner_radius_all(24)
+	rcc_style.set_corner_radius_all(18)
 	rcc_style.shadow_color = Color(0, 0, 0, 0.3)
-	rcc_style.shadow_size = 6
-	rcc_style.shadow_offset = Vector2(0, 4)
+	rcc_style.shadow_size = 4
+	rcc_style.shadow_offset = Vector2(0, 3)
 	rc_close_btn.add_theme_stylebox_override("normal", rcc_style)
 	var rcc_hover = rcc_style.duplicate()
 	rcc_hover.bg_color = Color("f87171")
@@ -1387,6 +1387,18 @@ func _update_layout() -> void:
 
 
 
+func _direct_restart() -> void:
+	_play_sfx("ui")
+	if pause_overlay and pause_overlay.visible:
+		pause_overlay.visible = false
+	get_tree().paused = false
+	var gc = get_tree().root.get_node_or_null("GameController")
+	if gc:
+		if gc.current_level_number > 0:
+			gc.start_level(gc.current_level_number)
+		else:
+			gc.goto_scene("res://scenes/main.tscn")
+
 func _on_restart_pressed() -> void:
 	_play_sfx("ui")
 	_was_paused_before_confirm = get_tree().paused
@@ -1409,21 +1421,21 @@ func _confirm_restart_no() -> void:
 
 func _create_procedural_glossy_button(btn_text: String, bg_color: Color, border_color: Color, on_click: Callable) -> Control:
 	var wrapper = Control.new()
-	wrapper.custom_minimum_size = Vector2(110, 50)
+	wrapper.custom_minimum_size = Vector2(82, 38)
 	
 	var panel = PanelContainer.new()
 	panel.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var style = StyleBoxFlat.new()
 	style.bg_color = bg_color
-	style.corner_radius_top_left = 16
-	style.corner_radius_top_right = 16
-	style.corner_radius_bottom_left = 16
-	style.corner_radius_bottom_right = 16
-	style.border_width_bottom = 6
+	style.corner_radius_top_left = 12
+	style.corner_radius_top_right = 12
+	style.corner_radius_bottom_left = 12
+	style.corner_radius_bottom_right = 12
+	style.border_width_bottom = 4
 	style.border_color = border_color
 	style.shadow_color = Color(0,0,0,0.2)
-	style.shadow_size = 4
-	style.shadow_offset = Vector2(0, 4)
+	style.shadow_size = 3
+	style.shadow_offset = Vector2(0, 3)
 	panel.add_theme_stylebox_override("panel", style)
 	wrapper.add_child(panel)
 	
@@ -1433,8 +1445,8 @@ func _create_procedural_glossy_button(btn_text: String, bg_color: Color, border_
 	gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var g_style = StyleBoxFlat.new()
 	g_style.bg_color = Color(1, 1, 1, 0.3)
-	g_style.corner_radius_top_left = 16
-	g_style.corner_radius_top_right = 16
+	g_style.corner_radius_top_left = 12
+	g_style.corner_radius_top_right = 12
 	gloss.add_theme_stylebox_override("panel", g_style)
 	wrapper.add_child(gloss)
 	
@@ -1443,10 +1455,10 @@ func _create_procedural_glossy_button(btn_text: String, bg_color: Color, border_
 	lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	lbl.add_theme_font_size_override("font_size", 20)
+	lbl.add_theme_font_size_override("font_size", 15)
 	lbl.add_theme_color_override("font_color", Color.WHITE)
 	lbl.add_theme_color_override("font_outline_color", border_color)
-	lbl.add_theme_constant_override("outline_size", 4)
+	lbl.add_theme_constant_override("outline_size", 3)
 	wrapper.add_child(lbl)
 	
 	var btn = Button.new()
@@ -1455,17 +1467,17 @@ func _create_procedural_glossy_button(btn_text: String, bg_color: Color, border_
 	btn.modulate = Color(1,1,1,0.01)
 	btn.button_down.connect(func():
 		var tw = wrapper.create_tween()
-		tw.tween_property(wrapper, "position:y", 4.0, 0.05)
-		tw.parallel().tween_property(panel, "theme_override_styles/panel:border_width_bottom", 2, 0.05)
+		tw.tween_property(wrapper, "position:y", 3.0, 0.05)
+		tw.parallel().tween_property(panel, "theme_override_styles/panel:border_width_bottom", 1, 0.05)
 		tw.parallel().tween_property(panel, "theme_override_styles/panel:shadow_size", 0, 0.05)
 		tw.parallel().tween_property(panel, "theme_override_styles/panel:shadow_offset", Vector2(0,0), 0.05)
 	)
 	btn.button_up.connect(func():
 		var tw = wrapper.create_tween()
 		tw.tween_property(wrapper, "position:y", 0.0, 0.1)
-		tw.parallel().tween_property(panel, "theme_override_styles/panel:border_width_bottom", 6, 0.1)
-		tw.parallel().tween_property(panel, "theme_override_styles/panel:shadow_size", 4, 0.1)
-		tw.parallel().tween_property(panel, "theme_override_styles/panel:shadow_offset", Vector2(0,4), 0.1)
+		tw.parallel().tween_property(panel, "theme_override_styles/panel:border_width_bottom", 4, 0.1)
+		tw.parallel().tween_property(panel, "theme_override_styles/panel:shadow_size", 3, 0.1)
+		tw.parallel().tween_property(panel, "theme_override_styles/panel:shadow_offset", Vector2(0,3), 0.1)
 	)
 	btn.pressed.connect(on_click)
 	wrapper.add_child(btn)
