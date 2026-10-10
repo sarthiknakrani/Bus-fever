@@ -832,21 +832,21 @@ func _build_hud() -> void:
 	pause_overlay.add_child(p_center)
 
 	var p_wrapper := Control.new()
-	p_wrapper.custom_minimum_size = Vector2(340, 420)
+	p_wrapper.custom_minimum_size = Vector2(255, 315)
 	p_center.add_child(p_wrapper)
 
 	var p_panel := PanelContainer.new()
 	p_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var p_style_panel = StyleBoxFlat.new()
 	p_style_panel.bg_color = Color("fcf8ef")
-	p_style_panel.corner_radius_top_left = 32
-	p_style_panel.corner_radius_top_right = 32
-	p_style_panel.corner_radius_bottom_left = 32
-	p_style_panel.corner_radius_bottom_right = 32
+	p_style_panel.corner_radius_top_left = 24
+	p_style_panel.corner_radius_top_right = 24
+	p_style_panel.corner_radius_bottom_left = 24
+	p_style_panel.corner_radius_bottom_right = 24
 	p_style_panel.shadow_color = Color(0,0,0,0.3)
-	p_style_panel.shadow_size = 12
-	p_style_panel.shadow_offset = Vector2(0, 8)
-	p_style_panel.border_width_bottom = 6
+	p_style_panel.shadow_size = 9
+	p_style_panel.shadow_offset = Vector2(0, 6)
+	p_style_panel.border_width_bottom = 4
 	p_style_panel.border_color = Color("e0d2b8")
 	p_panel.add_theme_stylebox_override("panel", p_style_panel)
 	p_wrapper.add_child(p_panel)
@@ -858,28 +858,28 @@ func _build_hud() -> void:
 	pop_gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var pg_style = StyleBoxFlat.new()
 	pg_style.bg_color = Color(1, 1, 1, 0.4)
-	pg_style.corner_radius_top_left = 32
-	pg_style.corner_radius_top_right = 32
+	pg_style.corner_radius_top_left = 24
+	pg_style.corner_radius_top_right = 24
 	pop_gloss.add_theme_stylebox_override("panel", pg_style)
 	p_wrapper.add_child(pop_gloss)
 
 	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 28)
-	margin.add_theme_constant_override("margin_right", 28)
-	margin.add_theme_constant_override("margin_top", 28)
-	margin.add_theme_constant_override("margin_bottom", 28)
+	margin.add_theme_constant_override("margin_left", 21)
+	margin.add_theme_constant_override("margin_right", 21)
+	margin.add_theme_constant_override("margin_top", 21)
+	margin.add_theme_constant_override("margin_bottom", 21)
 	p_panel.add_child(margin)
 
 	var pb_vbox := VBoxContainer.new()
 	pb_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	pb_vbox.add_theme_constant_override("separation", 18)
+	pb_vbox.add_theme_constant_override("separation", 13)
 	margin.add_child(pb_vbox)
 
 	# A. Top area with Title
 	var title := Label.new()
 	title.text = "Settings"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 24)
+	title.add_theme_font_size_override("font_size", 18)
 	title.add_theme_color_override("font_color", Color("9e7655"))
 	pb_vbox.add_child(title)
 
@@ -890,7 +890,7 @@ func _build_hud() -> void:
 
 	# C. Separate inner container (Toggles)
 	var toggles := VBoxContainer.new()
-	toggles.add_theme_constant_override("separation", 12)
+	toggles.add_theme_constant_override("separation", 9)
 	pb_vbox.add_child(toggles)
 	
 	var sm_sfx = true
@@ -922,7 +922,7 @@ func _build_hud() -> void:
 	# D. Bottom buttons
 	var btm_hbox = HBoxContainer.new()
 	btm_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	btm_hbox.add_theme_constant_override("separation", 16)
+	btm_hbox.add_theme_constant_override("separation", 12)
 	pb_vbox.add_child(btm_hbox)
 
 	var p_btn_restart := TextureButton.new()
@@ -930,17 +930,17 @@ func _build_hud() -> void:
 	p_btn_restart.texture_pressed = load("res://assets/ui/settings_buttons/restart_pressed.svg")
 	p_btn_restart.ignore_texture_size = true
 	p_btn_restart.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
-	p_btn_restart.custom_minimum_size = Vector2(130, 56)
+	p_btn_restart.custom_minimum_size = Vector2(98, 42)
 	
 	var r_lbl = Label.new()
 	r_lbl.text = "Restart"
 	r_lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
 	r_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	r_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	r_lbl.add_theme_font_size_override("font_size", 20)
+	r_lbl.add_theme_font_size_override("font_size", 15)
 	r_lbl.add_theme_color_override("font_color", Color.WHITE)
 	r_lbl.add_theme_color_override("font_outline_color", Color("14532d"))
-	r_lbl.add_theme_constant_override("outline_size", 6)
+	r_lbl.add_theme_constant_override("outline_size", 4)
 	r_lbl.offset_top = -4
 	r_lbl.offset_bottom = -4
 	p_btn_restart.add_child(r_lbl)
@@ -957,7 +957,7 @@ func _build_hud() -> void:
 		var tw = p_btn_restart.create_tween()
 		tw.tween_property(p_btn_restart, "scale", Vector2.ONE, 0.1)
 	)
-	p_btn_restart.pivot_offset = Vector2(65, 28)
+	p_btn_restart.pivot_offset = Vector2(49, 21)
 	p_btn_restart.pressed.connect(_on_restart_pressed)
 	btm_hbox.add_child(p_btn_restart)
 
@@ -966,17 +966,17 @@ func _build_hud() -> void:
 	p_btn_home.texture_pressed = load("res://assets/ui/settings_buttons/home_pressed.svg")
 	p_btn_home.ignore_texture_size = true
 	p_btn_home.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
-	p_btn_home.custom_minimum_size = Vector2(130, 56)
+	p_btn_home.custom_minimum_size = Vector2(98, 42)
 	
 	var h_lbl = Label.new()
 	h_lbl.text = "Home"
 	h_lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
 	h_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	h_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	h_lbl.add_theme_font_size_override("font_size", 20)
+	h_lbl.add_theme_font_size_override("font_size", 15)
 	h_lbl.add_theme_color_override("font_color", Color.WHITE)
 	h_lbl.add_theme_color_override("font_outline_color", Color("9a3412"))
-	h_lbl.add_theme_constant_override("outline_size", 6)
+	h_lbl.add_theme_constant_override("outline_size", 4)
 	h_lbl.offset_top = -4
 	h_lbl.offset_bottom = -4
 	p_btn_home.add_child(h_lbl)
@@ -993,7 +993,7 @@ func _build_hud() -> void:
 		var tw = p_btn_home.create_tween()
 		tw.tween_property(p_btn_home, "scale", Vector2.ONE, 0.1)
 	)
-	p_btn_home.pivot_offset = Vector2(65, 28)
+	p_btn_home.pivot_offset = Vector2(49, 21)
 	p_btn_home.pressed.connect(func():
 		get_tree().paused = false
 		if GameController: GameController.goto_scene("res://scenes/main.tscn")
@@ -1016,10 +1016,10 @@ func _build_hud() -> void:
 	close_btn.offset_bottom = 32.0
 	var c_style = StyleBoxFlat.new()
 	c_style.bg_color = Color("ef4444")
-	c_style.set_corner_radius_all(24)
+	c_style.set_corner_radius_all(18)
 	c_style.shadow_color = Color(0, 0, 0, 0.3)
-	c_style.shadow_size = 6
-	c_style.shadow_offset = Vector2(0, 4)
+	c_style.shadow_size = 4
+	c_style.shadow_offset = Vector2(0, 3)
 	close_btn.add_theme_stylebox_override("normal", c_style)
 	
 	var c_hover = c_style.duplicate()
@@ -1038,8 +1038,8 @@ func _build_hud() -> void:
 	cg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var cgs = StyleBoxFlat.new()
 	cgs.bg_color = Color(1, 1, 1, 0.3)
-	cgs.corner_radius_top_left = 24
-	cgs.corner_radius_top_right = 24
+	cgs.corner_radius_top_left = 18
+	cgs.corner_radius_top_right = 18
 	cg.add_theme_stylebox_override("panel", cgs)
 	close_btn.add_child(cg)
 	
@@ -1182,7 +1182,7 @@ func _build_hud() -> void:
 	var rc_title := Label.new()
 	rc_title.text = "Restart"
 	rc_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	rc_title.add_theme_font_size_override("font_size", 24)
+	rc_title.add_theme_font_size_override("font_size", 18)
 	rc_title.add_theme_color_override("font_color", Color("9e7655"))
 	rc_vbox.add_child(rc_title)
 
@@ -1498,7 +1498,7 @@ func _show_parking_full_toast() -> void:
 		
 		var lbl = Label.new()
 		lbl.text = "NO SPOT AVAILABLE"
-		lbl.add_theme_font_size_override("font_size", 16)
+		lbl.add_theme_font_size_override("font_size", 12)
 		lbl.add_theme_color_override("font_color", Color.WHITE)
 		hb.add_child(lbl)
 		
@@ -1600,7 +1600,7 @@ func _create_settings_icon_button(label_text: String, icon_text: String, is_on: 
 	
 	var lbl = Label.new()
 	lbl.text = label_text
-	lbl.add_theme_font_size_override("font_size", 16)
+	lbl.add_theme_font_size_override("font_size", 12)
 	lbl.add_theme_color_override("font_color", Color("64748b"))
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	
@@ -1683,31 +1683,31 @@ func _on_individual_boarded(pid: int, vehicle_id: int, color_id: String, token: 
 
 func _create_custom_toggle(text: String, icon_text: String, is_on: bool, on_toggle: Callable) -> Control:
 	var row := HBoxContainer.new()
-	row.custom_minimum_size = Vector2(280, 48)
+	row.custom_minimum_size = Vector2(210, 36)
 
 	var icon := Label.new()
 	icon.text = icon_text
-	icon.add_theme_font_size_override("font_size", 16)
+	icon.add_theme_font_size_override("font_size", 12)
 	icon.add_theme_color_override("font_color", Color("9e7655"))
 	icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	row.add_child(icon)
 
 	var spacer := Control.new()
-	spacer.custom_minimum_size = Vector2(12, 0)
+	spacer.custom_minimum_size = Vector2(9, 0)
 	row.add_child(spacer)
 
 	var lbl := Label.new()
 	lbl.text = text
-	lbl.add_theme_font_size_override("font_size", 16)
+	lbl.add_theme_font_size_override("font_size", 12)
 	lbl.add_theme_color_override("font_color", Color("9e7655"))
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(lbl)
 
-	const PILL_W := 70.0
-	const PILL_H := 40.0
-	const KNOB := 28.0
-	const PAD := 7.0
+	const PILL_W := 52.0
+	const PILL_H := 30.0
+	const KNOB := 21.0
+	const PAD := 5.0
 
 	var pill := Panel.new()
 	pill.custom_minimum_size = Vector2(PILL_W, PILL_H)
@@ -1752,16 +1752,20 @@ func _create_custom_toggle(text: String, icon_text: String, is_on: bool, on_togg
 	var knob_style := StyleBoxFlat.new()
 	knob_style.bg_color = Color.WHITE
 	knob_style.set_corner_radius_all(int(KNOB / 2))
-	knob_style.border_width_bottom = 3
+	knob_style.border_width_bottom = 2
 	knob_style.border_color = Color("e5e7eb")
 	knob_style.shadow_color = Color(0, 0, 0, 0.20)
-	knob_style.shadow_size = 4
-	knob_style.shadow_offset = Vector2(0, 2)
+	knob_style.shadow_size = 3
+	knob_style.shadow_offset = Vector2(0, 1)
 	knob.add_theme_stylebox_override("panel", knob_style)
 	inside.add_child(knob)
 
 	var hit := Button.new()
 	hit.set_anchors_preset(Control.PRESET_FULL_RECT)
+	hit.offset_left = -10
+	hit.offset_top = -10
+	hit.offset_right = 10
+	hit.offset_bottom = 10
 	hit.flat = true
 	hit.modulate = Color(1, 1, 1, 0.01)
 	pill.add_child(hit)

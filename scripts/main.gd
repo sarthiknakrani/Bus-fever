@@ -179,7 +179,7 @@ func _show_settings_overlay() -> void:
 	# Wrapper Control so the close button can anchor freely OUTSIDE the
 	# PanelContainer (PanelContainer forces child layout and ignores anchors).
 	var wrapper := Control.new()
-	wrapper.custom_minimum_size = Vector2(340, 380)
+	wrapper.custom_minimum_size = Vector2(255, 285)
 	wrapper.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	center.add_child(wrapper)
 
@@ -187,12 +187,12 @@ func _show_settings_overlay() -> void:
 	_settings_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var ps := StyleBoxFlat.new()
 	ps.bg_color = Color("fcf8ef")
-	ps.border_width_bottom = 6
+	ps.border_width_bottom = 4
 	ps.border_color = Color("e0d2b8")
-	ps.set_corner_radius_all(32)
+	ps.set_corner_radius_all(24)
 	ps.shadow_color = Color(0,0,0,0.3)
-	ps.shadow_size = 12
-	ps.shadow_offset = Vector2(0, 8)
+	ps.shadow_size = 9
+	ps.shadow_offset = Vector2(0, 6)
 	_settings_panel.add_theme_stylebox_override("panel", ps)
 	# REMOVED clip_children because it breaks the shadow and layout!
 	wrapper.add_child(_settings_panel)
@@ -204,26 +204,26 @@ func _show_settings_overlay() -> void:
 	pop_gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var pg_style = StyleBoxFlat.new()
 	pg_style.bg_color = Color(1, 1, 1, 0.4)
-	pg_style.corner_radius_top_left = 32
-	pg_style.corner_radius_top_right = 32
+	pg_style.corner_radius_top_left = 24
+	pg_style.corner_radius_top_right = 24
 	pop_gloss.add_theme_stylebox_override("panel", pg_style)
 	wrapper.add_child(pop_gloss)
 
 	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 28)
-	margin.add_theme_constant_override("margin_right", 28)
-	margin.add_theme_constant_override("margin_top", 28)
-	margin.add_theme_constant_override("margin_bottom", 28)
+	margin.add_theme_constant_override("margin_left", 21)
+	margin.add_theme_constant_override("margin_right", 21)
+	margin.add_theme_constant_override("margin_top", 21)
+	margin.add_theme_constant_override("margin_bottom", 21)
 	_settings_panel.add_child(margin)
 
 	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 18)
+	vbox.add_theme_constant_override("separation", 13)
 	margin.add_child(vbox)
 
 	var title := Label.new()
 	title.text = "Settings"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 24)
+	title.add_theme_font_size_override("font_size", 18)
 	title.add_theme_color_override("font_color", Color("9e7655"))
 	vbox.add_child(title)
 
@@ -233,7 +233,7 @@ func _show_settings_overlay() -> void:
 	vbox.add_child(line)
 
 	var toggles := VBoxContainer.new()
-	toggles.add_theme_constant_override("separation", 12)
+	toggles.add_theme_constant_override("separation", 9)
 	vbox.add_child(toggles)
 
 	toggles.add_child(_create_custom_toggle("Sound", "🔊", SettingsManager.sfx_enabled(), func(on):
@@ -264,10 +264,10 @@ func _show_settings_overlay() -> void:
 	# NO clip_children to prevent shadow bug
 	var c_style = StyleBoxFlat.new()
 	c_style.bg_color = Color("ef4444")
-	c_style.set_corner_radius_all(24)
+	c_style.set_corner_radius_all(18)
 	c_style.shadow_color = Color(0, 0, 0, 0.3)
-	c_style.shadow_size = 6
-	c_style.shadow_offset = Vector2(0, 4)
+	c_style.shadow_size = 4
+	c_style.shadow_offset = Vector2(0, 3)
 	close_btn.add_theme_stylebox_override("normal", c_style)
 	
 	var c_hover = c_style.duplicate()
@@ -286,8 +286,8 @@ func _show_settings_overlay() -> void:
 	cg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var cgs = StyleBoxFlat.new()
 	cgs.bg_color = Color(1, 1, 1, 0.3)
-	cgs.corner_radius_top_left = 24
-	cgs.corner_radius_top_right = 24
+	cgs.corner_radius_top_left = 18
+	cgs.corner_radius_top_right = 18
 	cg.add_theme_stylebox_override("panel", cgs)
 	close_btn.add_child(cg)
 	
@@ -302,32 +302,32 @@ func _show_settings_overlay() -> void:
 
 func _create_custom_toggle(text: String, icon_text: String, is_on: bool, on_toggle: Callable) -> Control:
 	var row := HBoxContainer.new()
-	row.custom_minimum_size = Vector2(280, 48)
+	row.custom_minimum_size = Vector2(210, 36)
 
 	var icon := Label.new()
 	icon.text = icon_text
-	icon.add_theme_font_size_override("font_size", 16)
+	icon.add_theme_font_size_override("font_size", 12)
 	icon.add_theme_color_override("font_color", Color("9e7655"))
 	icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	row.add_child(icon)
 
 	var spacer := Control.new()
-	spacer.custom_minimum_size = Vector2(12, 0)
+	spacer.custom_minimum_size = Vector2(9, 0)
 	row.add_child(spacer)
 
 	var lbl := Label.new()
 	lbl.text = text
-	lbl.add_theme_font_size_override("font_size", 16)
+	lbl.add_theme_font_size_override("font_size", 12)
 	lbl.add_theme_color_override("font_color", Color("9e7655"))
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(lbl)
 
 	# Procedural 3D toggle pill (no PNG — sharp at any resolution)
-	const PILL_W := 70.0
-	const PILL_H := 40.0
-	const KNOB := 28.0
-	const PAD := 7.0
+	const PILL_W := 52.0
+	const PILL_H := 30.0
+	const KNOB := 21.0
+	const PAD := 5.0
 
 	var pill := Panel.new()
 	pill.custom_minimum_size = Vector2(PILL_W, PILL_H)
@@ -374,17 +374,21 @@ func _create_custom_toggle(text: String, icon_text: String, is_on: bool, on_togg
 	var knob_style := StyleBoxFlat.new()
 	knob_style.bg_color = Color.WHITE
 	knob_style.set_corner_radius_all(int(KNOB / 2))
-	knob_style.border_width_bottom = 3
+	knob_style.border_width_bottom = 2
 	knob_style.border_color = Color("e5e7eb")
 	knob_style.shadow_color = Color(0, 0, 0, 0.20)
-	knob_style.shadow_size = 4
-	knob_style.shadow_offset = Vector2(0, 2)
+	knob_style.shadow_size = 3
+	knob_style.shadow_offset = Vector2(0, 1)
 	knob.add_theme_stylebox_override("panel", knob_style)
 	inside.add_child(knob)
 
 	# Invisible full-pill click target
 	var hit := Button.new()
 	hit.set_anchors_preset(Control.PRESET_FULL_RECT)
+	hit.offset_left = -10
+	hit.offset_top = -10
+	hit.offset_right = 10
+	hit.offset_bottom = 10
 	hit.flat = true
 	hit.modulate = Color(1, 1, 1, 0.01)
 	pill.add_child(hit)
