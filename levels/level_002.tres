@@ -11,16 +11,16 @@ color_id = "red"
 [sub_resource type="Resource" id="Resource_uw0fl"]
 script = ExtResource("1_ajesq")
 group_id = 1
-color_id = "yellow"
 
 [sub_resource type="Resource" id="Resource_cto8n"]
 script = ExtResource("1_ajesq")
 group_id = 2
-color_id = "red"
+color_id = "yellow"
 
 [sub_resource type="Resource" id="Resource_4ftab"]
 script = ExtResource("1_ajesq")
 group_id = 3
+color_id = "red"
 
 [sub_resource type="Resource" id="Resource_ujhyu"]
 script = ExtResource("1_ajesq")
@@ -34,11 +34,12 @@ group_id = 5
 [sub_resource type="Resource" id="Resource_y081a"]
 script = ExtResource("1_ajesq")
 group_id = 6
+color_id = "red"
 
 [sub_resource type="Resource" id="Resource_ws7cc"]
 script = ExtResource("1_ajesq")
 group_id = 7
-color_id = "yellow"
+color_id = "red"
 
 [sub_resource type="Resource" id="Resource_r065b"]
 script = ExtResource("1_ajesq")
@@ -47,35 +48,35 @@ group_id = 8
 [sub_resource type="Resource" id="Resource_mmxpe"]
 script = ExtResource("1_ajesq")
 group_id = 9
-color_id = "red"
+color_id = "yellow"
 
 [sub_resource type="Resource" id="Resource_m50rt"]
 script = ExtResource("1_ajesq")
 group_id = 10
-color_id = "yellow"
 
 [sub_resource type="Resource" id="Resource_fdx02"]
 script = ExtResource("1_ajesq")
 group_id = 11
-color_id = "red"
+color_id = "yellow"
 
 [sub_resource type="Resource" id="Resource_r46n8"]
 script = ExtResource("3_ssqa0")
 id = 1
 code = "v1"
-anchor = Vector2i(0, 1)
-initial_anchor = Vector2i(0, 1)
-footprint = Array[Vector2i]([Vector2i(0, 0), Vector2i(0, 1)])
-color_id = "red"
+anchor = Vector2i(2, 1)
+initial_anchor = Vector2i(2, 1)
+footprint = Array[Vector2i]([Vector2i(0, 0), Vector2i(-1, 0)])
+direction = 3
 
 [sub_resource type="Resource" id="Resource_qr7mg"]
 script = ExtResource("3_ssqa0")
 id = 2
 code = "v2"
-anchor = Vector2i(0, 4)
-initial_anchor = Vector2i(0, 4)
-footprint = Array[Vector2i]([Vector2i(0, 0), Vector2i(0, -1)])
-direction = 1
+anchor = Vector2i(4, 1)
+initial_anchor = Vector2i(4, 1)
+footprint = Array[Vector2i]([Vector2i(0, 0), Vector2i(-1, 0)])
+direction = 3
+color_id = "red"
 
 [sub_resource type="Resource" id="Resource_er5fi"]
 script = ExtResource("3_ssqa0")
@@ -90,30 +91,30 @@ color_id = "yellow"
 script = ExtResource("3_ssqa0")
 id = 4
 code = "v4"
-anchor = Vector2i(2, 3)
-initial_anchor = Vector2i(2, 3)
-footprint = Array[Vector2i]([Vector2i(0, 0), Vector2i(0, -1)])
-direction = 1
+anchor = Vector2i(2, 2)
+initial_anchor = Vector2i(2, 2)
+footprint = Array[Vector2i]([Vector2i(0, 0), Vector2i(1, 0)])
+direction = 2
 color_id = "red"
 
 [sub_resource type="Resource" id="Resource_tpsu1"]
 script = ExtResource("3_ssqa0")
 id = 5
 code = "v5"
-anchor = Vector2i(3, 1)
-initial_anchor = Vector2i(3, 1)
-footprint = Array[Vector2i]([Vector2i(0, 0), Vector2i(-1, 0)])
-direction = 3
+anchor = Vector2i(4, 2)
+initial_anchor = Vector2i(4, 2)
+footprint = Array[Vector2i]([Vector2i(0, 0), Vector2i(0, -1)])
+direction = 1
+color_id = "yellow"
 
 [sub_resource type="Resource" id="Resource_7oh1j"]
 script = ExtResource("3_ssqa0")
 id = 6
 code = "v6"
-anchor = Vector2i(5, 1)
-initial_anchor = Vector2i(5, 1)
+anchor = Vector2i(3, 3)
+initial_anchor = Vector2i(3, 3)
 footprint = Array[Vector2i]([Vector2i(0, 0), Vector2i(-1, 0)])
 direction = 3
-color_id = "yellow"
 
 [sub_resource type="Resource" id="Resource_xov1q"]
 script = ExtResource("3_ssqa0")
@@ -121,53 +122,52 @@ id = 7
 code = "v7"
 anchor = Vector2i(1, 4)
 initial_anchor = Vector2i(1, 4)
-footprint = Array[Vector2i]([Vector2i(0, 0), Vector2i(1, 0)])
-direction = 2
+footprint = Array[Vector2i]([Vector2i(0, 0), Vector2i(0, 1)])
 color_id = "red"
 
 [sub_resource type="Resource" id="Resource_eldw1"]
 script = ExtResource("3_ssqa0")
 id = 8
 code = "v8"
-anchor = Vector2i(4, 4)
-initial_anchor = Vector2i(4, 4)
-footprint = Array[Vector2i]([Vector2i(0, 0), Vector2i(-1, 0)])
-direction = 3
+anchor = Vector2i(2, 4)
+initial_anchor = Vector2i(2, 4)
+footprint = Array[Vector2i]([Vector2i(0, 0), Vector2i(1, 0)])
+direction = 2
 
 [sub_resource type="Resource" id="Resource_opaqo"]
 script = ExtResource("3_ssqa0")
 id = 9
 code = "v9"
-anchor = Vector2i(2, 5)
-initial_anchor = Vector2i(2, 5)
-footprint = Array[Vector2i]([Vector2i(0, 0), Vector2i(1, 0)])
-direction = 2
-color_id = "yellow"
+anchor = Vector2i(4, 4)
+initial_anchor = Vector2i(4, 4)
+footprint = Array[Vector2i]([Vector2i(0, 0), Vector2i(0, -1)])
+direction = 1
+color_id = "red"
 
 [sub_resource type="Resource" id="Resource_io41y"]
 script = ExtResource("3_ssqa0")
 id = 10
 code = "v10"
-anchor = Vector2i(5, 2)
-initial_anchor = Vector2i(5, 2)
-footprint = Array[Vector2i]([Vector2i(0, 0), Vector2i(0, 1)])
-color_id = "red"
+anchor = Vector2i(3, 5)
+initial_anchor = Vector2i(3, 5)
+footprint = Array[Vector2i]([Vector2i(0, 0), Vector2i(-1, 0)])
+direction = 3
+color_id = "yellow"
 
 [sub_resource type="Resource" id="Resource_y67xn"]
 script = ExtResource("3_ssqa0")
 id = 11
 code = "v11"
-anchor = Vector2i(5, 5)
-initial_anchor = Vector2i(5, 5)
-footprint = Array[Vector2i]([Vector2i(0, 0), Vector2i(0, -1)])
-direction = 1
+anchor = Vector2i(0, 2)
+initial_anchor = Vector2i(0, 2)
+footprint = Array[Vector2i]([Vector2i(0, 0), Vector2i(0, 1)])
 
 [sub_resource type="Resource" id="Resource_bretr"]
 script = ExtResource("3_ssqa0")
 id = 12
 code = "v12"
-anchor = Vector2i(6, 3)
-initial_anchor = Vector2i(6, 3)
+anchor = Vector2i(5, 3)
+initial_anchor = Vector2i(5, 3)
 footprint = Array[Vector2i]([Vector2i(0, 0), Vector2i(0, -1)])
 direction = 1
 color_id = "yellow"
@@ -176,6 +176,7 @@ color_id = "yellow"
 script = ExtResource("2_lnfhx")
 level_id = 2
 title = "Level 2"
+board_size = Vector2i(6, 6)
 parking_slots_count = 7
 vehicles = Array[ExtResource("3_ssqa0")]([SubResource("Resource_r46n8"), SubResource("Resource_qr7mg"), SubResource("Resource_er5fi"), SubResource("Resource_dh8uc"), SubResource("Resource_tpsu1"), SubResource("Resource_7oh1j"), SubResource("Resource_xov1q"), SubResource("Resource_eldw1"), SubResource("Resource_opaqo"), SubResource("Resource_io41y"), SubResource("Resource_y67xn"), SubResource("Resource_bretr")])
 passenger_groups = Array[ExtResource("1_ajesq")]([SubResource("Resource_gsivs"), SubResource("Resource_uw0fl"), SubResource("Resource_cto8n"), SubResource("Resource_4ftab"), SubResource("Resource_ujhyu"), SubResource("Resource_sckbn"), SubResource("Resource_y081a"), SubResource("Resource_ws7cc"), SubResource("Resource_r065b"), SubResource("Resource_mmxpe"), SubResource("Resource_m50rt"), SubResource("Resource_fdx02")])
