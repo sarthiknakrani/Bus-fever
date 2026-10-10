@@ -3,5 +3,6 @@
     <rect x="6" y="8" width="68" height="68" rx="16" fill="#1e3a8a" />
     <rect x="6" y="6" width="68" height="68" rx="16" fill="#3b82f6" />
     <path d="M22 6 H58 A16 16 0 0 1 74 22 V30 A50 10 0 0 0 6 30 V22 A16 16 0 0 1 22 6 Z" fill="#ffffff" fill-opacity="0.25" />
-    <path d="M 40 22 A 18 18 0 1 0 54 30 L 46 30 L 58 44 L 70 30 L 62 30 A 26 26 0 1 1 22 22" fill="#ffffff" />
+    <!-- Center is (40, 40) -->
+    <path d="M 40 26 C 32 26 26 32 26 40 L 22 40 L 28 48 L 34 40 L 30 40 C 30 34 34 30 40 30 C 46 30 50 34 50 40 C 50 46 46 50 40 50 L 40 54 C 48 54 54 48 54 40 C 54 32 48 26 40 26 Z" fill="#ffffff" />
 </svg>

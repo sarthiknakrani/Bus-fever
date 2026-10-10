@@ -3,6 +3,6 @@
     <rect x="6" y="8" width="68" height="68" rx="16" fill="#1e3a8a" />
     <rect x="6" y="6" width="68" height="68" rx="16" fill="#3b82f6" />
     <path d="M22 6 H58 A16 16 0 0 1 74 22 V30 A50 10 0 0 0 6 30 V22 A16 16 0 0 1 22 6 Z" fill="#ffffff" fill-opacity="0.25" />
-    <rect x="28" y="26" width="8" height="28" rx="2" fill="#ffffff" />
-    <rect x="44" y="26" width="8" height="28" rx="2" fill="#ffffff" />
+    <rect x="30" y="28" width="6" height="24" rx="2" fill="#ffffff" />
+    <rect x="44" y="28" width="6" height="24" rx="2" fill="#ffffff" />
 </svg>
