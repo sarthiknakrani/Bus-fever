@@ -1048,7 +1048,7 @@ func _update_layout() -> void:
 	# Distribute the remaining vertical space evenly into the 2 gaps
 	var remaining_h = available_local_h - (track_h + parking_h + board_pixel_h)
 	# But cap the gaps so they don't look completely ridiculous
-	var gap = clampf(remaining_h / 2.5, 60.0, 350.0)
+	var gap = clampf(remaining_h / 4.0, 20.0, 100.0)
 	
 	var total_content_h = track_h + gap + parking_h + gap + board_pixel_h
 	
@@ -1095,7 +1095,7 @@ func _update_layout() -> void:
 		var plat_top = parking_y - (parking_h / 2.0) - 40.0
 		
 		# Partition gap
-		var partition_y = parking_y + (parking_h / 2.0) + (gap / 2.0)
+		var partition_y = parking_y + (parking_h / 2.0) + 10.0
 		
 		# Width needs to cover entire screen width
 		var full_w = (vp_size.x / scale_factor) + 200.0

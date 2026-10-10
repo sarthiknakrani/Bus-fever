@@ -183,7 +183,7 @@ static func animate_departure(
 	
 	# 1. Reverse maneuver (Straight backward)
 	print("[QA %d] Bus %d reverse started." % [Time.get_ticks_msec(), vehicle_id])
-	var reverse_pos = vehicle_node.position + Vector2(0, 220.0) # Move far down, completely outside the parking slots
+	var reverse_pos = vehicle_node.position + Vector2(0, 185.0) # Move far down, completely outside the parking slots
 	tw.tween_property(vehicle_node, "position", reverse_pos, 0.6).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
 	
 	var lambda_clear = func(ctrl, v_id, s_id, tok):
@@ -201,11 +201,11 @@ static func animate_departure(
 	# Final target Y is higher than reverse_pos, creating a natural C-curve forward sweep.
 	# reverse_pos is +220. We exit at +120. The parking slots end around +60.
 	# This keeps the entire exit path safely below the locked slot cards!
-	var final_target = Vector2(exit_local.x, reverse_pos.y - 100.0)
+	var final_target = Vector2(exit_local.x, reverse_pos.y - 10.0)
 	
 	# Start point: at reverse_pos (facing UP initially before it begins curving).
 	# We want it to turn right. The out handle pulls it UP to initiate forward driving.
-	curve.add_point(reverse_pos, Vector2.ZERO, Vector2(0, -120.0))
+	curve.add_point(reverse_pos, Vector2.ZERO, Vector2(0, -50.0))
 	# End point: far right, approaching horizontally from left
 	curve.add_point(final_target, Vector2(-150.0, 0), Vector2.ZERO)
 	

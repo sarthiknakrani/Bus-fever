@@ -18,13 +18,15 @@ func _draw() -> void:
 	var curb_color = Color("ffffff", 0.8)
 	var shadow_color = Color("a5abc2")
 	var deep_color = Color("959caf")
+	var road_color = Color("c7cddf") # Slightly darker for the road surface
 
 	var hill_w = 540.0
 	var slope_w = 80.0
 	var gy = p_partition_y
 	
-	# The straight line the user requested, slightly below the trapezoid shoulders
-	var line_y = gy + 60.0
+	# The road's lower boundary
+	var road_height = 170.0
+	var line_y = gy + road_height
 
 	var points = PackedVector2Array([
 		Vector2(-p_width/2.0, p_bottom),
@@ -37,8 +39,12 @@ func _draw() -> void:
 		Vector2(p_width/2.0, p_bottom)
 	])
 
-	# Fill the platform
+	# Fill the entire platform base
 	draw_colored_polygon(points, bg_color)
+	
+	# Draw the actual EXIT ROAD surface shading
+	# From the trapezoid base down to line_y
+	draw_rect(Rect2(-p_width/2.0, gy, p_width, road_height), road_color)
 	
 	# Draw the 3D curb along the top edge of the trapezoid shape
 	var top_edge = PackedVector2Array([
@@ -50,7 +56,6 @@ func _draw() -> void:
 		Vector2(p_width/2.0, gy)
 	])
 	
-	# To draw a thick line, we draw polylines multiple times with offsets
 	for offset_y in range(0, 10):
 		var color = deep_color
 		if offset_y < 2: color = curb_color
@@ -62,7 +67,7 @@ func _draw() -> void:
 			
 		draw_polyline(offset_pts, color, 2.0, true)
 		
-	# Draw the requested straight horizontal line below the hill
+	# Draw the lower road boundary (the straight horizontal line requested)
 	draw_rect(Rect2(-p_width/2.0, line_y, p_width, 4), shadow_color)
 	draw_rect(Rect2(-p_width/2.0, line_y + 4, p_width, 3), deep_color)
 	draw_rect(Rect2(-p_width/2.0, line_y + 7, p_width, 3), curb_color)
