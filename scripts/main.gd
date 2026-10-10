@@ -57,8 +57,11 @@ func _build_ui() -> void:
 	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	safe.add_child(hud)
 	# C. Top-right Settings button (Glossy Blue SVG)
-	var settings_btn := Button3D.new()
-	settings_btn.setup_3d("res://assets/models/btn_64x64.obj", Color("3b82f6"), "res://assets/ui/buttons/icon_settings.svg", "", Vector2(64, 64), false, 12.0)
+	var settings_btn := TextureButton.new()
+	settings_btn.texture_normal = load("res://assets/ui/buttons/settings_gear_normal.svg")
+	settings_btn.texture_pressed = load("res://assets/ui/buttons/settings_gear_pressed.svg")
+	settings_btn.ignore_texture_size = true
+	settings_btn.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
 	settings_btn.anchor_left = 1.0
 	settings_btn.anchor_right = 1.0
 	settings_btn.anchor_top = 0.0
@@ -68,6 +71,16 @@ func _build_ui() -> void:
 	settings_btn.offset_top = 0.0
 	settings_btn.offset_bottom = 64.0
 	settings_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	settings_btn.pivot_offset = Vector2(32, 32)
+	
+	settings_btn.button_down.connect(func():
+		var tw = settings_btn.create_tween()
+		tw.tween_property(settings_btn, "scale", Vector2(0.9, 0.9), 0.05).set_trans(Tween.TRANS_QUAD)
+	)
+	settings_btn.button_up.connect(func():
+		var tw = settings_btn.create_tween()
+		tw.tween_property(settings_btn, "scale", Vector2.ONE, 0.1).set_trans(Tween.TRANS_QUAD)
+	)
 	
 	settings_btn.pressed.connect(_on_settings_pressed)
 	hud.add_child(settings_btn)

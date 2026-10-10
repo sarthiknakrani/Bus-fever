@@ -1,0 +1,43 @@
+import os
+
+os.makedirs('assets/ui/buttons', exist_ok=True)
+
+normal_svg = """<svg width="240" height="90" xmlns="http://www.w3.org/2000/svg">
+    <!-- Drop Shadow -->
+    <rect x="10" y="14" width="220" height="74" rx="24" fill="#000000" fill-opacity="0.25" />
+    <!-- 3D Extrusion (Dark Blue) -->
+    <rect x="10" y="10" width="220" height="74" rx="24" fill="#1e3a8a" />
+    <!-- Main Button Face (Glossy Blue) -->
+    <rect x="10" y="4" width="220" height="70" rx="24" fill="#3b82f6" />
+    <!-- Top Highlight (Glass/Gloss) -->
+    <path d="M34 6 H206 A22 22 0 0 1 228 28 V38 A200 24 0 0 0 12 38 V28 A22 22 0 0 1 34 6 Z" fill="#ffffff" fill-opacity="0.25" />
+    <!-- Bottom Highlight -->
+    <rect x="25" y="62" width="190" height="8" rx="4" fill="#2563eb" />
+    
+    <!-- Text Shadow -->
+    <text x="120" y="48" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="32" fill="#1e3a8a" text-anchor="middle" dominant-baseline="central">Play</text>
+    <!-- Text Face -->
+    <text x="120" y="45" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="32" fill="#ffffff" text-anchor="middle" dominant-baseline="central">Play</text>
+</svg>"""
+
+pressed_svg = """<svg width="240" height="90" xmlns="http://www.w3.org/2000/svg">
+    <!-- Drop Shadow (reduced) -->
+    <rect x="10" y="14" width="220" height="74" rx="24" fill="#000000" fill-opacity="0.15" />
+    <!-- 3D Extrusion (Dark Blue) - less depth -->
+    <rect x="10" y="14" width="220" height="70" rx="24" fill="#1e3a8a" />
+    <!-- Main Button Face (Glossy Blue) - moved down -->
+    <rect x="10" y="10" width="220" height="70" rx="24" fill="#3b82f6" />
+    <!-- Top Highlight (Glass/Gloss) - moved down -->
+    <path d="M34 12 H206 A22 22 0 0 1 228 34 V44 A200 24 0 0 0 12 44 V34 A22 22 0 0 1 34 12 Z" fill="#ffffff" fill-opacity="0.25" />
+    <!-- Bottom Highlight - moved down -->
+    <rect x="25" y="68" width="190" height="8" rx="4" fill="#2563eb" />
+    
+    <!-- Text Shadow - moved down -->
+    <text x="120" y="54" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="32" fill="#1e3a8a" text-anchor="middle" dominant-baseline="central">Play</text>
+    <!-- Text Face - moved down -->
+    <text x="120" y="51" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="32" fill="#ffffff" text-anchor="middle" dominant-baseline="central">Play</text>
+</svg>"""
+
+with open('assets/ui/buttons/play_normal.svg', 'w') as f: f.write(normal_svg)
+with open('assets/ui/buttons/play_pressed.svg', 'w') as f: f.write(pressed_svg)
+print("SVGs created successfully.")

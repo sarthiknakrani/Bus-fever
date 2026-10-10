@@ -3,9 +3,7 @@ import re
 with open("scripts/main.gd", "r") as f:
     content = f.read()
 
-# I want to replace section "D. Bottom-center Play button (clean, sharper, green)" down to "hud.add_child(play_btn)"
-
-pattern = r'\s*# D\. Bottom-center Play button \(clean, sharper, green\).*?hud\.add_child\(play_btn\)'
+pattern = r'\s*# D\. Bottom-center Play button \(Glossy Blue 3D SVG\).*?hud\.add_child\(play_btn\)'
 match = re.search(pattern, content, re.MULTILINE | re.DOTALL)
 
 if not match:
@@ -29,33 +27,26 @@ new_play_btn = """	# D. Bottom-center Play button (Glossy Blue 3D SVG)
 	play_btn.pivot_offset = Vector2(160, 40)
 	play_btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	
-	var pb_orig_y = play_btn.position.y
-	var pb_orig_scale = Vector2.ONE
-	
 	play_btn.button_down.connect(func():
 		var tw = play_btn.create_tween()
 		tw.set_parallel(true)
-		tw.tween_property(play_btn, "position:y", pb_orig_y + 4.0, 0.05).set_trans(Tween.TRANS_QUAD)
-		tw.tween_property(play_btn, "scale", Vector2(0.95, 0.95), 0.05).set_trans(Tween.TRANS_QUAD)
+		# The SVG itself handles the 3D button face depression. 
+		# We add a subtle physical scale down of the entire node for extra tactile feel.
+		tw.tween_property(play_btn, "scale", Vector2(0.96, 0.96), 0.05).set_trans(Tween.TRANS_QUAD)
+		# A tiny real downward nudge of the whole node
+		tw.tween_property(play_btn, "position:y", play_btn.position.y + 2.0, 0.05).set_trans(Tween.TRANS_QUAD)
 	)
 	
-	var release_func = func():
+	play_btn.button_up.connect(func():
 		var tw = play_btn.create_tween()
 		tw.set_parallel(true)
-		tw.tween_property(play_btn, "position:y", pb_orig_y, 0.1).set_trans(Tween.TRANS_QUAD)
-		tw.tween_property(play_btn, "scale", pb_orig_scale, 0.1).set_trans(Tween.TRANS_QUAD)
-	
-	play_btn.button_up.connect(release_func)
-	
-	# To handle cases where player drags off the button (cancellation)
-	# but wait, TextureButton button_up might not fire if dragged off. 
-	# Or it might. However, TextureButton has mouse_exited which we can use, 
-	# but that could glitch if they move back. 
-	# A safer approach for native GUI buttons is to rely on button_up. 
-	# In Godot, button_up fires when you release the mouse, even outside.
+		tw.tween_property(play_btn, "scale", Vector2.ONE, 0.1).set_trans(Tween.TRANS_QUAD)
+		# Restore original position based on anchors/offsets rather than hardcoded Y
+		tw.tween_property(play_btn, "position:y", play_btn.position.y - 2.0, 0.1).set_trans(Tween.TRANS_QUAD)
+	)
 	
 	play_btn.pressed.connect(func():
-		# Prevent multiple presses (double tap bug)
+		# Prevent double click bugs
 		if play_btn.disabled: return
 		play_btn.disabled = true
 		_on_play_pressed()
@@ -66,4 +57,4 @@ content = content[:match.start()] + "\n" + new_play_btn + content[match.end():]
 
 with open("scripts/main.gd", "w") as f:
     f.write(content)
-print("main.gd patched")
+print("main.gd patched properly")
