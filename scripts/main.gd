@@ -100,9 +100,12 @@ func _build_ui() -> void:
 
 	settings_btn.pressed.connect(_on_settings_pressed)
 	hud.add_child(settings_btn)
-
-	# D. Bottom-center Play button (clean, sharper, green)
-	var play_btn := Button.new()
+	# D. Bottom-center Play button (Glossy Blue 3D SVG)
+	var play_btn := TextureButton.new()
+	play_btn.texture_normal = load("res://assets/ui/buttons/play_normal.svg")
+	play_btn.texture_pressed = load("res://assets/ui/buttons/play_pressed.svg")
+	play_btn.ignore_texture_size = true
+	play_btn.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
 	play_btn.anchor_left = 0.5
 	play_btn.anchor_right = 0.5
 	play_btn.anchor_top = 0.85
@@ -111,38 +114,33 @@ func _build_ui() -> void:
 	play_btn.offset_right = 160.0
 	play_btn.offset_top = -80.0
 	play_btn.offset_bottom = 0.0
+	play_btn.pivot_offset = Vector2(160, 40)
 	play_btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	
-	var pb_style = StyleBoxFlat.new()
-	pb_style.bg_color = Color("22c55e")
-	pb_style.set_corner_radius_all(12) # Sharper corners
-	pb_style.shadow_color = Color(0, 0, 0, 0.2)
-	pb_style.shadow_size = 6
-	pb_style.shadow_offset = Vector2(0, 6)
-	play_btn.add_theme_stylebox_override("normal", pb_style)
+	play_btn.button_down.connect(func():
+		var tw = play_btn.create_tween()
+		tw.set_parallel(true)
+		# The SVG itself handles the 3D button face depression. 
+		# We add a subtle physical scale down of the entire node for extra tactile feel.
+		tw.tween_property(play_btn, "scale", Vector2(0.96, 0.96), 0.05).set_trans(Tween.TRANS_QUAD)
+		# A tiny real downward nudge of the whole node
+		tw.tween_property(play_btn, "position:y", play_btn.position.y + 2.0, 0.05).set_trans(Tween.TRANS_QUAD)
+	)
 	
-	var pb_hover = pb_style.duplicate()
-	pb_hover.bg_color = Color("4ade80")
-	play_btn.add_theme_stylebox_override("hover", pb_hover)
+	play_btn.button_up.connect(func():
+		var tw = play_btn.create_tween()
+		tw.set_parallel(true)
+		tw.tween_property(play_btn, "scale", Vector2.ONE, 0.1).set_trans(Tween.TRANS_QUAD)
+		# Restore original position based on anchors/offsets rather than hardcoded Y
+		tw.tween_property(play_btn, "position:y", play_btn.position.y - 2.0, 0.1).set_trans(Tween.TRANS_QUAD)
+	)
 	
-	var pb_pressed = pb_style.duplicate()
-	pb_pressed.bg_color = Color("15803d")
-	pb_pressed.shadow_size = 0
-	pb_pressed.shadow_offset = Vector2(0, 0)
-	play_btn.add_theme_stylebox_override("pressed", pb_pressed)
-	
-	var p_lbl = Label.new()
-	p_lbl.text = "Play"
-	p_lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
-	p_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	p_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	var ls_play = LabelSettings.new()
-	ls_play.font_size = 46
-	ls_play.font_color = Color.WHITE
-	p_lbl.label_settings = ls_play
-	play_btn.add_child(p_lbl)
-	
-	play_btn.pressed.connect(_on_play_pressed)
+	play_btn.pressed.connect(func():
+		# Prevent double click bugs
+		if play_btn.disabled: return
+		play_btn.disabled = true
+		_on_play_pressed()
+	)
 	hud.add_child(play_btn)
 
 
