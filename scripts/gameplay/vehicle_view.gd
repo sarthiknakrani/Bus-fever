@@ -150,7 +150,8 @@ func play_badge_pulse() -> void:
 
 func _setup_capacity_badge() -> void:
 	if _badge_node != null: return
-		var arrow_draw := Node2D.new()
+	
+	var arrow_draw := Node2D.new()
 	arrow_draw.draw.connect(func():
 		var ci = arrow_draw.get_canvas_item()
 		var p1 = Vector2(0, -22)
@@ -165,9 +166,13 @@ func _setup_capacity_badge() -> void:
 		# shadow
 		var shadow_pts = PackedVector2Array()
 		for p in pts:
-			shadow_pts.append(p + Vector2(0, 3))
-		arrow_draw.draw_polygon(shadow_pts, PackedColorArray([Color(0,0,0,0.5)]))
+			shadow_pts.append(p + Vector2(0, 4))
+		arrow_draw.draw_polygon(shadow_pts, PackedColorArray([Color(0,0,0,0.4)]))
 		arrow_draw.draw_polygon(pts, PackedColorArray([col]))
+		
+		# Add a thick, crisp outline so the white arrow is highly visible against yellow buses
+		var outline_pts = PackedVector2Array([p1, p2, p3, p4, p5, p6, p7, p1])
+		arrow_draw.draw_polyline(outline_pts, Color(0, 0, 0, 0.75), 3.0, true)
 	)
 	
 	if vehicle_dir == CarJamVehicleData.Direction.UP:
@@ -181,7 +186,7 @@ func _setup_capacity_badge() -> void:
 		
 	# Add it to self, because there is no _v_root in the current vehicle_view.gd!
 	add_child(arrow_draw)
-
+	
 	_badge_node = Node2D.new()
 	_badge_node.name = "CapacityBadge"
 	_badge_node.position = Vector2.ZERO # Centered perfectly on the geometric center of the bus footprint
