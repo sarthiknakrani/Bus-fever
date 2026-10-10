@@ -830,7 +830,7 @@ func _build_hud() -> void:
 	pause_overlay.add_child(p_center)
 
 	var p_panel := PanelContainer.new()
-	p_panel.custom_minimum_size = Vector2(300, 360)
+	p_panel.custom_minimum_size = Vector2(300, 180)
 	var p_style_panel = StyleBoxFlat.new()
 	p_style_panel.bg_color = Color("f8fafc")
 	p_style_panel.corner_radius_top_left = 24
