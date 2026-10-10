@@ -172,7 +172,7 @@ func _setup_capacity_badge() -> void:
 		
 		# Add a thick, crisp outline so the white arrow is highly visible against yellow buses
 		var outline_pts = PackedVector2Array([p1, p2, p3, p4, p5, p6, p7, p1])
-		arrow_draw.draw_polyline(outline_pts, Color(0, 0, 0, 0.75), 3.0, true)
+		arrow_draw.draw_polyline(outline_pts, Color.BLACK, 5.0, true)
 	)
 	
 	if vehicle_dir == CarJamVehicleData.Direction.UP:

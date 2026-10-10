@@ -161,6 +161,19 @@ func _process(delta: float) -> void:
 	# Remove boarded passengers from active loop array so gaps are recognized
 	for pid in to_remove:
 		circulating_ids.erase(pid)
+	
+	# Isometric manual Y-sorting for buses based on global screen Y
+	if vehicle_layer != null:
+		var views = []
+		for i in vehicle_layer.get_child_count():
+			var c = vehicle_layer.get_child(i)
+			if c is VehicleView:
+				views.append(c)
+		views.sort_custom(func(a, b): return a.global_position.y < b.global_position.y)
+		for i in range(views.size()):
+			if views[i].get_index() != i:
+				vehicle_layer.move_child(views[i], i)
+
 
 func _ready() -> void:
 	_build_scene_hierarchy()
@@ -218,6 +231,7 @@ func _build_scene_hierarchy() -> void:
 
 	vehicle_layer = Node2D.new()
 	vehicle_layer.name = "VehicleLayer"
+	
 	board_root.add_child(vehicle_layer)
 
 	board_effects = Node2D.new()
@@ -724,22 +738,16 @@ func _build_hud() -> void:
 		var vbox = VBoxContainer.new()
 		vbox.add_theme_constant_override("separation", 8)
 
-		var btn := TextureButton.new()
-		var tex_path = "res://assets/btn_" + b_name.to_lower() + ".png"
-		if ResourceLoader.exists(tex_path):
-			var tex = ResourceLoader.load(tex_path)
-			btn.texture_normal = tex
-			btn.texture_pressed = tex
-			btn.texture_disabled = tex
-			btn.ignore_texture_size = true
-			btn.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
-		else:
-			# fallback
-			pass
-			
+		# Base button uses procedural style to remain crisp and clean
+		var btn := Button.new()
+		btn.add_theme_stylebox_override("normal", bst_style)
+		btn.add_theme_stylebox_override("hover", bst_style)
+		btn.add_theme_stylebox_override("pressed", bst_pressed)
+		btn.add_theme_stylebox_override("disabled", bst_style)
 		btn.disabled = true
-		btn.custom_minimum_size = Vector2(72, 72)
-		btn.mouse_filter = Control.MOUSE_FILTER_STOP
+		btn.custom_minimum_size = Vector2(52, 52)
+		
+
 		
 		# Add a green '+' circle
 		var plus := Label.new()
@@ -759,8 +767,8 @@ func _build_hud() -> void:
 		plus.add_theme_stylebox_override("normal", p_style)
 		plus.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		plus.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		plus.size = Vector2(24, 24)
-		plus.position = Vector2(55, -6)
+		plus.size = Vector2(21, 21)
+		plus.position = Vector2(41, -6)
 		btn.add_child(plus)
 		
 		vbox.add_child(btn)
