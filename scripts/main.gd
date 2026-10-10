@@ -27,21 +27,47 @@ func _build_ui() -> void:
 	root.name = "HomeRoot"
 	add_child(root)
 
-	# 3D Background
+	# A. Full portrait background (Clean soft white/light-grey)
 	var bg := ColorRect.new()
-	bg.color = Color("87CEEB") # Level 1 Sky Blue Color
+	bg.color = Color("f8fafc")
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(bg)
 
-	# SafeArea
+	# B. Outer frame (Thin, dark-grey rounded outline)
+	var frame_margin = MarginContainer.new()
+	frame_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	frame_margin.add_theme_constant_override("margin_top", 12)
+	frame_margin.add_theme_constant_override("margin_bottom", 12)
+	frame_margin.add_theme_constant_override("margin_left", 12)
+	frame_margin.add_theme_constant_override("margin_right", 12)
+	frame_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(frame_margin)
+
+	var frame := Panel.new()
+	frame.set_anchors_preset(Control.PRESET_FULL_RECT)
+	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var frame_sb = StyleBoxFlat.new()
+	frame_sb.bg_color = Color.TRANSPARENT
+	frame_sb.border_width_left = 6
+	frame_sb.border_width_right = 6
+	frame_sb.border_width_top = 6
+	frame_sb.border_width_bottom = 6
+	frame_sb.border_color = Color("334155")
+	frame_sb.set_corner_radius_all(24)
+	frame_sb.shadow_color = Color(0, 0, 0, 0.05)
+	frame_sb.shadow_size = 12
+	frame.add_theme_stylebox_override("panel", frame_sb)
+	frame_margin.add_child(frame)
+
+	# SafeArea for buttons
 	var safe := MarginContainer.new()
 	safe.name = "SafeArea"
 	safe.set_anchors_preset(Control.PRESET_FULL_RECT)
-	safe.add_theme_constant_override("margin_top", 60)
-	safe.add_theme_constant_override("margin_bottom", 60)
-	safe.add_theme_constant_override("margin_left", 24)
-	safe.add_theme_constant_override("margin_right", 24)
+	safe.add_theme_constant_override("margin_top", 40)
+	safe.add_theme_constant_override("margin_bottom", 40)
+	safe.add_theme_constant_override("margin_left", 40)
+	safe.add_theme_constant_override("margin_right", 40)
 	safe.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(safe)
 
@@ -50,232 +76,104 @@ func _build_ui() -> void:
 	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	safe.add_child(hud)
 
-	# --- Premium 2D Glossy Settings button ---
+	# C. Top-right Settings button (Small rounded-square, light-grey surface, dark-grey outline)
 	var settings_btn := Button.new()
 	settings_btn.anchor_left = 1.0
 	settings_btn.anchor_right = 1.0
 	settings_btn.anchor_top = 0.0
 	settings_btn.anchor_bottom = 0.0
-	settings_btn.offset_left = -60.0
-	settings_btn.offset_right = -6.0
-	settings_btn.offset_top = -4.0
-	settings_btn.offset_bottom = 50.0
+	settings_btn.offset_left = -64.0
+	settings_btn.offset_right = 0.0
+	settings_btn.offset_top = 0.0
+	settings_btn.offset_bottom = 64.0
 	settings_btn.mouse_filter = Control.MOUSE_FILTER_STOP
-	# NO clip_children to fix shadow bug
 	
-	var sb_style = StyleBoxFlat.new()
-	sb_style.bg_color = Color("3b82f6")
-	sb_style.set_corner_radius_all(27)
-	sb_style.shadow_color = Color(0, 0, 0, 0.3)
-	sb_style.shadow_size = 8
-	sb_style.shadow_offset = Vector2(0, 4)
-	settings_btn.add_theme_stylebox_override("normal", sb_style)
+	var sb_set = StyleBoxFlat.new()
+	sb_set.bg_color = Color("e2e8f0")
+	sb_set.border_width_left = 3
+	sb_set.border_width_right = 3
+	sb_set.border_width_top = 3
+	sb_set.border_width_bottom = 3
+	sb_set.border_color = Color("475569")
+	sb_set.set_corner_radius_all(14)
+	sb_set.shadow_color = Color(0, 0, 0, 0.15)
+	sb_set.shadow_size = 6
+	sb_set.shadow_offset = Vector2(0, 4)
+	settings_btn.add_theme_stylebox_override("normal", sb_set)
 	
-	var sb_hover = sb_style.duplicate()
-	sb_hover.bg_color = Color("60a5fa")
-	settings_btn.add_theme_stylebox_override("hover", sb_hover)
+	var sb_set_hover = sb_set.duplicate()
+	sb_set_hover.bg_color = Color("cbd5e1")
+	settings_btn.add_theme_stylebox_override("hover", sb_set_hover)
 	
-	var sb_pressed = sb_style.duplicate()
-	sb_pressed.bg_color = Color("2563eb")
-	sb_pressed.shadow_size = 2
-	sb_pressed.shadow_offset = Vector2(0, 1)
-	settings_btn.add_theme_stylebox_override("pressed", sb_pressed)
+	var sb_set_pressed = sb_set.duplicate()
+	sb_set_pressed.bg_color = Color("94a3b8")
+	sb_set_pressed.shadow_size = 1
+	sb_set_pressed.shadow_offset = Vector2(0, 1)
+	settings_btn.add_theme_stylebox_override("pressed", sb_set_pressed)
 	
-	var s_gloss = Panel.new()
-	s_gloss.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	s_gloss.anchor_bottom = 0.5
-	s_gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var sg_style = StyleBoxFlat.new()
-	sg_style.bg_color = Color(1, 1, 1, 0.25)
-	sg_style.corner_radius_top_left = 27
-	sg_style.corner_radius_top_right = 27
-	s_gloss.add_theme_stylebox_override("panel", sg_style)
-	settings_btn.add_child(s_gloss)
-	
-	var s_text = Label.new()
-	s_text.text = "⚙"
-	s_text.set_anchors_preset(Control.PRESET_FULL_RECT)
-	s_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	s_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	var ls_s = LabelSettings.new()
-	ls_s.font_size = 36
-	ls_s.font_color = Color.WHITE
-	s_text.label_settings = ls_s
-	settings_btn.add_child(s_text)
-	
+	var s_hl = Panel.new()
+	s_hl.set_anchors_preset(Control.PRESET_FULL_RECT)
+	s_hl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var shls = StyleBoxFlat.new()
+	shls.bg_color = Color.TRANSPARENT
+	shls.border_width_top = 4
+	shls.border_color = Color(1, 1, 1, 0.8)
+	shls.set_corner_radius_all(12)
+	s_hl.add_theme_stylebox_override("panel", shls)
+	settings_btn.add_child(s_hl)
+
 	settings_btn.pressed.connect(_on_settings_pressed)
 	hud.add_child(settings_btn)
 
-	# --- Premium 3D Procedural Logo ---
-	var logo_container = VBoxContainer.new()
-	logo_container.anchor_left = 0.5
-	logo_container.anchor_right = 0.5
-	logo_container.anchor_top = 0.12
-	logo_container.anchor_bottom = 0.08
-	logo_container.offset_left = -175
-	logo_container.offset_right = 175
-	logo_container.offset_top = 0
-	logo_container.offset_bottom = 260
-	logo_container.alignment = BoxContainer.ALIGNMENT_CENTER
-	logo_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	logo_container.add_theme_constant_override("separation", -10)
-	
-	var bus_box = Control.new()
-	bus_box.custom_minimum_size = Vector2(0, 85)
-	bus_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	logo_container.add_child(bus_box)
-	
-	var bus_shadow = Label.new()
-	bus_shadow.text = "BUS"
-	bus_shadow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	bus_shadow.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var ls_shadow = LabelSettings.new()
-	ls_shadow.font_size = 80
-	ls_shadow.font_color = Color("b45309") # Dark orange
-	ls_shadow.outline_size = 20
-	ls_shadow.outline_color = Color("b45309")
-	ls_shadow.shadow_size = 12
-	ls_shadow.shadow_color = Color(0, 0, 0, 0.4)
-	ls_shadow.shadow_offset = Vector2(0, 20)
-	bus_shadow.label_settings = ls_shadow
-	bus_shadow.position.y += 16
-	bus_box.add_child(bus_shadow)
-	
-	var bus_front = Label.new()
-	bus_front.text = "BUS"
-	bus_front.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	bus_front.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var ls_front = LabelSettings.new()
-	ls_front.font_size = 80
-	ls_front.font_color = Color("f59e0b") # Yellow/Gold
-	ls_front.outline_size = 16
-	ls_front.outline_color = Color.WHITE
-	bus_front.label_settings = ls_front
-	bus_box.add_child(bus_front)
-	
-	var fever_box = Control.new()
-	fever_box.custom_minimum_size = Vector2(0, 50)
-	fever_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	logo_container.add_child(fever_box)
-	
-	var fp_shadow = Label.new()
-	fp_shadow.text = "FEVER PARTY!"
-	fp_shadow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	fp_shadow.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var ls_fps = LabelSettings.new()
-	ls_fps.font_size = 42
-	ls_fps.font_color = Color("b45309") # Dark Blue
-	ls_fps.outline_size = 16
-	ls_fps.outline_color = Color("b45309")
-	ls_fps.shadow_size = 12
-	ls_fps.shadow_color = Color(0, 0, 0, 0.4)
-	ls_fps.shadow_offset = Vector2(0, 14)
-	fp_shadow.label_settings = ls_fps
-	fp_shadow.position.y += 12
-	fever_box.add_child(fp_shadow)
-	
-	var fp_front = Label.new()
-	fp_front.text = "FEVER PARTY!"
-	fp_front.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	fp_front.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var ls_fpf = LabelSettings.new()
-	ls_fpf.font_size = 42
-	ls_fpf.font_color = Color("f59e0b") # Light Blue
-	ls_fpf.outline_size = 12
-	ls_fpf.outline_color = Color.WHITE
-	fp_front.label_settings = ls_fpf
-	fever_box.add_child(fp_front)
-	
-	hud.add_child(logo_container)
-
-	# --- Premium 2D Glossy Play Button ---
-	# Separate shadow panel behind to avoid clip_children shadow bugs
-	var play_shadow = Panel.new()
-	play_shadow.anchor_left = 0.5
-	play_shadow.anchor_right = 0.5
-	play_shadow.anchor_top = 0.82
-	play_shadow.anchor_bottom = 0.82
-	play_shadow.offset_left = -110
-	play_shadow.offset_right = 110
-	play_shadow.offset_top = -80
-	play_shadow.offset_bottom = 0
-	play_shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var shadow_sb = StyleBoxFlat.new()
-	shadow_sb.bg_color = Color("22c55e")
-	shadow_sb.set_corner_radius_all(40)
-	shadow_sb.shadow_color = Color(0, 0, 0, 0.3)
-	shadow_sb.shadow_size = 12
-	shadow_sb.shadow_offset = Vector2(0, 6)
-	play_shadow.add_theme_stylebox_override("panel", shadow_sb)
-	hud.add_child(play_shadow)
-
+	# D. Bottom-center Play button (Wide, horizontally oriented rounded rectangle)
 	var play_btn := Button.new()
-	play_btn.set_anchors_preset(Control.PRESET_FULL_RECT)
+	play_btn.anchor_left = 0.5
+	play_btn.anchor_right = 0.5
+	play_btn.anchor_top = 0.85
+	play_btn.anchor_bottom = 0.85
+	play_btn.offset_left = -160.0
+	play_btn.offset_right = 160.0
+	play_btn.offset_top = -80.0
+	play_btn.offset_bottom = 0.0
 	play_btn.mouse_filter = Control.MOUSE_FILTER_STOP
-	play_btn.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
-	play_shadow.add_child(play_btn)
 	
-	# Actual button has no shadow because clip_children breaks it
-	var p_style = StyleBoxFlat.new()
-	p_style.bg_color = Color("22c55e")
-	p_style.set_corner_radius_all(40)
-	play_btn.add_theme_stylebox_override("normal", p_style)
+	var pb_style = StyleBoxFlat.new()
+	pb_style.bg_color = Color("e2e8f0")
+	pb_style.border_width_left = 4
+	pb_style.border_width_right = 4
+	pb_style.border_width_top = 4
+	pb_style.border_width_bottom = 4
+	pb_style.border_color = Color("475569")
+	pb_style.set_corner_radius_all(24)
+	pb_style.shadow_color = Color(0, 0, 0, 0.2)
+	pb_style.shadow_size = 8
+	pb_style.shadow_offset = Vector2(0, 6)
+	play_btn.add_theme_stylebox_override("normal", pb_style)
 	
-	var p_hover = p_style.duplicate()
-	p_hover.bg_color = Color("4ade80")
-	play_btn.add_theme_stylebox_override("hover", p_hover)
+	var pb_hover = pb_style.duplicate()
+	pb_hover.bg_color = Color("cbd5e1")
+	play_btn.add_theme_stylebox_override("hover", pb_hover)
 	
-	var p_pressed = p_style.duplicate()
-	p_pressed.bg_color = Color("16a34a")
-	play_btn.add_theme_stylebox_override("pressed", p_pressed)
+	var pb_pressed = pb_style.duplicate()
+	pb_pressed.bg_color = Color("94a3b8")
+	pb_pressed.shadow_size = 2
+	pb_pressed.shadow_offset = Vector2(0, 2)
+	play_btn.add_theme_stylebox_override("pressed", pb_pressed)
 	
-	var p_gloss = Panel.new()
-	p_gloss.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	p_gloss.anchor_bottom = 0.45
-	p_gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var pg_style = StyleBoxFlat.new()
-	pg_style.bg_color = Color(1, 1, 1, 0.25)
-	p_gloss.add_theme_stylebox_override("panel", pg_style)
-	play_btn.add_child(p_gloss)
+	var p_hl = Panel.new()
+	p_hl.set_anchors_preset(Control.PRESET_FULL_RECT)
+	p_hl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var phls = StyleBoxFlat.new()
+	phls.bg_color = Color.TRANSPARENT
+	phls.border_width_top = 4
+	phls.border_color = Color(1, 1, 1, 0.8)
+	phls.set_corner_radius_all(20)
+	p_hl.add_theme_stylebox_override("panel", phls)
+	play_btn.add_child(p_hl)
 	
-	var shine = ColorRect.new()
-	shine.color = Color(1, 1, 1, 0.4)
-	shine.rotation_degrees = 25
-	shine.size = Vector2(30, 200)
-	shine.position = Vector2(-100, -50)
-	shine.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	play_btn.add_child(shine)
-	
-	var tween = play_btn.create_tween().set_loops()
-	tween.tween_property(shine, "position:x", 350.0, 1.5).from(-100.0).set_trans(Tween.TRANS_SINE)
-	tween.tween_interval(1.5)
-	
-	var p_text = Label.new()
-	p_text.text = "Play"
-	p_text.set_anchors_preset(Control.PRESET_FULL_RECT)
-	p_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	p_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	var ls_play = LabelSettings.new()
-	ls_play.font_size = 46
-	ls_play.font_color = Color.WHITE
-	ls_play.shadow_size = 6
-	ls_play.shadow_color = Color(0, 0, 0, 0.4)
-	ls_play.shadow_offset = Vector2(0, 3)
-	p_text.label_settings = ls_play
-	p_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	play_btn.add_child(p_text)
-	
-	play_btn.button_down.connect(func():
-		shadow_sb.shadow_size = 2
-		shadow_sb.shadow_offset = Vector2(0, 2)
-		play_btn.position.y += 4
-	)
-	play_btn.button_up.connect(func():
-		shadow_sb.shadow_size = 12
-		shadow_sb.shadow_offset = Vector2(0, 6)
-		play_btn.position.y -= 4
-	)
 	play_btn.pressed.connect(_on_play_pressed)
+	hud.add_child(play_btn)
+
 
 func _on_play_pressed() -> void:
 	AudioManager.play(AudioManager.SFX_UI)
@@ -286,58 +184,6 @@ func _on_settings_pressed() -> void:
 	AudioManager.play(AudioManager.SFX_UI)
 	_show_settings_overlay()
 
-
-# ---------- helpers ----------
-
-# Build a 3D-extruded StyleBoxFlat: solid top color, thick colored bottom
-# "lip" via border_width_bottom for the extrusion. Optional text_padding_y
-# shrinks height on press. (Moved to scripts/ui/style_helpers.gd)
-
-
-# Drop a single offset shadow label behind a front label. The shadow label
-# is added as a *sibling* under `parent` (not inside) so it can be offset
-# freely without affecting the front label's layout.
-func _add_extruded_title(parent: Control, text: String,
-		front: Color, shadow: Color,
-		anchor_lt: Vector2, anchor_rb: Vector2,
-		font_size: int, shadow_offset: Vector2) -> Control:
-	# Use a fixed-size container so the shadow sits behind without affecting layout
-	var holder := Control.new()
-	holder.anchor_left = anchor_lt.x
-	holder.anchor_top = anchor_lt.y
-	holder.anchor_right = anchor_rb.x
-	holder.anchor_bottom = anchor_rb.y
-	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	parent.add_child(holder)
-
-	var back := Label.new()
-	back.text = text
-	back.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	back.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	back.set_anchors_preset(Control.PRESET_FULL_RECT)
-	back.position = shadow_offset
-	var ls_back := LabelSettings.new()
-	ls_back.font_size = font_size
-	ls_back.font_color = shadow
-	back.label_settings = ls_back
-	back.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	holder.add_child(back)
-
-	var front_lbl := Label.new()
-	front_lbl.text = text
-	front_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	front_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	front_lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var ls_front := LabelSettings.new()
-	ls_front.font_size = font_size
-	ls_front.font_color = front
-	front_lbl.label_settings = ls_front
-	front_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	holder.add_child(front_lbl)
-	return holder
-
-
-# ---------- settings overlay ----------
 
 func _show_settings_overlay() -> void:
 	if _settings_overlay != null and is_instance_valid(_settings_overlay):
