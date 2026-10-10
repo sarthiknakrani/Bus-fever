@@ -179,7 +179,7 @@ func _show_settings_overlay() -> void:
 	# Wrapper Control so the close button can anchor freely OUTSIDE the
 	# PanelContainer (PanelContainer forces child layout and ignores anchors).
 	var wrapper := Control.new()
-	wrapper.custom_minimum_size = Vector2(255, 285)
+	wrapper.custom_minimum_size = Vector2(255, 215)
 	wrapper.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	center.add_child(wrapper)
 
