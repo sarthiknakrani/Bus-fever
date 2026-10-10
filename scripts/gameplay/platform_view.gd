@@ -22,6 +22,9 @@ func _draw() -> void:
 	var hill_w = 540.0
 	var slope_w = 80.0
 	var gy = p_partition_y
+	
+	# The straight line the user requested, slightly below the trapezoid shoulders
+	var line_y = gy + 60.0
 
 	var points = PackedVector2Array([
 		Vector2(-p_width/2.0, p_bottom),
@@ -37,7 +40,7 @@ func _draw() -> void:
 	# Fill the platform
 	draw_colored_polygon(points, bg_color)
 	
-	# Draw the 3D curb along the top edge
+	# Draw the 3D curb along the top edge of the trapezoid shape
 	var top_edge = PackedVector2Array([
 		Vector2(-p_width/2.0, gy),
 		Vector2(-hill_w/2.0 - slope_w, gy),
@@ -59,8 +62,8 @@ func _draw() -> void:
 			
 		draw_polyline(offset_pts, color, 2.0, true)
 		
-	# Draw a straight partition line separating parking from the board
-	# This creates that "shelf" look from the wireframe
-	draw_rect(Rect2(-p_width/2.0, gy, p_width, 4), shadow_color)
-	draw_rect(Rect2(-p_width/2.0, gy + 4, p_width, 2), deep_color)
+	# Draw the requested straight horizontal line below the hill
+	draw_rect(Rect2(-p_width/2.0, line_y, p_width, 4), shadow_color)
+	draw_rect(Rect2(-p_width/2.0, line_y + 4, p_width, 3), deep_color)
+	draw_rect(Rect2(-p_width/2.0, line_y + 7, p_width, 3), curb_color)
 
