@@ -179,56 +179,41 @@ static func animate_departure(
 	vehicle_node.set_parking_mode(false)
 	vehicle_node.z_index = 200 # Ensure it renders above other elements while exiting
 	
-	var tw = vehicle_node.create_tween()
-	
-	# 1. Reverse maneuver (Straight backward)
 	print("[QA %d] Bus %d reverse started." % [Time.get_ticks_msec(), vehicle_id])
-	var reverse_pos = vehicle_node.position + Vector2(0, 185.0) # Move far down, completely outside the parking slots
-	tw.tween_property(vehicle_node, "position", reverse_pos, 0.6).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
 	
-	var lambda_clear = func(ctrl, v_id, s_id, tok):
-		ctrl.on_vehicle_cleared_slot(v_id, s_id, tok)
-	tw.tween_callback(lambda_clear.bind(controller, vehicle_id, slot_id, token))
+	var dep = VehicleDepartureController.new()
+	dep.vehicle = vehicle_node
+	dep.controller = controller
+	dep.vehicle_id = vehicle_id
+	dep.slot_id = slot_id
+	dep.token = token
+	dep.slot_pos = slot_pos
+	dep.reverse_target_y = slot_pos.y + 195.0
 	
-	# 2 & 3. Smooth forward curve to exit screen right, staying OUTSIDE the parking container
 	var curve = Curve2D.new()
 	var vp_rect = vehicle_node.get_viewport_rect()
-	var global_right_x = (vp_rect.size.x / 2.0) + 350.0 
+	var global_right_x = (vp_rect.size.x / 2.0) + 400.0 
 	var exit_global = Vector2(global_right_x, 0)
 	var exit_local = vehicle_node.get_parent().get_global_transform().affine_inverse() * exit_global
 	
-	# The bus drives RIGHT, maintaining its lowered Y position
-	# Final target Y is higher than reverse_pos, creating a natural C-curve forward sweep.
-	# reverse_pos is +220. We exit at +120. The parking slots end around +60.
-	# This keeps the entire exit path safely below the locked slot cards!
-	var final_target = Vector2(exit_local.x, reverse_pos.y - 10.0)
+	var final_target = Vector2(exit_local.x, dep.reverse_target_y - 15.0)
+	var start_pos = Vector2(slot_pos.x, dep.reverse_target_y)
 	
-	# Start point: at reverse_pos (facing UP initially before it begins curving).
-	# We want it to turn right. The out handle pulls it UP to initiate forward driving.
-	curve.add_point(reverse_pos, Vector2.ZERO, Vector2(0, -50.0))
-	# End point: far right, approaching horizontally from left
-	curve.add_point(final_target, Vector2(-150.0, 0), Vector2.ZERO)
+	curve.add_point(start_pos, Vector2.ZERO, Vector2(0, -60.0))
+	curve.add_point(final_target, Vector2(-160.0, 0), Vector2.ZERO)
 	
-	var start_scale = vehicle_node.scale
+	dep.curve = curve
+	dep.curve_len = curve.get_baked_length()
+	
 	var front_native = Vector2(0, -1)
 	match vehicle_node.vehicle_dir:
 		CarJamVehicleData.Direction.DOWN: front_native = Vector2(0, 1)
 		CarJamVehicleData.Direction.UP: front_native = Vector2(0, -1)
 		CarJamVehicleData.Direction.LEFT: front_native = Vector2(-1, 0)
 		CarJamVehicleData.Direction.RIGHT: front_native = Vector2(1, 0)
-		
-	var curve_callable = Callable(VehicleMovement, "_update_curve").bind(curve, vehicle_node, start_scale, start_scale, true, front_native)
+	dep.front_native = front_native
 	
-	# Total exit time 1.5s
-	tw.tween_method(curve_callable, 0.0, 1.0, 1.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	
-	var lambda_func2 = func(v_node, ctrl, v_id, s_id, tok):
-		if is_instance_valid(v_node):
-			v_node.visible = false
-		ctrl.on_vehicle_departed_from_slot(v_id, s_id, tok)
-		
-	tw.tween_callback(lambda_func2.bind(vehicle_node, controller, vehicle_id, slot_id, token))
-
+	vehicle_node.add_child(dep)
 
 static func _update_curve(t: float, curve: Curve2D, v_node: Node2D, target_scale: Vector2, start_scale: Vector2, drive_forward: bool, front_native: Vector2, _force_final_rot: bool = false, _final_rot_target: float = 0.0) -> void:
 	if not is_instance_valid(v_node): return
