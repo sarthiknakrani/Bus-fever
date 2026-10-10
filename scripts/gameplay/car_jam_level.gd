@@ -661,7 +661,8 @@ func _build_hud() -> void:
 
 	# Restart (Premium TextureButton)
 	var btn_restart := TextureButton.new()
-	btn_restart.texture_normal = load("res://assets/btn_restart.png")
+	btn_restart.texture_normal = load("res://assets/ui/gameplay_buttons/restart_normal.svg")
+	btn_restart.texture_pressed = load("res://assets/ui/gameplay_buttons/restart_pressed.svg")
 	btn_restart.ignore_texture_size = true
 	btn_restart.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
 	btn_restart.custom_minimum_size = Vector2(50, 50)
@@ -695,7 +696,8 @@ func _build_hud() -> void:
 	top_bar.add_child(level_title_label)
 
 	var btn_pause := TextureButton.new()
-	btn_pause.texture_normal = load("res://assets/btn_pause.png")
+	btn_pause.texture_normal = load("res://assets/ui/gameplay_buttons/pause_normal.svg")
+	btn_pause.texture_pressed = load("res://assets/ui/gameplay_buttons/pause_pressed.svg")
 	btn_pause.ignore_texture_size = true
 	btn_pause.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
 	btn_pause.custom_minimum_size = Vector2(50, 50)
@@ -748,10 +750,25 @@ func _build_hud() -> void:
 		btn_container.custom_minimum_size = Vector2(56, 56)
 
 		var btn := TextureButton.new()
-		btn.texture_normal = load(b_info["icon"])
+		btn.texture_normal = load("res://assets/ui/gameplay_buttons/base_booster_normal.svg")
+		btn.texture_pressed = load("res://assets/ui/gameplay_buttons/base_booster_pressed.svg")
 		btn.ignore_texture_size = true
 		btn.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
 		btn.set_anchors_preset(Control.PRESET_FULL_RECT)
+		
+		# Add the illustration PNG on top
+		var icon_rect = TextureRect.new()
+		icon_rect.texture = load(b_info["icon"])
+		icon_rect.ignore_texture_size = true
+		icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+		icon_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		# slight padding inside the SVG base
+		icon_rect.offset_left = 6
+		icon_rect.offset_right = -6
+		icon_rect.offset_top = 6
+		icon_rect.offset_bottom = -12
+		btn.add_child(icon_rect)
 		
 		# Premium glossy pressed effect
 		btn.button_down.connect(func():
