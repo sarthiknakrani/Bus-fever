@@ -56,10 +56,10 @@ func _build_ui() -> void:
 	settings_btn.anchor_right = 1.0
 	settings_btn.anchor_top = 0.0
 	settings_btn.anchor_bottom = 0.0
-	settings_btn.offset_left = -70.0
-	settings_btn.offset_right = -16.0
-	settings_btn.offset_top = 16.0
-	settings_btn.offset_bottom = 70.0
+	settings_btn.offset_left = -60.0
+	settings_btn.offset_right = -6.0
+	settings_btn.offset_top = -4.0
+	settings_btn.offset_bottom = 50.0
 	settings_btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	# NO clip_children to fix shadow bug
 	
@@ -110,7 +110,7 @@ func _build_ui() -> void:
 	var logo_container = VBoxContainer.new()
 	logo_container.anchor_left = 0.5
 	logo_container.anchor_right = 0.5
-	logo_container.anchor_top = 0.08
+	logo_container.anchor_top = 0.12
 	logo_container.anchor_bottom = 0.08
 	logo_container.offset_left = -175
 	logo_container.offset_right = 175
@@ -118,10 +118,10 @@ func _build_ui() -> void:
 	logo_container.offset_bottom = 260
 	logo_container.alignment = BoxContainer.ALIGNMENT_CENTER
 	logo_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	logo_container.add_theme_constant_override("separation", 0)
+	logo_container.add_theme_constant_override("separation", -10)
 	
 	var bus_box = Control.new()
-	bus_box.custom_minimum_size = Vector2(0, 130)
+	bus_box.custom_minimum_size = Vector2(0, 85)
 	bus_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	logo_container.add_child(bus_box)
 	
@@ -136,9 +136,9 @@ func _build_ui() -> void:
 	ls_shadow.outline_color = Color("b45309")
 	ls_shadow.shadow_size = 12
 	ls_shadow.shadow_color = Color(0, 0, 0, 0.4)
-	ls_shadow.shadow_offset = Vector2(0, 16)
+	ls_shadow.shadow_offset = Vector2(0, 20)
 	bus_shadow.label_settings = ls_shadow
-	bus_shadow.position.y += 12
+	bus_shadow.position.y += 16
 	bus_box.add_child(bus_shadow)
 	
 	var bus_front = Label.new()
@@ -154,7 +154,7 @@ func _build_ui() -> void:
 	bus_box.add_child(bus_front)
 	
 	var fever_box = Control.new()
-	fever_box.custom_minimum_size = Vector2(0, 90)
+	fever_box.custom_minimum_size = Vector2(0, 50)
 	fever_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	logo_container.add_child(fever_box)
 	
@@ -164,14 +164,14 @@ func _build_ui() -> void:
 	fp_shadow.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var ls_fps = LabelSettings.new()
 	ls_fps.font_size = 42
-	ls_fps.font_color = Color("0284c7") # Dark Blue
-	ls_fps.outline_size = 12
-	ls_fps.outline_color = Color("0284c7")
+	ls_fps.font_color = Color("b45309") # Dark Blue
+	ls_fps.outline_size = 16
+	ls_fps.outline_color = Color("b45309")
 	ls_fps.shadow_size = 12
 	ls_fps.shadow_color = Color(0, 0, 0, 0.4)
-	ls_fps.shadow_offset = Vector2(0, 10)
+	ls_fps.shadow_offset = Vector2(0, 14)
 	fp_shadow.label_settings = ls_fps
-	fp_shadow.position.y += 8
+	fp_shadow.position.y += 12
 	fever_box.add_child(fp_shadow)
 	
 	var fp_front = Label.new()
@@ -180,8 +180,8 @@ func _build_ui() -> void:
 	fp_front.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var ls_fpf = LabelSettings.new()
 	ls_fpf.font_size = 42
-	ls_fpf.font_color = Color("38bdf8") # Light Blue
-	ls_fpf.outline_size = 8
+	ls_fpf.font_color = Color("f59e0b") # Light Blue
+	ls_fpf.outline_size = 12
 	ls_fpf.outline_color = Color.WHITE
 	fp_front.label_settings = ls_fpf
 	fever_box.add_child(fp_front)
