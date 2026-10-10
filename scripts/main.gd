@@ -117,26 +117,45 @@ func _build_ui() -> void:
 	play_btn.pivot_offset = Vector2(160, 40)
 	play_btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	
+	# Add Godot Label for "Play" text because Godot SVG importer ignores <text> tags
+	var p_lbl = Label.new()
+	p_lbl.text = "Play"
+	p_lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
+	p_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	p_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	p_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Shift it up slightly so it centers perfectly on the raised glossy face, not the shadow
+	p_lbl.offset_top = -6.0
+	p_lbl.offset_bottom = -6.0
+	
+	var ls_play = LabelSettings.new()
+	ls_play.font_size = 46
+	ls_play.font_color = Color.WHITE
+	ls_play.outline_size = 6
+	ls_play.outline_color = Color("1e3a8a")
+	ls_play.shadow_size = 4
+	ls_play.shadow_color = Color(0, 0, 0, 0.4)
+	ls_play.shadow_offset = Vector2(0, 3)
+	p_lbl.label_settings = ls_play
+	
+	play_btn.add_child(p_lbl)
+	
 	play_btn.button_down.connect(func():
 		var tw = play_btn.create_tween()
 		tw.set_parallel(true)
-		# The SVG itself handles the 3D button face depression. 
-		# We add a subtle physical scale down of the entire node for extra tactile feel.
 		tw.tween_property(play_btn, "scale", Vector2(0.96, 0.96), 0.05).set_trans(Tween.TRANS_QUAD)
-		# A tiny real downward nudge of the whole node
-		tw.tween_property(play_btn, "position:y", play_btn.position.y + 2.0, 0.05).set_trans(Tween.TRANS_QUAD)
+		# The SVG face moves down visually, so we must move the Label down to match it
+		tw.tween_property(p_lbl, "position:y", -1.0, 0.05).set_trans(Tween.TRANS_QUAD)
 	)
 	
 	play_btn.button_up.connect(func():
 		var tw = play_btn.create_tween()
 		tw.set_parallel(true)
 		tw.tween_property(play_btn, "scale", Vector2.ONE, 0.1).set_trans(Tween.TRANS_QUAD)
-		# Restore original position based on anchors/offsets rather than hardcoded Y
-		tw.tween_property(play_btn, "position:y", play_btn.position.y - 2.0, 0.1).set_trans(Tween.TRANS_QUAD)
+		tw.tween_property(p_lbl, "position:y", -6.0, 0.1).set_trans(Tween.TRANS_QUAD)
 	)
 	
 	play_btn.pressed.connect(func():
-		# Prevent double click bugs
 		if play_btn.disabled: return
 		play_btn.disabled = true
 		_on_play_pressed()
