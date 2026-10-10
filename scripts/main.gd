@@ -56,9 +56,12 @@ func _build_ui() -> void:
 	hud.set_anchors_preset(Control.PRESET_FULL_RECT)
 	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	safe.add_child(hud)
-
-	# C. Top-right Settings button (clean, sharper, blue)
-	var settings_btn := Button.new()
+	# C. Top-right Settings button (Glossy Blue SVG)
+	var settings_btn := TextureButton.new()
+	settings_btn.texture_normal = load("res://assets/ui/buttons/settings_gear_normal.svg")
+	settings_btn.texture_pressed = load("res://assets/ui/buttons/settings_gear_pressed.svg")
+	settings_btn.ignore_texture_size = true
+	settings_btn.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
 	settings_btn.anchor_left = 1.0
 	settings_btn.anchor_right = 1.0
 	settings_btn.anchor_top = 0.0
@@ -67,37 +70,19 @@ func _build_ui() -> void:
 	settings_btn.offset_right = 0.0
 	settings_btn.offset_top = 0.0
 	settings_btn.offset_bottom = 64.0
+	settings_btn.pivot_offset = Vector2(32, 32)
 	settings_btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	
-	var sb_set = StyleBoxFlat.new()
-	sb_set.bg_color = Color("3b82f6")
-	sb_set.set_corner_radius_all(10) # Sharper corners
-	sb_set.shadow_color = Color(0, 0, 0, 0.2)
-	sb_set.shadow_size = 4
-	sb_set.shadow_offset = Vector2(0, 4)
-	settings_btn.add_theme_stylebox_override("normal", sb_set)
+	settings_btn.button_down.connect(func():
+		var tw = settings_btn.create_tween()
+		tw.tween_property(settings_btn, "scale", Vector2(0.92, 0.92), 0.05).set_trans(Tween.TRANS_QUAD)
+	)
 	
-	var sb_set_hover = sb_set.duplicate()
-	sb_set_hover.bg_color = Color("60a5fa")
-	settings_btn.add_theme_stylebox_override("hover", sb_set_hover)
+	settings_btn.button_up.connect(func():
+		var tw = settings_btn.create_tween()
+		tw.tween_property(settings_btn, "scale", Vector2.ONE, 0.1).set_trans(Tween.TRANS_QUAD)
+	)
 	
-	var sb_set_pressed = sb_set.duplicate()
-	sb_set_pressed.bg_color = Color("1d4ed8")
-	sb_set_pressed.shadow_size = 0
-	sb_set_pressed.shadow_offset = Vector2(0, 0)
-	settings_btn.add_theme_stylebox_override("pressed", sb_set_pressed)
-
-	var s_icon = Label.new()
-	s_icon.text = "⚙"
-	s_icon.set_anchors_preset(Control.PRESET_FULL_RECT)
-	s_icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	s_icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	var ls_s = LabelSettings.new()
-	ls_s.font_size = 40
-	ls_s.font_color = Color.WHITE
-	s_icon.label_settings = ls_s
-	settings_btn.add_child(s_icon)
-
 	settings_btn.pressed.connect(_on_settings_pressed)
 	hud.add_child(settings_btn)
 	# D. Bottom-center Play button (Glossy Blue 3D SVG)
