@@ -1064,59 +1064,144 @@ func _build_hud() -> void:
 	result_overlay.add_child(res_center)
 	
 	var res_panel := PanelContainer.new()
-	res_panel.custom_minimum_size = Vector2(280, 220)
-	res_panel.add_theme_stylebox_override("panel", p_style_panel)
+	res_panel.custom_minimum_size = Vector2(300, 320)
+	
+	# Create a warm glowing panel style specifically for the victory screen
+	var res_style = StyleBoxFlat.new()
+	res_style.bg_color = Color("fffdf5") # warm white
+	res_style.corner_radius_top_left = 32
+	res_style.corner_radius_top_right = 32
+	res_style.corner_radius_bottom_left = 32
+	res_style.corner_radius_bottom_right = 32
+	res_style.shadow_color = Color(1.0, 0.85, 0.4, 0.25) # soft golden glow
+	res_style.shadow_size = 20
+	res_style.shadow_offset = Vector2(0, 4)
+	res_style.border_width_bottom = 6
+	res_style.border_color = Color("e5d3b3")
+	res_panel.add_theme_stylebox_override("panel", res_style)
 	res_center.add_child(res_panel)
+	
+	var res_margin = MarginContainer.new()
+	res_margin.add_theme_constant_override("margin_left", 24)
+	res_margin.add_theme_constant_override("margin_right", 24)
+	res_margin.add_theme_constant_override("margin_top", 32)
+	res_margin.add_theme_constant_override("margin_bottom", 32)
+	res_panel.add_child(res_margin)
 	
 	var res_vbox := VBoxContainer.new()
 	res_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	res_vbox.add_theme_constant_override("separation", 16)
-	res_panel.add_child(res_vbox)
+	res_vbox.add_theme_constant_override("separation", 20)
+	res_margin.add_child(res_vbox)
+	
+	# Header with Trophy and Title
+	var header_vbox = VBoxContainer.new()
+	header_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	header_vbox.add_theme_constant_override("separation", 8)
+	res_vbox.add_child(header_vbox)
+	
+	var trophy_lbl = Label.new()
+	trophy_lbl.text = "✨ 🏆 ✨"
+	trophy_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	trophy_lbl.add_theme_font_size_override("font_size", 48)
+	header_vbox.add_child(trophy_lbl)
 	
 	result_title_label = Label.new()
-	result_title_label.text = "Level Cleared!"
-	result_title_label.add_theme_font_size_override("font_size", 32)
-	result_title_label.add_theme_color_override("font_color", Color("334155"))
+	result_title_label.text = "LEVEL CLEAR!"
+	result_title_label.add_theme_font_size_override("font_size", 28)
+	result_title_label.add_theme_color_override("font_color", Color("9e7655"))
 	result_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	res_vbox.add_child(result_title_label)
+	header_vbox.add_child(result_title_label)
 	
-	# Home and Restart logic
-	var res_btn_restart := TextureButton.new()
-	res_btn_restart.texture_normal = load("res://assets/btn_restart.png")
-	res_btn_restart.ignore_texture_size = true
-	res_btn_restart.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
-	res_btn_restart.custom_minimum_size = Vector2(180, 56)
-	res_btn_restart.button_down.connect(func():
-		var tw = res_btn_restart.create_tween()
-		tw.tween_property(res_btn_restart, "scale", Vector2(0.9, 0.9), 0.05)
-	)
-	res_btn_restart.button_up.connect(func():
-		var tw = res_btn_restart.create_tween()
-		tw.tween_property(res_btn_restart, "scale", Vector2.ONE, 0.1)
-	)
-	res_btn_restart.pivot_offset = Vector2(90, 28)
-	res_btn_restart.pressed.connect(_on_restart_pressed)
-	res_vbox.add_child(res_btn_restart)
+	var btn_vbox = VBoxContainer.new()
+	btn_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	btn_vbox.add_theme_constant_override("separation", 16)
+	res_vbox.add_child(btn_vbox)
 	
+	# --- Button 1: Level 2 ---
+	var res_btn_level2 := TextureButton.new()
+	res_btn_level2.texture_normal = load("res://assets/ui/settings_buttons/next_normal.svg")
+	res_btn_level2.texture_pressed = load("res://assets/ui/settings_buttons/next_pressed.svg")
+	res_btn_level2.ignore_texture_size = true
+	res_btn_level2.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
+	res_btn_level2.custom_minimum_size = Vector2(160, 56)
+	
+	var l2_lbl = Label.new()
+	l2_lbl.text = "Level 2"
+	l2_lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
+	l2_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l2_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	l2_lbl.add_theme_font_size_override("font_size", 20)
+	l2_lbl.add_theme_color_override("font_color", Color.WHITE)
+	l2_lbl.add_theme_color_override("font_outline_color", Color("1e3a8a"))
+	l2_lbl.add_theme_constant_override("outline_size", 6)
+	l2_lbl.offset_top = -4
+	l2_lbl.offset_bottom = -4
+	res_btn_level2.add_child(l2_lbl)
+	
+	res_btn_level2.button_down.connect(func():
+		l2_lbl.offset_top = 2
+		l2_lbl.offset_bottom = 2
+		var tw = res_btn_level2.create_tween()
+		tw.tween_property(res_btn_level2, "scale", Vector2(0.94, 0.94), 0.05)
+	)
+	res_btn_level2.button_up.connect(func():
+		l2_lbl.offset_top = -4
+		l2_lbl.offset_bottom = -4
+		var tw = res_btn_level2.create_tween()
+		tw.tween_property(res_btn_level2, "scale", Vector2.ONE, 0.1)
+	)
+	res_btn_level2.pivot_offset = Vector2(80, 28)
+	res_btn_level2.pressed.connect(func():
+		_play_sfx("ui")
+		get_tree().paused = false
+		var gc = get_tree().root.get_node_or_null("GameController")
+		if gc:
+			gc.start_level(2)
+	)
+	btn_vbox.add_child(res_btn_level2)
+	
+	# --- Button 2: Home ---
 	var res_btn_home := TextureButton.new()
-	res_btn_home.texture_normal = load("res://assets/btn_home.png")
+	res_btn_home.texture_normal = load("res://assets/ui/settings_buttons/home_normal.svg")
+	res_btn_home.texture_pressed = load("res://assets/ui/settings_buttons/home_pressed.svg")
 	res_btn_home.ignore_texture_size = true
 	res_btn_home.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
-	res_btn_home.custom_minimum_size = Vector2(180, 56)
+	res_btn_home.custom_minimum_size = Vector2(160, 56)
+	
+	var rh_lbl = Label.new()
+	rh_lbl.text = "Home"
+	rh_lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
+	rh_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	rh_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	rh_lbl.add_theme_font_size_override("font_size", 20)
+	rh_lbl.add_theme_color_override("font_color", Color.WHITE)
+	rh_lbl.add_theme_color_override("font_outline_color", Color("9a3412"))
+	rh_lbl.add_theme_constant_override("outline_size", 6)
+	rh_lbl.offset_top = -4
+	rh_lbl.offset_bottom = -4
+	res_btn_home.add_child(rh_lbl)
+	
 	res_btn_home.button_down.connect(func():
+		rh_lbl.offset_top = 2
+		rh_lbl.offset_bottom = 2
 		var tw = res_btn_home.create_tween()
-		tw.tween_property(res_btn_home, "scale", Vector2(0.9, 0.9), 0.05)
+		tw.tween_property(res_btn_home, "scale", Vector2(0.94, 0.94), 0.05)
 	)
 	res_btn_home.button_up.connect(func():
+		rh_lbl.offset_top = -4
+		rh_lbl.offset_bottom = -4
 		var tw = res_btn_home.create_tween()
 		tw.tween_property(res_btn_home, "scale", Vector2.ONE, 0.1)
 	)
-	res_btn_home.pivot_offset = Vector2(90, 28)
+	res_btn_home.pivot_offset = Vector2(80, 28)
 	res_btn_home.pressed.connect(func():
+		_play_sfx("ui")
 		get_tree().paused = false
-		if GameController: GameController.goto_scene("res://scenes/main.tscn")
+		var gc = get_tree().root.get_node_or_null("GameController")
+		if gc:
+			gc.goto_scene("res://scenes/main.tscn")
 	)
-	res_vbox.add_child(res_btn_home)
+	btn_vbox.add_child(res_btn_home)
 
 	# --- Restart Confirmation Popup ---
 	restart_confirm_overlay = Control.new()
