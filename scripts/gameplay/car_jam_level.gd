@@ -5,15 +5,6 @@ class_name CarJamLevel
 ## Pure Godot 2D architecture with 2.5D pseudo-3D layered buses,
 ## exactly 4 parking slots, swept-footprint collision, and ordered passenger queue.
 
-const CarJamLevelData := preload("res://data/level_data.gd")
-const CarJamLevelFactory := preload("res://scripts/gameplay/level_factory.gd")
-const CarJamController := preload("res://scripts/gameplay/car_jam_controller.gd")
-const BoardView := preload("res://scripts/gameplay/board_view.gd")
-const VehicleView := preload("res://scripts/gameplay/vehicle_view.gd")
-const ParkingSlotView := preload("res://scripts/gameplay/parking_slot_view.gd")
-const PassengerView := preload("res://scripts/gameplay/passenger_view.gd")
-const VehicleMovement := preload("res://scripts/gameplay/vehicle_movement.gd")
-const SimpleStyle := preload("res://scripts/ui/style_helpers.gd")
 
 # Metrics
 const CELL_SIZE: float = 78.0
@@ -77,7 +68,7 @@ const PASSENGER_SPACING := 50.0
 const TRACK_SPEED := 40.0
 
 
-var _anim_clock: float = 0.0
+
 
 
 func _process(delta: float) -> void:
