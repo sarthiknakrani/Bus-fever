@@ -82,7 +82,7 @@ func setup_3d(mesh_path: String, color: Color, icon_path: String, text: String, 
 		label_3d.pixel_size = 1.0
 		# If the button is 80 units high, a 36-unit font is nicely proportioned (about 45% of height)
 		# For pause buttons (56 high), 24 is nicely proportioned.
-		label_3d.font_size = int(size_2d.y * 0.45) if icon_path == "" else int(size_2d.y * 0.25)
+		label_3d.font_size = int(size_2d.y * 0.35) if icon_path == "" else int(size_2d.y * 0.20)
 		label_3d.outline_size = max(2, int(label_3d.font_size * 0.2))
 		label_3d.position = Vector3(0, 0, face_z)
 		label_3d.modulate = Color("ffffff")

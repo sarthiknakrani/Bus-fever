@@ -58,7 +58,7 @@ func _build_ui() -> void:
 	safe.add_child(hud)
 	# C. Top-right Settings button (Glossy Blue SVG)
 	var settings_btn := Button3D.new()
-	settings_btn.setup_3d("res://assets/models/btn_64x64.obj", Color("3b82f6"), "res://assets/ui/buttons/settings_gear_normal.svg", "", Vector2(64, 64), false, 12.0)
+	settings_btn.setup_3d("res://assets/models/btn_64x64.obj", Color("3b82f6"), "res://assets/ui/buttons/icon_settings.svg", "", Vector2(64, 64), false, 12.0)
 	settings_btn.anchor_left = 1.0
 	settings_btn.anchor_right = 1.0
 	settings_btn.anchor_top = 0.0
