@@ -41,20 +41,6 @@ func _build_ui() -> void:
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(bg)
 
-	# B. Outer frame - cleanly matching the actual screen edge, no inner margin strips
-	var frame := Panel.new()
-	frame.set_anchors_preset(Control.PRESET_FULL_RECT)
-	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var frame_sb = StyleBoxFlat.new()
-	frame_sb.bg_color = Color.TRANSPARENT
-	frame_sb.border_width_left = 6
-	frame_sb.border_width_right = 6
-	frame_sb.border_width_top = 6
-	frame_sb.border_width_bottom = 6
-	frame_sb.border_color = Color("94a3b8")
-	frame.add_theme_stylebox_override("panel", frame_sb)
-	root.add_child(frame)
-
 	# SafeArea for buttons
 	var safe := MarginContainer.new()
 	safe.name = "SafeArea"
