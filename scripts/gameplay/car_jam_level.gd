@@ -949,24 +949,24 @@ func _build_hud() -> void:
 	r_style.corner_radius_bottom_left = 24
 	r_style.corner_radius_bottom_right = 24
 	r_panel.add_theme_stylebox_override("panel", r_style)
-	r_panel.custom_minimum_size = Vector2(460, 320)
+	r_panel.custom_minimum_size = Vector2(300, 240)
 	r_center.add_child(r_panel)
 	
 	var r_margin := MarginContainer.new()
-	r_margin.add_theme_constant_override("margin_left", 32)
-	r_margin.add_theme_constant_override("margin_right", 32)
-	r_margin.add_theme_constant_override("margin_top", 40)
-	r_margin.add_theme_constant_override("margin_bottom", 40)
+	r_margin.add_theme_constant_override("margin_left", 24)
+	r_margin.add_theme_constant_override("margin_right", 24)
+	r_margin.add_theme_constant_override("margin_top", 24)
+	r_margin.add_theme_constant_override("margin_bottom", 24)
 	r_panel.add_child(r_margin)
 
 	var r_vbox := VBoxContainer.new()
-	r_vbox.add_theme_constant_override("separation", 24)
+	r_vbox.add_theme_constant_override("separation", 16)
 	r_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	r_margin.add_child(r_vbox)
 
 	result_title_label = Label.new()
 	result_title_label.text = "LEVEL CLEAR!"
-	result_title_label.add_theme_font_size_override("font_size", 42)
+	result_title_label.add_theme_font_size_override("font_size", 28)
 	result_title_label.add_theme_color_override("font_color", Color("4b7bec"))
 	result_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	r_vbox.add_child(result_title_label)
@@ -974,7 +974,7 @@ func _build_hud() -> void:
 	# Action Buttons (Home and Restart)
 	var r_btn_home := Button.new()
 	r_btn_home.text = "Home"
-	r_btn_home.add_theme_font_size_override("font_size", 36)
+	r_btn_home.add_theme_font_size_override("font_size", 24)
 	r_btn_home.add_theme_color_override("font_color", Color.WHITE)
 	r_btn_home.add_theme_stylebox_override("normal", SimpleStyle.make_extruded_style(
 		Color("f97316"), Color("9a3412"), 16, 7, 0))
@@ -982,21 +982,21 @@ func _build_hud() -> void:
 		Color("fb923c"), Color("9a3412"), 16, 7, 0))
 	r_btn_home.add_theme_stylebox_override("pressed", SimpleStyle.make_extruded_style(
 		Color("ea580c"), Color("7c2d12"), 16, 3, 4, 3))
-	r_btn_home.custom_minimum_size = Vector2(260, 100)
-	r_btn_home.button_down.connect(func(): r_btn_home.position.y += 6)
-	r_btn_home.button_up.connect(func(): r_btn_home.position.y -= 6)
+	r_btn_home.custom_minimum_size = Vector2(180, 56)
+	r_btn_home.button_down.connect(func(): r_btn_home.position.y += 4)
+	r_btn_home.button_up.connect(func(): r_btn_home.position.y -= 4)
 	r_btn_home.pressed.connect(_on_home_pressed)
 	r_vbox.add_child(r_btn_home)
 	
 	result_btn = TextureButton.new()
 	result_btn.stretch_mode = TextureButton.STRETCH_SCALE
-	result_btn.custom_minimum_size = Vector2(296, 102)
-	result_btn.button_down.connect(func(): result_btn.position.y += 8)
-	result_btn.button_up.connect(func(): result_btn.position.y -= 8)
+	result_btn.custom_minimum_size = Vector2(180, 62)
+	result_btn.button_down.connect(func(): result_btn.position.y += 4)
+	result_btn.button_up.connect(func(): result_btn.position.y -= 4)
 	result_btn.pressed.connect(_on_restart_pressed)
 	
 	var r_restart_center = CenterContainer.new()
-	r_restart_center.custom_minimum_size = Vector2(300, 110)
+	r_restart_center.custom_minimum_size = Vector2(200, 70)
 	var rrc_wrap = Control.new()
 	rrc_wrap.custom_minimum_size = result_btn.custom_minimum_size
 	rrc_wrap.add_child(result_btn)
