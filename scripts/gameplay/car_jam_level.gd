@@ -737,9 +737,9 @@ func _build_hud() -> void:
 	booster_bar.add_child(b_hbox)
 
 	var boosters = [
-		{"name": "VIP", "icon": "res://assets/ui/gameplay_buttons/icon_vip.png"},
-		{"name": "Arrange", "icon": "res://assets/ui/gameplay_buttons/icon_arrange.png"},
-		{"name": "Jumble", "icon": "res://assets/ui/gameplay_buttons/icon_jumble.png"}
+		{"name": "VIP", "icon": "res://assets/ui/booster_icons/vip_icon.png"},
+		{"name": "Arrange", "icon": "res://assets/ui/booster_icons/arrange_icon.png"},
+		{"name": "Jumble", "icon": "res://assets/ui/booster_icons/jumble_icon.png"}
 	]
 
 	for b_info in boosters:
@@ -764,10 +764,10 @@ func _build_hud() -> void:
 		icon_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
 		icon_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		# slight padding inside the SVG base
-		icon_rect.offset_left = 6
-		icon_rect.offset_right = -6
-		icon_rect.offset_top = 6
-		icon_rect.offset_bottom = -12
+		icon_rect.offset_left = 10
+		icon_rect.offset_right = -10
+		icon_rect.offset_top = 8
+		icon_rect.offset_bottom = -14
 		btn.add_child(icon_rect)
 		
 		# Premium glossy pressed effect
