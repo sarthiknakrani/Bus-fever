@@ -129,13 +129,13 @@ func _build_ui() -> void:
 	p_lbl.offset_bottom = -6.0
 	
 	var ls_play = LabelSettings.new()
-	ls_play.font_size = 46
-	ls_play.font_color = Color.WHITE
-	ls_play.outline_size = 6
-	ls_play.outline_color = Color("1e3a8a")
-	ls_play.shadow_size = 4
-	ls_play.shadow_color = Color(0, 0, 0, 0.4)
-	ls_play.shadow_offset = Vector2(0, 3)
+	ls_play.font_size = 52
+	ls_play.font_color = Color("f8fafc") # Very light grey / white
+	ls_play.outline_size = 16
+	ls_play.outline_color = Color("1e3a8a") # Dark blue outline
+	ls_play.shadow_size = 0 # Sharp extrusion
+	ls_play.shadow_color = Color("0f172a") # Almost black/navy for bottom extrusion depth
+	ls_play.shadow_offset = Vector2(0, 6)
 	p_lbl.label_settings = ls_play
 	
 	play_btn.add_child(p_lbl)
