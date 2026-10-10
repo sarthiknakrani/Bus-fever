@@ -40,6 +40,8 @@ var top_bar: Control
 var booster_bar: Control
 var pause_overlay: Control
 var result_overlay: Control
+var restart_confirm_overlay: Control
+var _was_paused_before_confirm: bool = false
 
 var level_title_label: Label
 var result_title_label: Label
@@ -1077,6 +1079,173 @@ func _build_hud() -> void:
 		if GameController: GameController.goto_scene("res://scenes/main.tscn")
 	)
 	res_vbox.add_child(res_btn_home)
+
+	# --- Restart Confirmation Popup ---
+	restart_confirm_overlay = Control.new()
+	restart_confirm_overlay.name = "RestartConfirmOverlay"
+	restart_confirm_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	restart_confirm_overlay.visible = false
+	restart_confirm_overlay.process_mode = Node.PROCESS_MODE_ALWAYS
+	hud.add_child(restart_confirm_overlay)
+
+	var rc_bg := ColorRect.new()
+	rc_bg.color = Color(0, 0, 0, 0.7)
+	rc_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	rc_bg.mouse_filter = Control.MOUSE_FILTER_STOP
+	restart_confirm_overlay.add_child(rc_bg)
+
+	var rc_center := CenterContainer.new()
+	rc_center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	restart_confirm_overlay.add_child(rc_center)
+
+	var rc_wrapper := Control.new()
+	rc_wrapper.custom_minimum_size = Vector2(340, 360)
+	rc_center.add_child(rc_wrapper)
+
+	var rc_panel := PanelContainer.new()
+	rc_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var rc_style = StyleBoxFlat.new()
+	rc_style.bg_color = Color("fcf8ef")
+	rc_style.corner_radius_top_left = 32
+	rc_style.corner_radius_top_right = 32
+	rc_style.corner_radius_bottom_left = 32
+	rc_style.corner_radius_bottom_right = 32
+	rc_style.shadow_color = Color(0,0,0,0.3)
+	rc_style.shadow_size = 12
+	rc_style.shadow_offset = Vector2(0, 8)
+	rc_style.border_width_bottom = 6
+	rc_style.border_color = Color("e0d2b8")
+	rc_panel.add_theme_stylebox_override("panel", rc_style)
+	rc_wrapper.add_child(rc_panel)
+
+	var rc_gloss = Panel.new()
+	rc_gloss.set_anchors_preset(Control.PRESET_FULL_RECT)
+	rc_gloss.anchor_bottom = 0.5
+	rc_gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var rcg_style = StyleBoxFlat.new()
+	rcg_style.bg_color = Color(1, 1, 1, 0.4)
+	rcg_style.corner_radius_top_left = 32
+	rcg_style.corner_radius_top_right = 32
+	rc_gloss.add_theme_stylebox_override("panel", rcg_style)
+	rc_wrapper.add_child(rc_gloss)
+
+	var rc_margin := MarginContainer.new()
+	rc_margin.add_theme_constant_override("margin_left", 24)
+	rc_margin.add_theme_constant_override("margin_right", 24)
+	rc_margin.add_theme_constant_override("margin_top", 24)
+	rc_margin.add_theme_constant_override("margin_bottom", 24)
+	rc_panel.add_child(rc_margin)
+
+	var rc_vbox := VBoxContainer.new()
+	rc_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	rc_vbox.add_theme_constant_override("separation", 16)
+	rc_margin.add_child(rc_vbox)
+
+	var rc_title := Label.new()
+	rc_title.text = "Restart"
+	rc_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	rc_title.add_theme_font_size_override("font_size", 24)
+	rc_title.add_theme_color_override("font_color", Color("9e7655"))
+	rc_vbox.add_child(rc_title)
+
+	var rc_line := ColorRect.new()
+	rc_line.custom_minimum_size = Vector2(0, 2)
+	rc_line.color = Color("c4b29c")
+	rc_vbox.add_child(rc_line)
+
+	# Inner confirmation container
+	var rc_inner_panel := PanelContainer.new()
+	var rc_inner_style = StyleBoxFlat.new()
+	rc_inner_style.bg_color = Color("f1f5f9")
+	rc_inner_style.corner_radius_top_left = 16
+	rc_inner_style.corner_radius_top_right = 16
+	rc_inner_style.corner_radius_bottom_left = 16
+	rc_inner_style.corner_radius_bottom_right = 16
+	rc_inner_style.border_width_bottom = 4
+	rc_inner_style.border_color = Color("e2e8f0")
+	rc_inner_panel.add_theme_stylebox_override("panel", rc_inner_style)
+	rc_inner_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	rc_vbox.add_child(rc_inner_panel)
+
+	var rc_inner_margin = MarginContainer.new()
+	rc_inner_margin.add_theme_constant_override("margin_left", 16)
+	rc_inner_margin.add_theme_constant_override("margin_right", 16)
+	rc_inner_margin.add_theme_constant_override("margin_top", 16)
+	rc_inner_margin.add_theme_constant_override("margin_bottom", 16)
+	rc_inner_panel.add_child(rc_inner_margin)
+
+	var rc_inner_vbox = VBoxContainer.new()
+	rc_inner_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	rc_inner_vbox.add_theme_constant_override("separation", 12)
+	rc_inner_margin.add_child(rc_inner_vbox)
+
+	var rc_icon = TextureRect.new()
+	rc_icon.texture = load("res://assets/ui/gameplay_buttons/restart_normal.svg")
+	rc_icon.ignore_texture_size = true
+	rc_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	rc_icon.custom_minimum_size = Vector2(64, 64)
+	rc_icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	rc_inner_vbox.add_child(rc_icon)
+
+	var rc_lbl = Label.new()
+	rc_lbl.text = "Restart this level?"
+	rc_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	rc_lbl.add_theme_font_size_override("font_size", 18)
+	rc_lbl.add_theme_color_override("font_color", Color("475569"))
+	rc_inner_vbox.add_child(rc_lbl)
+
+	# YES / NO buttons
+	var rc_btns = HBoxContainer.new()
+	rc_btns.alignment = BoxContainer.ALIGNMENT_CENTER
+	rc_btns.add_theme_constant_override("separation", 16)
+	rc_vbox.add_child(rc_btns)
+
+	rc_btns.add_child(_create_procedural_glossy_button("Yes", Color("22c55e"), Color("166534"), _confirm_restart_yes))
+	rc_btns.add_child(_create_procedural_glossy_button("No", Color("f97316"), Color("9a3412"), _confirm_restart_no))
+
+	# Close button (top right)
+	var rc_close_btn := Button.new()
+	rc_close_btn.text = "✖"
+	rc_close_btn.add_theme_font_size_override("font_size", 18)
+	rc_close_btn.add_theme_color_override("font_color", Color.WHITE)
+	rc_close_btn.custom_minimum_size = Vector2(40, 40)
+	rc_close_btn.anchor_left = 1.0
+	rc_close_btn.anchor_right = 1.0
+	rc_close_btn.anchor_top = 0.0
+	rc_close_btn.anchor_bottom = 0.0
+	rc_close_btn.offset_left = -24.0
+	rc_close_btn.offset_top = -16.0
+	rc_close_btn.offset_right = 24.0
+	rc_close_btn.offset_bottom = 32.0
+	var rcc_style = StyleBoxFlat.new()
+	rcc_style.bg_color = Color("ef4444")
+	rcc_style.set_corner_radius_all(24)
+	rcc_style.shadow_color = Color(0, 0, 0, 0.3)
+	rcc_style.shadow_size = 6
+	rcc_style.shadow_offset = Vector2(0, 4)
+	rc_close_btn.add_theme_stylebox_override("normal", rcc_style)
+	var rcc_hover = rcc_style.duplicate()
+	rcc_hover.bg_color = Color("f87171")
+	rc_close_btn.add_theme_stylebox_override("hover", rcc_hover)
+	var rcc_pressed = rcc_style.duplicate()
+	rcc_pressed.bg_color = Color("dc2626")
+	rcc_pressed.shadow_size = 0
+	rcc_pressed.shadow_offset = Vector2(0,0)
+	rc_close_btn.add_theme_stylebox_override("pressed", rcc_pressed)
+	var rc_cg = Panel.new()
+	rc_cg.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	rc_cg.anchor_bottom = 0.5
+	rc_cg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var rc_cgs = StyleBoxFlat.new()
+	rc_cgs.bg_color = Color(1, 1, 1, 0.3)
+	rc_cgs.corner_radius_top_left = 24
+	rc_cgs.corner_radius_top_right = 24
+	rc_cg.add_theme_stylebox_override("panel", rc_cgs)
+	rc_close_btn.add_child(rc_cg)
+	
+	rc_close_btn.pressed.connect(_confirm_restart_no)
+	rc_wrapper.add_child(rc_close_btn)
+
 
 func _update_layout() -> void:
 	if world_root == null:
