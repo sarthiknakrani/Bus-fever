@@ -812,7 +812,7 @@ func _build_hud() -> void:
 		
 		b_hbox.add_child(vbox)
 
-	# PauseOverlay
+	# PauseOverlay (Settings Popup Redesign)
 	pause_overlay = Control.new()
 	pause_overlay.name = "PauseOverlay"
 	pause_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -829,48 +829,122 @@ func _build_hud() -> void:
 	p_center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	pause_overlay.add_child(p_center)
 
+	var p_wrapper := Control.new()
+	p_wrapper.custom_minimum_size = Vector2(340, 420)
+	p_center.add_child(p_wrapper)
+
 	var p_panel := PanelContainer.new()
-	p_panel.custom_minimum_size = Vector2(280, 150)
+	p_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var p_style_panel = StyleBoxFlat.new()
-	p_style_panel.bg_color = Color("f8fafc")
-	p_style_panel.corner_radius_top_left = 24
-	p_style_panel.corner_radius_top_right = 24
-	p_style_panel.corner_radius_bottom_left = 24
-	p_style_panel.corner_radius_bottom_right = 24
-	p_style_panel.shadow_color = Color(0,0,0,0.2)
-	p_style_panel.shadow_size = 16
-	p_style_panel.border_width_bottom = 8
-	p_style_panel.border_color = Color("cbd5e1")
+	p_style_panel.bg_color = Color("fcf8ef")
+	p_style_panel.corner_radius_top_left = 32
+	p_style_panel.corner_radius_top_right = 32
+	p_style_panel.corner_radius_bottom_left = 32
+	p_style_panel.corner_radius_bottom_right = 32
+	p_style_panel.shadow_color = Color(0,0,0,0.3)
+	p_style_panel.shadow_size = 12
+	p_style_panel.shadow_offset = Vector2(0, 8)
+	p_style_panel.border_width_bottom = 6
+	p_style_panel.border_color = Color("e0d2b8")
 	p_panel.add_theme_stylebox_override("panel", p_style_panel)
-	p_center.add_child(p_panel)
+	p_wrapper.add_child(p_panel)
+
+	# Glossy top
+	var pop_gloss = Panel.new()
+	pop_gloss.set_anchors_preset(Control.PRESET_FULL_RECT)
+	pop_gloss.anchor_bottom = 0.5
+	pop_gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var pg_style = StyleBoxFlat.new()
+	pg_style.bg_color = Color(1, 1, 1, 0.4)
+	pg_style.corner_radius_top_left = 32
+	pg_style.corner_radius_top_right = 32
+	pop_gloss.add_theme_stylebox_override("panel", pg_style)
+	p_wrapper.add_child(pop_gloss)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 28)
+	margin.add_theme_constant_override("margin_right", 28)
+	margin.add_theme_constant_override("margin_top", 28)
+	margin.add_theme_constant_override("margin_bottom", 28)
+	p_panel.add_child(margin)
 
 	var pb_vbox := VBoxContainer.new()
 	pb_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	pb_vbox.add_theme_constant_override("separation", 12)
-	p_panel.add_child(pb_vbox)
+	pb_vbox.add_theme_constant_override("separation", 18)
+	margin.add_child(pb_vbox)
 
-	var p_btn_resume := TextureButton.new()
-	p_btn_resume.texture_normal = load("res://assets/btn_play.png")
-	p_btn_resume.ignore_texture_size = true
-	p_btn_resume.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
-	p_btn_resume.custom_minimum_size = Vector2(180, 56)
-	p_btn_resume.button_down.connect(func():
-		var tw = p_btn_resume.create_tween()
-		tw.tween_property(p_btn_resume, "scale", Vector2(0.9, 0.9), 0.05)
-	)
-	p_btn_resume.button_up.connect(func():
-		var tw = p_btn_resume.create_tween()
-		tw.tween_property(p_btn_resume, "scale", Vector2.ONE, 0.1)
-	)
-	p_btn_resume.pivot_offset = Vector2(90, 28)
-	p_btn_resume.pressed.connect(_on_resume_pressed)
-	pb_vbox.add_child(p_btn_resume)
+	# A. Top area with Title
+	var title := Label.new()
+	title.text = "Settings"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 24)
+	title.add_theme_color_override("font_color", Color("9e7655"))
+	pb_vbox.add_child(title)
+
+	var line := ColorRect.new()
+	line.custom_minimum_size = Vector2(0, 2)
+	line.color = Color("c4b29c")
+	pb_vbox.add_child(line)
+
+	# C. Separate inner container (Toggles)
+	var toggles := VBoxContainer.new()
+	toggles.add_theme_constant_override("separation", 12)
+	pb_vbox.add_child(toggles)
 	
+	var sm_sfx = true
+	var sm_music = true
+	var sm_haptics = true
+	if is_inside_tree() and get_tree().root.has_node("SettingsManager"):
+		var sm = get_tree().root.get_node("SettingsManager")
+		sm_sfx = sm.sfx_enabled()
+		sm_music = sm.music_enabled()
+		sm_haptics = sm.haptics_enabled()
+
+	toggles.add_child(_create_custom_toggle("Sound", "🔊", sm_sfx, func(on):
+		if is_inside_tree() and get_tree().root.has_node("SettingsManager"):
+			get_tree().root.get_node("SettingsManager").set_sfx(on)
+	))
+	toggles.add_child(_create_custom_toggle("Music", "🎵", sm_music, func(on): 
+		if is_inside_tree() and get_tree().root.has_node("SettingsManager"):
+			get_tree().root.get_node("SettingsManager").set_music(on)
+		if is_inside_tree() and get_tree().root.has_node("AudioManager"):
+			var am = get_tree().root.get_node("AudioManager")
+			if on: am.play_music()
+			else: am.stop_music()
+	))
+	toggles.add_child(_create_custom_toggle("Vibration", "📳", sm_haptics, func(on):
+		if is_inside_tree() and get_tree().root.has_node("SettingsManager"):
+			get_tree().root.get_node("SettingsManager").set_haptics(on)
+	))
+
+	# D. Bottom buttons
+	var btm_hbox = HBoxContainer.new()
+	btm_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	btm_hbox.add_theme_constant_override("separation", 16)
+	pb_vbox.add_child(btm_hbox)
+
+	var p_btn_restart := TextureButton.new()
+	p_btn_restart.texture_normal = load("res://assets/btn_restart.png")
+	p_btn_restart.ignore_texture_size = true
+	p_btn_restart.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
+	p_btn_restart.custom_minimum_size = Vector2(130, 56)
+	p_btn_restart.button_down.connect(func():
+		var tw = p_btn_restart.create_tween()
+		tw.tween_property(p_btn_restart, "scale", Vector2(0.9, 0.9), 0.05)
+	)
+	p_btn_restart.button_up.connect(func():
+		var tw = p_btn_restart.create_tween()
+		tw.tween_property(p_btn_restart, "scale", Vector2.ONE, 0.1)
+	)
+	p_btn_restart.pivot_offset = Vector2(65, 28)
+	p_btn_restart.pressed.connect(_on_restart_pressed)
+	btm_hbox.add_child(p_btn_restart)
+
 	var p_btn_home := TextureButton.new()
 	p_btn_home.texture_normal = load("res://assets/btn_home.png")
 	p_btn_home.ignore_texture_size = true
 	p_btn_home.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
-	p_btn_home.custom_minimum_size = Vector2(180, 56)
+	p_btn_home.custom_minimum_size = Vector2(130, 56)
 	p_btn_home.button_down.connect(func():
 		var tw = p_btn_home.create_tween()
 		tw.tween_property(p_btn_home, "scale", Vector2(0.9, 0.9), 0.05)
@@ -879,12 +953,58 @@ func _build_hud() -> void:
 		var tw = p_btn_home.create_tween()
 		tw.tween_property(p_btn_home, "scale", Vector2.ONE, 0.1)
 	)
-	p_btn_home.pivot_offset = Vector2(90, 28)
+	p_btn_home.pivot_offset = Vector2(65, 28)
 	p_btn_home.pressed.connect(func():
 		get_tree().paused = false
 		if GameController: GameController.goto_scene("res://scenes/main.tscn")
 	)
-	pb_vbox.add_child(p_btn_home)
+	btm_hbox.add_child(p_btn_home)
+
+	# B. Close button (top-right)
+	var close_btn := Button.new()
+	close_btn.text = "✖"
+	close_btn.add_theme_font_size_override("font_size", 18)
+	close_btn.add_theme_color_override("font_color", Color.WHITE)
+	close_btn.custom_minimum_size = Vector2(40, 40)
+	close_btn.anchor_left = 1.0
+	close_btn.anchor_right = 1.0
+	close_btn.anchor_top = 0.0
+	close_btn.anchor_bottom = 0.0
+	close_btn.offset_left = -24.0
+	close_btn.offset_top = -16.0
+	close_btn.offset_right = 24.0
+	close_btn.offset_bottom = 32.0
+	var c_style = StyleBoxFlat.new()
+	c_style.bg_color = Color("ef4444")
+	c_style.set_corner_radius_all(24)
+	c_style.shadow_color = Color(0, 0, 0, 0.3)
+	c_style.shadow_size = 6
+	c_style.shadow_offset = Vector2(0, 4)
+	close_btn.add_theme_stylebox_override("normal", c_style)
+	
+	var c_hover = c_style.duplicate()
+	c_hover.bg_color = Color("f87171")
+	close_btn.add_theme_stylebox_override("hover", c_hover)
+	
+	var c_pressed = c_style.duplicate()
+	c_pressed.bg_color = Color("dc2626")
+	c_pressed.shadow_size = 0
+	c_pressed.shadow_offset = Vector2(0,0)
+	close_btn.add_theme_stylebox_override("pressed", c_pressed)
+	
+	var cg = Panel.new()
+	cg.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	cg.anchor_bottom = 0.5
+	cg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var cgs = StyleBoxFlat.new()
+	cgs.bg_color = Color(1, 1, 1, 0.3)
+	cgs.corner_radius_top_left = 24
+	cgs.corner_radius_top_right = 24
+	cg.add_theme_stylebox_override("panel", cgs)
+	close_btn.add_child(cg)
+	
+	close_btn.pressed.connect(_on_resume_pressed)
+	p_wrapper.add_child(close_btn)
 
 	# ResultOverlay
 	result_overlay = Control.new()
@@ -1275,3 +1395,103 @@ func _on_individual_boarded(pid: int, vehicle_id: int, color_id: String, token: 
 			p["view"].queue_free()
 		p["state"] = "BOARDED"
 	controller.commit_boarding(vehicle_id, color_id, token)
+
+func _create_custom_toggle(text: String, icon_text: String, is_on: bool, on_toggle: Callable) -> Control:
+	var row := HBoxContainer.new()
+	row.custom_minimum_size = Vector2(280, 48)
+
+	var icon := Label.new()
+	icon.text = icon_text
+	icon.add_theme_font_size_override("font_size", 16)
+	icon.add_theme_color_override("font_color", Color("9e7655"))
+	icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	row.add_child(icon)
+
+	var spacer := Control.new()
+	spacer.custom_minimum_size = Vector2(12, 0)
+	row.add_child(spacer)
+
+	var lbl := Label.new()
+	lbl.text = text
+	lbl.add_theme_font_size_override("font_size", 16)
+	lbl.add_theme_color_override("font_color", Color("9e7655"))
+	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(lbl)
+
+	const PILL_W := 70.0
+	const PILL_H := 40.0
+	const KNOB := 28.0
+	const PAD := 7.0
+
+	var pill := Panel.new()
+	pill.custom_minimum_size = Vector2(PILL_W, PILL_H)
+	pill.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
+	var pill_style := StyleBoxFlat.new()
+	pill_style.bg_color = Color("22c55e") if is_on else Color("d1d5db")
+	pill_style.set_corner_radius_all(int(PILL_H / 2))
+	pill.add_theme_stylebox_override("panel", pill_style)
+	
+	var t_gloss = Panel.new()
+	t_gloss.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	t_gloss.anchor_bottom = 0.5
+	t_gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var tg_style = StyleBoxFlat.new()
+	tg_style.bg_color = Color(1, 1, 1, 0.4)
+	t_gloss.add_theme_stylebox_override("panel", tg_style)
+	pill.add_child(t_gloss)
+	
+	if is_on:
+		var shine = ColorRect.new()
+		shine.color = Color(1, 1, 1, 0.5)
+		shine.rotation_degrees = 25
+		shine.size = Vector2(10, 100)
+		shine.position = Vector2(-50, -20)
+		shine.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		pill.add_child(shine)
+		var tw = pill.create_tween().set_loops()
+		tw.tween_property(shine, "position:x", 100.0, 1.2).from(-50.0).set_trans(Tween.TRANS_SINE)
+		tw.tween_interval(1.0)
+
+	var inside := Control.new()
+	inside.set_anchors_preset(Control.PRESET_FULL_RECT)
+	inside.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pill.add_child(inside)
+
+	var knob := Panel.new()
+	knob.custom_minimum_size = Vector2(KNOB, KNOB)
+	knob.position = Vector2(
+		(PILL_W - KNOB - PAD) if is_on else PAD,
+		(PILL_H - KNOB) / 2.0
+	)
+	var knob_style := StyleBoxFlat.new()
+	knob_style.bg_color = Color.WHITE
+	knob_style.set_corner_radius_all(int(KNOB / 2))
+	knob_style.border_width_bottom = 3
+	knob_style.border_color = Color("e5e7eb")
+	knob_style.shadow_color = Color(0, 0, 0, 0.20)
+	knob_style.shadow_size = 4
+	knob_style.shadow_offset = Vector2(0, 2)
+	knob.add_theme_stylebox_override("panel", knob_style)
+	inside.add_child(knob)
+
+	var hit := Button.new()
+	hit.set_anchors_preset(Control.PRESET_FULL_RECT)
+	hit.flat = true
+	hit.modulate = Color(1, 1, 1, 0.01)
+	pill.add_child(hit)
+
+	var state := {"on": is_on}
+	hit.pressed.connect(func():
+		_play_sfx("ui")
+		state["on"] = not state["on"]
+		var on = state["on"]
+		pill_style.bg_color = Color("22c55e") if on else Color("9ca3af")
+		knob.position.x = (PILL_W - KNOB - PAD) if on else PAD
+		on_toggle.call(on)
+	)
+
+	var wrap := CenterContainer.new()
+	wrap.add_child(pill)
+	row.add_child(wrap)
+	return row
