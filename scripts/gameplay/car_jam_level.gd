@@ -63,10 +63,11 @@ var _speed_logged: bool = false
 var slot_boarding_points: Dictionary = {}
 var _waiting_label: Label
 var track_time: float = 0.0
-const PASSENGER_SPACING := 50.0
-@export var passenger_normal_speed: float = 150.0
-@export var passenger_sprint_speed: float = 250.0
-@export var bus_movement_duration_multiplier: float = 3.0
+var _last_board_landing_time: float = 0.0
+const PASSENGER_SPACING := 22.0
+@export var passenger_normal_speed: float = 660.0
+@export var passenger_sprint_speed: float = 900.0
+@export var bus_movement_duration_multiplier: float = 1.0
 const TRACK_SPEED := 40.0
 
 
@@ -105,9 +106,11 @@ func _process(delta: float) -> void:
 			var diff = p_ahead["progress"] - p["progress"]
 			if diff < 0: diff += track_len
 			
-			# If the gap is larger than the ideal spacing, smoothly speed up to catch up!
+			# If the gap is larger than ideal spacing, smoothly sprint to catch up!
 			if diff > PASSENGER_SPACING * 1.2:
 				speed = passenger_sprint_speed
+			elif diff < PASSENGER_SPACING * 0.8:
+				speed = passenger_normal_speed * 0.8
 		# ---------------------------------------------
 		
 		var old_prog = p["progress"]
@@ -444,6 +447,7 @@ func _init_passenger_track() -> void:
 		var closest = passenger_track.curve.get_closest_offset(Vector2((i - 2) * 80.0, 90))
 		slot_boarding_points[i] = closest
 
+	_last_board_landing_time = 0.0
 	all_passengers.clear()
 	circulating_ids.clear()
 	var pid = 0
@@ -1741,13 +1745,22 @@ func _animate_individual_boarding(p: Dictionary, vehicle_id: int, slot_id: int, 
 	
 	pv.animate_jump(0.0)
 	
-	var tw = create_tween().set_parallel(true)
-	
 	var travel_dist = gpos.distance_to(target_pos)
-	var duration = clampf(travel_dist / 350.0, 0.20, 0.35)
+	var now_sec := Time.get_ticks_msec() / 1000.0
+	var base_duration := clampf(travel_dist / 450.0, 0.16, 0.20)
 	
-	var overlap_time = duration * 0.75
-	var fade_time = duration * 0.25
+	# Paced landing schedule to sustain ~30 passengers/second uninterrupted throughput
+	var interval := 1.0 / VehicleMovement.TARGET_PASSENGER_BOARDING_RATE
+	var target_landing := maxf(now_sec + base_duration, _last_board_landing_time + interval)
+	if now_sec > _last_board_landing_time + 0.12:
+		target_landing = now_sec + base_duration
+	_last_board_landing_time = target_landing
+	
+	var duration := maxf(target_landing - now_sec, 0.14)
+	var overlap_time = duration * 0.70
+	var fade_time = duration * 0.30
+	
+	var tw = create_tween().set_parallel(true)
 	
 	# Travel straight to the actual bus center smoothly
 	tw.tween_property(pv, "global_position", target_pos, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)

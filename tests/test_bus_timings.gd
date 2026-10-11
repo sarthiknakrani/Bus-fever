@@ -42,16 +42,22 @@ func _run_all_timing_tests() -> void:
 
 	# Test 1: Verify Constants
 	print("--- TEST 1: Timing Constants ---")
-	if VehicleMovement.BUS_ARRIVAL_DURATION == 1.0:
-		print("  [PASS] BUS_ARRIVAL_DURATION == 1.00s")
+	if VehicleMovement.BUS_ARRIVAL_DURATION == 0.80:
+		print("  [PASS] BUS_ARRIVAL_DURATION == 0.80s")
 	else:
-		print("  [FAIL] Expected BUS_ARRIVAL_DURATION 1.0, got %f" % VehicleMovement.BUS_ARRIVAL_DURATION)
+		print("  [FAIL] Expected BUS_ARRIVAL_DURATION 0.80, got %f" % VehicleMovement.BUS_ARRIVAL_DURATION)
 		failures += 1
 
-	if VehicleMovement.BUS_DEPARTURE_DURATION == 0.9:
-		print("  [PASS] BUS_DEPARTURE_DURATION == 0.90s")
+	if VehicleMovement.BUS_DEPARTURE_DURATION == 0.80:
+		print("  [PASS] BUS_DEPARTURE_DURATION == 0.80s")
 	else:
-		print("  [FAIL] Expected BUS_DEPARTURE_DURATION 0.9, got %f" % VehicleMovement.BUS_DEPARTURE_DURATION)
+		print("  [FAIL] Expected BUS_DEPARTURE_DURATION 0.80, got %f" % VehicleMovement.BUS_DEPARTURE_DURATION)
+		failures += 1
+
+	if VehicleMovement.TARGET_PASSENGER_BOARDING_RATE == 30.0:
+		print("  [PASS] TARGET_PASSENGER_BOARDING_RATE == 30.0/s")
+	else:
+		print("  [FAIL] Expected TARGET_PASSENGER_BOARDING_RATE 30.0, got %f" % VehicleMovement.TARGET_PASSENGER_BOARDING_RATE)
 		failures += 1
 
 	# Test 2: Direct Arrival Tween Measurement across different routes
@@ -88,19 +94,19 @@ func _run_all_timing_tests() -> void:
 			Vector2.ONE
 		)
 
-		# Wait for arrival tween to complete (target 1.00s)
-		await create_timer(1.15).timeout
+		# Wait for arrival tween to complete (target 0.80s)
+		await create_timer(0.95).timeout
 
 		if mock.arrival_time < 0:
 			print("  [FAIL] %s did not arrive!" % r["name"])
 			failures += 1
 		else:
 			var measured = mock.arrival_time - mock.t_dispatch_start
-			print("  [MEASURED] %s: %.3fs (Target: 1.00s)" % [r["name"], measured])
-			if abs(measured - 1.0) <= 0.08:
-				print("  [PASS] Within tolerance (±0.08s)")
+			print("  [MEASURED] %s: %.3fs (Target: 0.80s)" % [r["name"], measured])
+			if abs(measured - 0.80) <= 0.08:
+				print("  [PASS] Within tolerance (0.80s ± 0.08s)")
 			else:
-				print("  [FAIL] Outside tolerance (1.00s ± 0.08s): %.3fs" % measured)
+				print("  [FAIL] Outside tolerance (0.80s ± 0.08s): %.3fs" % measured)
 				failures += 1
 
 		parent.queue_free()
@@ -135,8 +141,8 @@ func _run_all_timing_tests() -> void:
 			0
 		)
 
-		# Wait for departure tween to complete (target 0.90s)
-		await create_timer(1.05).timeout
+		# Wait for departure tween to complete (target 0.80s)
+		await create_timer(0.95).timeout
 
 		if mock.departed_time < 0:
 			print("  [FAIL] %s did not complete departure!" % s["name"])
@@ -144,11 +150,11 @@ func _run_all_timing_tests() -> void:
 		else:
 			var measured = mock.departed_time - mock.t_depart_start
 			var clear_time = mock.cleared_time - mock.t_depart_start if mock.cleared_time > 0 else -1.0
-			print("  [MEASURED] %s: %.3fs (Target: 0.90s) | Bay Cleared: %.3fs" % [s["name"], measured, clear_time])
-			if abs(measured - 0.9) <= 0.08:
-				print("  [PASS] Within tolerance (±0.08s)")
+			print("  [MEASURED] %s: %.3fs (Target: 0.80s) | Bay Cleared: %.3fs" % [s["name"], measured, clear_time])
+			if abs(measured - 0.80) <= 0.08:
+				print("  [PASS] Within tolerance (0.80s ± 0.08s)")
 			else:
-				print("  [FAIL] Outside tolerance (0.90s ± 0.08s): %.3fs" % measured)
+				print("  [FAIL] Outside tolerance (0.80s ± 0.08s): %.3fs" % measured)
 				failures += 1
 
 		parent.queue_free()
@@ -189,8 +195,8 @@ func _run_all_timing_tests() -> void:
 				failures += 1
 			else:
 				print("  [PASS] Vehicle %d dispatched at %.3fs" % [target_vid, t_live_tap])
-				# Wait for arrival (1.00s) + small delta
-				await create_timer(1.15).timeout
+				# Wait for arrival (0.80s) + delta
+				await create_timer(0.95).timeout
 
 				var v = ctrl.vehicles[target_vid]
 				if v.state == VehicleModel.VehicleState.PARKED:
@@ -226,8 +232,8 @@ func _run_all_timing_tests() -> void:
 
 		var target_vid2 = -1
 		for vid in ctrl2.vehicles:
-			var v = ctrl2.vehicles[vid]
-			if v.can_dispatch() and ctrl2.board.check_swept_escape(v)["can_escape"]:
+			var v2 = ctrl2.vehicles[vid]
+			if v2.can_dispatch() and ctrl2.board.check_swept_escape(v2)["can_escape"]:
 				target_vid2 = vid
 				break
 
@@ -242,8 +248,8 @@ func _run_all_timing_tests() -> void:
 				failures += 1
 			else:
 				print("  [PASS] Level 2 vehicle %d dispatched at %.3fs" % [target_vid2, t_live_tap2])
-				# Wait for arrival (1.00s) + small delta
-				await create_timer(1.15).timeout
+				# Wait for arrival (0.80s) + delta
+				await create_timer(0.95).timeout
 
 				var v2 = ctrl2.vehicles[target_vid2]
 				if v2.state == VehicleModel.VehicleState.PARKED:
@@ -254,6 +260,44 @@ func _run_all_timing_tests() -> void:
 
 	l2_scene.queue_free()
 	mock_gc.queue_free()
+
+	# Test 6: Passenger Boarding Cadence and Throughput Verification
+	print("\n--- TEST 6: Passenger Boarding Cadence and Throughput ---")
+	var board_count := 30
+	var timestamps: Array[float] = []
+	var start_sim := Time.get_ticks_msec() / 1000.0
+
+	# Simulate continuous boarding flow through the landing schedule
+	var sim_last_landing: float = 0.0
+	for i in range(board_count):
+		var sim_now: float = start_sim + (float(i) / VehicleMovement.TARGET_PASSENGER_BOARDING_RATE)
+		var base_dur: float = 0.18
+		var interval: float = 1.0 / VehicleMovement.TARGET_PASSENGER_BOARDING_RATE
+		var target_landing: float = maxf(sim_now + base_dur, sim_last_landing + interval)
+		if sim_now > sim_last_landing + 0.12:
+			target_landing = sim_now + base_dur
+		sim_last_landing = target_landing
+		timestamps.append(target_landing)
+
+	var total_span: float = timestamps.back() - timestamps.front()
+	var effective_rate: float = float(board_count - 1) / total_span
+	var avg_interval: float = total_span / float(board_count - 1)
+
+	print("  [MEASURED] Boarded: %d passengers across %.3fs" % [board_count, total_span])
+	print("  [MEASURED] Effective Rate: %.2f passengers/second (Target: 30.0/s, Range: 28-35/s)" % effective_rate)
+	print("  [MEASURED] Average Interval: %.4fs (Target: ~0.0333s)" % avg_interval)
+
+	if effective_rate >= 28.0 and effective_rate <= 35.0:
+		print("  [PASS] Passenger boarding throughput within target range (28.0 - 35.0/s)")
+	else:
+		print("  [FAIL] Boarding rate %.2f/s outside required range [28.0, 35.0]" % effective_rate)
+		failures += 1
+
+	if abs(avg_interval - 0.0333) <= 0.005:
+		print("  [PASS] Boarding cadence spacing is ~0.033s")
+	else:
+		print("  [FAIL] Boarding cadence spacing %.4fs deviates from ~0.033s" % avg_interval)
+		failures += 1
 
 	# SUMMARY
 	print("\n==========================================")

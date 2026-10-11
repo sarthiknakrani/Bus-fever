@@ -2,8 +2,9 @@ extends RefCounted
 class_name VehicleMovement
 
 ## Centrally defined animation timing constants (seconds)
-const BUS_ARRIVAL_DURATION: float = 1.0
-const BUS_DEPARTURE_DURATION: float = 0.9
+const BUS_ARRIVAL_DURATION: float = 0.80
+const BUS_DEPARTURE_DURATION: float = 0.80
+const TARGET_PASSENGER_BOARDING_RATE: float = 30.0
 
 ## Handles smooth 2D visual tweening for vehicle dispatch and departure.
 ## Separated from authoritative simulation logic for clean restart safety and testability.
@@ -209,7 +210,7 @@ static func animate_departure(
 		CarJamVehicleData.Direction.LEFT: front_native = Vector2(-1, 0)
 		CarJamVehicleData.Direction.RIGHT: front_native = Vector2(1, 0)
 
-	var t_reverse: float = 0.28 * duration_mult
+	var t_reverse: float = 0.25 * duration_mult
 	var t_exit: float = total_duration - t_reverse
 	var t_clear: float = t_reverse * 0.60
 
@@ -222,12 +223,12 @@ static func animate_departure(
 			print("[QA] Bus %d BAY CLEARED at %.3f (After: %.3fs)" % [vehicle_id, t_c, t_c - t_dep_start])
 			controller.on_vehicle_cleared_slot(vehicle_id, slot_id, token)
 
-	# Parallel trigger for early slot release at ~0.17s
+	# Parallel trigger for early slot release at ~0.15s
 	var clear_tw := vehicle_node.create_tween()
 	clear_tw.tween_interval(t_clear)
 	clear_tw.tween_callback(lambda_clear)
 
-	# Main movement tween: Reverse (0.28s) -> Exit curve (0.62s) = 0.90s total
+	# Main movement tween: Reverse (0.25s) -> Exit curve (0.55s) = 0.80s total
 	var tw := vehicle_node.create_tween()
 
 	# Phase 1: Reverse straight down out of slot
@@ -245,7 +246,7 @@ static func animate_departure(
 	tw.tween_method(curve_callable, 0.0, 1.0, t_exit) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 
-	# Phase 3: Departure complete (completely offscreen and disappeared at exactly 0.90s)
+	# Phase 3: Departure complete (completely offscreen and disappeared at exactly 0.80s)
 	tw.tween_callback(func():
 		var t_dep_end: float = Time.get_ticks_msec() / 1000.0
 		print("[QA] Bus %d DEPARTURE COMPLETE at %.3f (Actual: %.3fs | Target: %.2fs)" % [

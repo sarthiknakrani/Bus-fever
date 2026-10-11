@@ -81,7 +81,7 @@ func _create_limb(tex: Texture2D, pos: Vector2, offset: Vector2, z: int) -> Spri
 
 func _process(delta: float) -> void:
 	if not _is_boarding:
-		_anim_time += delta * 12.0 # Walk cycle speed
+		_anim_time += delta * 24.0 # Running cycle matching fast 660 px/s track pace
 		
 		var leg_swing = sin(_anim_time) * 1.2
 		
@@ -123,17 +123,19 @@ func animate_jump(delay: float) -> void:
 	_head.rotation = 0
 	
 	var tw = create_tween()
-	tw.tween_interval(delay)
+	if delay > 0.0:
+		tw.tween_interval(delay)
 	var orig_y = _visual_node.position.y
-	# Nice boarding leap animation
-	tw.tween_property(_visual_node, "position:y", orig_y - 25.0, 0.15).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw.tween_property(_visual_node, "position:y", orig_y, 0.15).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	# Snappy boarding leap animation (0.16s total)
+	tw.tween_property(_visual_node, "position:y", orig_y - 20.0, 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(_visual_node, "position:y", orig_y, 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	
 	var tw2 = create_tween()
-	tw2.tween_interval(delay)
+	if delay > 0.0:
+		tw2.tween_interval(delay)
 	var base_scale = _visual_node.scale
-	tw2.tween_property(_visual_node, "scale", Vector2(base_scale.x * 0.8, base_scale.y * 1.2), 0.15)
-	tw2.tween_property(_visual_node, "scale", base_scale, 0.15)
+	tw2.tween_property(_visual_node, "scale", Vector2(base_scale.x * 0.8, base_scale.y * 1.2), 0.08)
+	tw2.tween_property(_visual_node, "scale", base_scale, 0.08)
 
 func _load_interim_sprite(path: String) -> Texture2D:
 	if ResourceLoader.exists(path):
