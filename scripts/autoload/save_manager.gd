@@ -17,7 +17,9 @@ var _path := "user://save.cfg"
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_load()
-	set_value(KEY_COINS, 0)
+	# NOTE: Do NOT unconditionally reset coins to zero here.
+	# Previously stored coins (and other progress) must survive subsequent launches.
+	# Defaults are only seeded for keys that are missing.
 	_init_defaults()
 
 func _init_defaults() -> void:

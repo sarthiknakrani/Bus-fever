@@ -7,6 +7,9 @@ signal back_to_home()
 var _current_level_path: String = ""
 var current_level_number: int = 1
 
+const MAIN_SCENE := "res://scenes/main.tscn"
+const GAMEPLAY_SCENE := "res://scenes/level1.tscn"
+
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	current_level_number = SaveManager.get_current_level()
@@ -14,14 +17,38 @@ func _ready() -> void:
 func start_level(level_num: int) -> void:
 	current_level_number = level_num
 	SaveManager.set_current_level(level_num)
-	goto_scene("res://scenes/level1.tscn")
+	goto_scene(GAMEPLAY_SCENE)
 
 func next_level() -> void:
 	var next_num := current_level_number + 1
-	var total := 5
-	if next_num > total:
-		next_num = 1
-	start_level(next_num)
+	if has_level(next_num):
+		start_level(next_num)
+	else:
+		# No further level authored — return to home.
+		goto_scene(MAIN_SCENE)
+
+## Authoritative check: does a level resource exist for the given 1-based number?
+## Uses the actual disk files (res://levels/level_NNN.tres) rather than a hard-coded
+## count, so the game never silently wraps around to Level 1.
+func has_level(level_num: int) -> bool:
+	if level_num < 1:
+		return false
+	var path := "res://levels/level_%03d.tres" % level_num
+	return ResourceLoader.exists(path)
+
+## Total authored level count — used by Level Select UI to know how many
+## buttons to render and what the last available level is.
+func available_level_count() -> int:
+	var n := 1
+	while has_level(n):
+		n += 1
+	return n - 1
+
+func next_available_level(level_num: int) -> int:
+	var n := level_num + 1
+	while has_level(n):
+		n += 1
+	return n  # first non-existent level after `level_num`
 
 func goto_scene(path: String) -> void:
 	# Use SceneTree change_scene_to for clean transitions.

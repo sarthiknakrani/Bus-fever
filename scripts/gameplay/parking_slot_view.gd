@@ -49,26 +49,43 @@ func _on_draw_lines() -> void:
 	var is_vip = (slot_id == 0)
 	var is_locked = (slot_id >= 4)
 	var is_reserved = (slot_state == CarJamParkingManager.SlotState.RESERVED)
-	
-	# Approved blue-grey UI styling
+	var is_occupied = (slot_state == CarJamParkingManager.SlotState.OCCUPIED)
+	var is_departing = (slot_state == CarJamParkingManager.SlotState.DEPARTING)
+
+	# Approved blue-grey UI styling — visual contract:
+	#   FREE       → light blue-grey border, neutral inner (looks "available")
+	#   RESERVED   → bright sky-blue border, darker blue inner (looks "claimed by incoming bus")
+	#   OCCUPIED   → green/teal border, dark green inner (looks "in use — bus is parked")
+	#   DEPARTING  → amber/warning border, dark amber inner (looks "unavailable, bus leaving")
+	#   LOCKED     → muted grey with padlock (looks "inaccessible")
+	#
+	# The DEPARTING state is intentionally distinct from FREE so the player never
+	# mistakes a slot that's emptying out for one they can immediately reuse.
 	var border_color = Color("e2e8f0")
-	var inner_color = Color("94a3b8") 
-	
+	var inner_color = Color("94a3b8")
+
 	if is_vip:
 		border_color = Color("fde68a")
 		inner_color = Color("d97706")
 	elif is_locked:
 		border_color = Color("94a3b8", 0.6)
 		inner_color = Color("64748b", 0.5)
+	elif is_departing:
+		# Distinguish from FREE: warmer/amber, never mistaken for available.
+		border_color = Color("fbbf24")
+		inner_color = Color("b45309", 0.85)
+	elif is_occupied:
+		border_color = Color("10b981")
+		inner_color = Color("047857", 0.85)
 	elif is_reserved:
 		border_color = Color("38bdf8")
 		inner_color = Color("0284c7", 0.75)
-		
+
 	var w = SLOT_WIDTH
 	var h = SLOT_HEIGHT
 	var hw = w/2.0
 	var hh = h/2.0
-	
+
 	# Raised Outer Border
 	var sb_outer = StyleBoxFlat.new()
 	sb_outer.bg_color = border_color
@@ -77,7 +94,7 @@ func _on_draw_lines() -> void:
 	sb_outer.shadow_size = 4
 	sb_outer.shadow_offset = Vector2(0, 4)
 	sb_outer.draw(_draw_node.get_canvas_item(), Rect2(-hw, -hh, w, h))
-	
+
 	# Recessed Inner Parking Surface
 	var sb_inner = StyleBoxFlat.new()
 	sb_inner.bg_color = inner_color
@@ -86,7 +103,7 @@ func _on_draw_lines() -> void:
 	sb_inner.border_width_left = 2
 	sb_inner.border_color = Color(0, 0, 0, 0.15) # Inner shadow effect
 	sb_inner.draw(_draw_node.get_canvas_item(), Rect2(-hw + 6, -hh + 6, w - 12, h - 12))
-	
+
 	if is_locked:
 		var lock_c = Color("e2e8f0", 0.8)
 		# Padlock body
@@ -100,4 +117,28 @@ func _on_draw_lines() -> void:
 		sb_hoop.border_width_top = 3
 		sb_hoop.set_corner_radius_all(6)
 		sb_hoop.draw(_draw_node.get_canvas_item(), Rect2(-6, -10, 12, 10))
+
+	if is_departing:
+		# Draw a small diagonal hatch so the slot reads as "in transition",
+		# not as the same neutral grey-blue that means FREE.
+		var hatch_c: Color = Color("fef3c7", 0.9)
+		var hatch_step: float = 8.0
+		var x0: float = -hw + 6.0
+		var y0: float = -hh + 6.0
+		var x1: float = x0 + (w - 12.0)
+		var y1: float = y0 + (h - 12.0)
+		# Diagonal lines from top-left to bottom-right of inner rect.
+		var start_x: float = x0 - (y1 - y0)
+		while start_x < x1:
+			var sx: float = start_x
+			var ex: float = start_x + (y1 - y0)
+			# Clip inside the inner rect.
+			var cax: float = max(sx, x0)
+			var cbx: float = min(ex, x1)
+			if cax < cbx:
+				# Map back: y = (x - sx) since slope is 1
+				var cay: float = max(y0, (cax - sx) + y0)
+				var cby: float = min(y1, (cbx - sx) + y0)
+				_draw_node.draw_line(Vector2(cax, cay), Vector2(cbx, cby), hatch_c, 1.5)
+			start_x += hatch_step
 

@@ -47,6 +47,10 @@ var _was_paused_before_confirm: bool = false
 var level_title_label: Label
 var result_title_label: Label
 var result_btn: TextureButton
+var result_btn_label: Label
+var result_retry_btn: TextureButton
+var result_subtitle_label: Label
+var _result_outcome: String = ""  # "victory" or "failure" — guards which buttons are shown
 
 var _toast_container: CenterContainer
 var _toast_panel: PanelContainer
@@ -420,18 +424,31 @@ func _load_current_level() -> void:
 	var gc = get_tree().root.get_node_or_null("GameController") if is_inside_tree() and get_tree() and get_tree().root else null
 	if gc:
 		lvl_num = gc.current_level_number
-		
+
 	var lvl: CarJamLevelData = null
 	var path = "res://levels/level_%03d.tres" % lvl_num
 	if ResourceLoader.exists(path):
 		lvl = ResourceLoader.load(path) as CarJamLevelData
-	
+
 	if lvl == null:
 		push_error("Level resource not found: " + path)
 		if ResourceLoader.exists("res://levels/level_001.tres"):
 			lvl = ResourceLoader.load("res://levels/level_001.tres") as CarJamLevelData
 		else:
 			lvl = CarJamLevelFactory.create_level_1()
+
+	# Reset result overlay state for this fresh level run.
+	_result_outcome = ""
+	if result_overlay != null:
+		result_overlay.visible = false
+	if result_btn != null:
+		result_btn.visible = false
+	if result_retry_btn != null:
+		result_retry_btn.visible = false
+	if result_subtitle_label != null:
+		result_subtitle_label.visible = false
+		result_subtitle_label.text = ""
+	get_tree().paused = false
 
 	controller.load_level(lvl)
 	_setup_visuals(lvl)
@@ -972,16 +989,96 @@ func _on_queue_updated() -> void:
 	_fill_passenger_track()
 
 func _on_level_completed() -> void:
+	# Guard: the win flow must only run once per session, AND must never override
+	# a failure outcome (a stray late signal can't resurrect victory UI).
+	if _result_outcome == "victory":
+		return
+	if _result_outcome == "failure":
+		# Failure is terminal for this attempt; do not flip to victory.
+		return
+	_result_outcome = "victory"
 	_play_sfx("victory")
-	result_title_label.text = "🏆 LEVEL CLEAR!"
+
+	var gc = get_tree().root.get_node_or_null("GameController")
+	var current_num: int = 1
+	if gc != null:
+		current_num = int(gc.current_level_number)
+
+	# Persist legitimate completion — but never unlock levels on a failure path.
+	var save_mgr = get_tree().root.get_node_or_null("SaveManager")
+	if save_mgr != null:
+		# Save per-level completion + raise max unlocked to current+1 if next exists.
+		if current_num == 1:
+			save_mgr.set_level_1_done(true)
+		var next_num: int = current_num + 1
+		if gc != null and gc.has_level(next_num):
+			save_mgr.unlock_level(next_num)
+
+	result_title_label.text = "LEVEL %d CLEAR!" % current_num
 	result_title_label.add_theme_color_override("font_color", Color("facc15"))
+
+	# Configure the next-level button based on actual authored levels.
+	var next_num: int = current_num + 1
+	if gc != null and gc.has_level(next_num):
+		result_btn_label.text = "Level %d" % next_num
+		result_btn.visible = true
+		result_subtitle_label.visible = false
+		result_subtitle_label.text = ""
+	else:
+		# No further level — don't pretend the player can advance.
+		result_btn.visible = false
+		result_subtitle_label.text = "More Levels Coming Soon"
+		result_subtitle_label.visible = true
+
+	# Failure-only button is never shown on victory.
+	result_retry_btn.visible = false
+
 	result_overlay.visible = true
 
 func _on_puzzle_failed() -> void:
+	# Guard: failure flow runs once per session.
+	if _result_outcome == "failure":
+		return
+	_result_outcome = "failure"
 	_play_sfx("failure")
-	result_title_label.text = "⚠️ NO MOVES LEFT!"
+
+	# CRITICAL: failure must NEVER enable level progression or unlock the next level.
+	# Only the retry/home actions are exposed — no victory-style next-level button.
+	result_title_label.text = "NO MOVES LEFT"
 	result_title_label.add_theme_color_override("font_color", Color("ef4444"))
+
+	# Hide the victory-only progression action.
+	result_btn.visible = false
+	result_subtitle_label.text = ""
+	result_subtitle_label.visible = false
+	result_retry_btn.visible = true
+
 	result_overlay.visible = true
+
+func _on_result_next_pressed() -> void:
+	# Defensive: if the user somehow taps this button outside a victory state,
+	# do nothing rather than silently advancing levels.
+	if _result_outcome != "victory":
+		return
+	_play_sfx("ui")
+	get_tree().paused = false
+	var gc = get_tree().root.get_node_or_null("GameController")
+	if gc != null:
+		var next_num: int = gc.current_level_number + 1
+		if gc.has_level(next_num):
+			gc.start_level(next_num)
+		else:
+			# Belt-and-braces: if no next level exists, send home instead of looping.
+			gc.goto_scene("res://scenes/main.tscn")
+
+func _on_result_retry_pressed() -> void:
+	if _result_outcome != "failure":
+		return
+	_play_sfx("ui")
+	get_tree().paused = false
+	var gc = get_tree().root.get_node_or_null("GameController")
+	if gc != null:
+		gc.start_level(gc.current_level_number)
 
 # -----------------------------------------------------------------
 # RESPONSIVE HUD & SAFE AREA
@@ -1478,16 +1575,17 @@ func _build_hud() -> void:
 	btn_vbox.add_theme_constant_override("separation", 16)
 	res_vbox.add_child(btn_vbox)
 	
-	# --- Button 1: Level 2 ---
+	# --- Button 1: Next Level (text + callback configured at show time) ---
 	var res_btn_level2 := TextureButton.new()
 	res_btn_level2.texture_normal = load("res://assets/ui/settings_buttons/next_normal.svg")
 	res_btn_level2.texture_pressed = load("res://assets/ui/settings_buttons/next_pressed.svg")
 	res_btn_level2.ignore_texture_size = true
 	res_btn_level2.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
 	res_btn_level2.custom_minimum_size = Vector2(160, 56)
-	
+	res_btn_level2.visible = false  # shown only on victory, text set per-level
+
 	var l2_lbl = Label.new()
-	l2_lbl.text = "Level 2"
+	l2_lbl.text = "Next"
 	l2_lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
 	l2_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l2_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -1498,7 +1596,7 @@ func _build_hud() -> void:
 	l2_lbl.offset_top = -4
 	l2_lbl.offset_bottom = -4
 	res_btn_level2.add_child(l2_lbl)
-	
+
 	res_btn_level2.button_down.connect(func():
 		l2_lbl.offset_top = 2
 		l2_lbl.offset_bottom = 2
@@ -1512,14 +1610,59 @@ func _build_hud() -> void:
 		tw.tween_property(res_btn_level2, "scale", Vector2.ONE, 0.1)
 	)
 	res_btn_level2.pivot_offset = Vector2(80, 28)
-	res_btn_level2.pressed.connect(func():
-		_play_sfx("ui")
-		get_tree().paused = false
-		var gc = get_tree().root.get_node_or_null("GameController")
-		if gc:
-			gc.start_level(2)
-	)
+	res_btn_level2.pressed.connect(_on_result_next_pressed)
 	btn_vbox.add_child(res_btn_level2)
+	result_btn = res_btn_level2
+	result_btn_label = l2_lbl
+
+	# --- Button 1b: Retry (shown only on failure) ---
+	var res_btn_retry := TextureButton.new()
+	res_btn_retry.texture_normal = load("res://assets/ui/settings_buttons/restart_normal.svg")
+	res_btn_retry.texture_pressed = load("res://assets/ui/settings_buttons/restart_pressed.svg")
+	res_btn_retry.ignore_texture_size = true
+	res_btn_retry.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
+	res_btn_retry.custom_minimum_size = Vector2(160, 56)
+	res_btn_retry.visible = false
+
+	var retry_lbl = Label.new()
+	retry_lbl.text = "Retry"
+	retry_lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
+	retry_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	retry_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	retry_lbl.add_theme_font_size_override("font_size", 20)
+	retry_lbl.add_theme_color_override("font_color", Color.WHITE)
+	retry_lbl.add_theme_color_override("font_outline_color", Color("7c2d12"))
+	retry_lbl.add_theme_constant_override("outline_size", 6)
+	retry_lbl.offset_top = -4
+	retry_lbl.offset_bottom = -4
+	res_btn_retry.add_child(retry_lbl)
+
+	res_btn_retry.button_down.connect(func():
+		retry_lbl.offset_top = 2
+		retry_lbl.offset_bottom = 2
+		var tw = res_btn_retry.create_tween()
+		tw.tween_property(res_btn_retry, "scale", Vector2(0.94, 0.94), 0.05)
+	)
+	res_btn_retry.button_up.connect(func():
+		retry_lbl.offset_top = -4
+		retry_lbl.offset_bottom = -4
+		var tw = res_btn_retry.create_tween()
+		tw.tween_property(res_btn_retry, "scale", Vector2.ONE, 0.1)
+	)
+	res_btn_retry.pivot_offset = Vector2(80, 28)
+	res_btn_retry.pressed.connect(_on_result_retry_pressed)
+	btn_vbox.add_child(res_btn_retry)
+	result_retry_btn = res_btn_retry
+
+	# --- Subtitle for "More Levels Coming Soon" state ---
+	result_subtitle_label = Label.new()
+	result_subtitle_label.text = ""
+	result_subtitle_label.add_theme_font_size_override("font_size", 16)
+	result_subtitle_label.add_theme_color_override("font_color", Color("475569"))
+	result_subtitle_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	result_subtitle_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	result_subtitle_label.visible = false
+	btn_vbox.add_child(result_subtitle_label)
 	
 	# --- Button 2: Home ---
 	var res_btn_home := TextureButton.new()
