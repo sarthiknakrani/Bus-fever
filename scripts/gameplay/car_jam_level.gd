@@ -63,10 +63,10 @@ class PassengerRow extends RefCounted:
 	var is_feeder: bool = false
 	var passengers: Array[Dictionary] = [] # {"id": int, "color_id": String, "lane": int, "view": PassengerView, "state": String}
 
-const LANE_SPACING := 24.0
-const ROW_SPACING := 34.0
+const LANE_SPACING := 22.0
+const ROW_SPACING := 38.0
 const NUM_LANES := 4
-const PASSENGER_SPACING := 34.0
+const PASSENGER_SPACING := 38.0
 const MAX_INITIAL_LOOP_PASSENGERS := 40
 
 var passenger_track: Path2D
@@ -230,7 +230,8 @@ func _process(delta: float) -> void:
 			var dist_to_trigger = trigger_prog - old_prog
 			if dist_to_trigger < 0: dist_to_trigger += track_len
 			
-			var reached = (dist_to_trigger <= dist_moved) or (abs(old_prog - trigger_prog) < 15.0 and old_prog >= 50.0 and old_prog <= 550.0)
+			var in_boarding_zone: bool = (old_prog >= 160.0 and old_prog <= 510.0)
+			var reached: bool = in_boarding_zone and ((dist_to_trigger <= dist_moved) or (abs(old_prog - trigger_prog) < 15.0))
 			if reached:
 				var slot = controller.parking.get_slot(slot_idx)
 				if slot != null and slot.state == CarJamParkingManager.SlotState.OCCUPIED and slot.vehicle_id != -1:
@@ -752,7 +753,11 @@ func _fill_passenger_track() -> void:
 
 func _on_vehicle_tapped(vehicle_id: int) -> void:
 	_play_sfx("select")
-	controller.tap_vehicle(vehicle_id)
+	var accepted := controller.tap_vehicle(vehicle_id)
+	if not accepted:
+		var vv: VehicleView = vehicle_views.get(vehicle_id, null)
+		if vv != null:
+			vv.play_blocked_shake()
 
 func _on_vehicle_dispatch_started(vehicle_id: int, slot_id: int, corridor: Array[Vector2i]) -> void:
 	_play_sfx("move")
@@ -867,6 +872,13 @@ func _recover_boarding_for_slot(slot_id: int) -> void:
 	var empty_rows: Array[PassengerRow] = []
 	for row in rows_to_check:
 		if v.remaining_capacity() <= 0: break
+		# Only board rows physically on the bottom platform approaching the slot
+		var dist_to_trig = trigger_prog - row.progress
+		if dist_to_trig < 0: dist_to_trig += track_len
+		var is_at_boarding_exit: bool = (dist_to_trig <= 360.0 and row.progress >= 160.0 and row.progress <= 510.0)
+		if not is_at_boarding_exit:
+			continue
+
 		var to_remove: Array[Dictionary] = []
 		for p in row.passengers:
 			if p["state"] == "CIRCULATING" and p["color_id"] == v.color_id:
@@ -1891,44 +1903,45 @@ func _create_procedural_glossy_button(btn_text: String, bg_color: Color, border_
 
 func _show_parking_full_toast() -> void:
 	var now := Time.get_ticks_msec() / 1000.0
-	if now - _last_toast_time < 0.8:
+	# Strict debounce: if toast is already active or triggered within 1.4s, don't re-trigger or spam
+	if (_toast_panel != null and _toast_panel.visible) or (now - _last_toast_time < 1.4):
 		return
 	_last_toast_time = now
 
 	if _toast_panel == null:
 		_toast_panel = PanelContainer.new()
 		var sb = StyleBoxFlat.new()
-		sb.bg_color = Color(0.12, 0.15, 0.22, 0.90)
-		sb.set_corner_radius_all(14)
+		sb.bg_color = Color(0.14, 0.16, 0.22, 0.94)
+		sb.set_corner_radius_all(12)
 		sb.border_width_left = 1
 		sb.border_width_top = 1
 		sb.border_width_right = 1
 		sb.border_width_bottom = 2
-		sb.border_color = Color(0.95, 0.4, 0.4, 0.8)
-		sb.shadow_color = Color(0, 0, 0, 0.35)
-		sb.shadow_size = 6
-		sb.shadow_offset = Vector2(0, 3)
+		sb.border_color = Color(0.95, 0.35, 0.35, 0.85)
+		sb.shadow_color = Color(0, 0, 0, 0.30)
+		sb.shadow_size = 4
+		sb.shadow_offset = Vector2(0, 2)
 		_toast_panel.add_theme_stylebox_override("panel", sb)
 		
 		var m = MarginContainer.new()
-		m.add_theme_constant_override("margin_left", 16)
-		m.add_theme_constant_override("margin_right", 16)
-		m.add_theme_constant_override("margin_top", 8)
-		m.add_theme_constant_override("margin_bottom", 8)
+		m.add_theme_constant_override("margin_left", 12)
+		m.add_theme_constant_override("margin_right", 12)
+		m.add_theme_constant_override("margin_top", 4)
+		m.add_theme_constant_override("margin_bottom", 4)
 		_toast_panel.add_child(m)
 		
 		var hb = HBoxContainer.new()
-		hb.add_theme_constant_override("separation", 8)
+		hb.add_theme_constant_override("separation", 6)
 		m.add_child(hb)
 		
 		var icon = Label.new()
 		icon.text = "⚠️"
-		icon.add_theme_font_size_override("font_size", 16)
+		icon.add_theme_font_size_override("font_size", 13)
 		hb.add_child(icon)
 		
 		var lbl = Label.new()
-		lbl.text = "NO PARKING SPOT AVAILABLE"
-		lbl.add_theme_font_size_override("font_size", 13)
+		lbl.text = "PARKING FULL"
+		lbl.add_theme_font_size_override("font_size", 12)
 		lbl.add_theme_color_override("font_color", Color("fef2f2"))
 		lbl.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
 		lbl.add_theme_constant_override("outline_size", 2)
@@ -1940,23 +1953,31 @@ func _show_parking_full_toast() -> void:
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		
-		hud.add_child(_toast_panel)
+		safe_area_root.add_child(_toast_panel)
 		
-	# Anchor safely below the TopBar without obscuring the passenger loop
-	_toast_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
-	_toast_panel.position.y = 80.0
+	# Anchor safely below TopBar (y=24..68) and above passenger track (y>=120)
+	_toast_panel.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_toast_panel.offset_top = 70.0
+	_toast_panel.offset_bottom = 96.0
+	_toast_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	
 	if _toast_tween:
 		_toast_tween.kill()
 		
 	_toast_panel.visible = true
 	_toast_panel.modulate.a = 0.0
+	_toast_panel.scale = Vector2(0.92, 0.92)
+	_toast_panel.pivot_offset = _toast_panel.size / 2.0
 	
 	_toast_tween = create_tween()
-	_toast_tween.tween_property(_toast_panel, "modulate:a", 1.0, 0.15).set_trans(Tween.TRANS_SINE)
-	_toast_tween.tween_interval(1.2)
-	_toast_tween.tween_property(_toast_panel, "modulate:a", 0.0, 0.3).set_trans(Tween.TRANS_SINE)
-	_toast_tween.tween_callback(func(): _toast_panel.visible = false)
+	_toast_tween.set_parallel(true)
+	_toast_tween.tween_property(_toast_panel, "modulate:a", 1.0, 0.10).set_trans(Tween.TRANS_SINE)
+	_toast_tween.tween_property(_toast_panel, "scale", Vector2.ONE, 0.10).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	
+	var tw_seq = create_tween()
+	tw_seq.tween_interval(0.70)
+	tw_seq.tween_property(_toast_panel, "modulate:a", 0.0, 0.20).set_trans(Tween.TRANS_SINE)
+	tw_seq.tween_callback(func(): _toast_panel.visible = false)
 
 func _on_home_pressed() -> void:
 	_play_sfx("ui")
@@ -2079,11 +2100,17 @@ func _animate_individual_boarding(p: Dictionary, vehicle_id: int, slot_id: int, 
 
 	# Doorway fan-in offset to prevent multi-passenger stacking on a single point
 	var lane_idx: int = p.get("lane", 0)
-	var fan_offset := Vector2((float(lane_idx) - 1.5) * 8.0, 0.0)
+	var fan_offset := Vector2((float(lane_idx) - 1.5) * 6.0, 0.0)
 	target_pos += fan_offset
 	pv.z_index = 100
 	
-	var travel_dist = gpos.distance_to(target_pos)
+	# Waypoint route: Leave the track at an intentional exit, merge from 4 lanes, and enter bus doorway
+	var mid_wp := Vector2(
+		lerpf(gpos.x, target_pos.x, 0.65),
+		maxf(gpos.y + 24.0, (gpos.y + target_pos.y) * 0.5)
+	)
+
+	var travel_dist = gpos.distance_to(mid_wp) + mid_wp.distance_to(target_pos)
 	var now_sec := Time.get_ticks_msec() / 1000.0
 	var flight_duration := clampf(travel_dist / 450.0, 0.16, 0.20)
 	
@@ -2109,8 +2136,13 @@ func _animate_individual_boarding(p: Dictionary, vehicle_id: int, slot_id: int, 
 	
 	var tw = create_tween().set_parallel(true)
 	
-	# Travel straight to the actual bus doorway smoothly
-	tw.tween_property(pv, "global_position", target_pos, flight_duration).set_delay(start_delay).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	# Smooth quadratic Bézier movement cleanly merging lanes into the bus entrance
+	var bezier_func = func(t: float):
+		if is_instance_valid(pv):
+			var one_minus_t = 1.0 - t
+			pv.global_position = one_minus_t * one_minus_t * gpos + 2.0 * one_minus_t * t * mid_wp + t * t * target_pos
+	
+	tw.tween_method(bezier_func, 0.0, 1.0, flight_duration).set_delay(start_delay).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	
 	# Shrink/fade cleanly during the final entry portion without reparenting scale pop
 	var start_pv_scale: Vector2 = pv.scale

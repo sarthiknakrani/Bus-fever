@@ -3,6 +3,10 @@ extends SceneTree
 const CarJamLevelScene = preload("res://scenes/gameplay/car_jam_level.tscn")
 
 func _init() -> void:
+	_run_all_tests()
+
+func _run_all_tests() -> void:
+	await create_timer(0.3).timeout
 	print("\n==========================================")
 	print("=== PASSENGER ART VERIFICATION SUITE ===")
 	print("==========================================")
@@ -112,12 +116,14 @@ func _init() -> void:
 		print("  [FAIL] Bus %d failed to dock at Slot 1" % target_vid)
 		failures += 1
 
-	# Allow boarding for 0.5s
-	await create_timer(0.50).timeout
+	# Allow boarding for 1.0s so passengers reach doorway and land
+	await create_timer(1.0).timeout
 	var v_model = level.controller.vehicles.get(target_vid, null)
-	if v_model != null and v_model.passenger_occupancy > 0:
-		print("  [PASS] Authentic boarding active: %d/%d passengers boarded bus %d" % [
-			v_model.passenger_occupancy, v_model.capacity, target_vid
+	var occ: int = v_model.passenger_occupancy if v_model else 0
+	var pend: int = level.controller.pending_boarders.get(target_vid, 0)
+	if v_model != null and (occ + pend) > 0:
+		print("  [PASS] Authentic boarding active: %d boarded (+%d in transit) for bus %d" % [
+			occ, pend, target_vid
 		])
 	else:
 		print("  [FAIL] No passengers boarded bus %d" % target_vid)

@@ -15,7 +15,7 @@ var _is_boarding: bool = false
 var _last_pos: Vector2 = Vector2.ZERO
 var _facing_right: bool = true
 
-const BASE_SCALE := 0.28
+const BASE_SCALE := 0.27
 
 func setup(p_col_id: String, p_id: int = 0, p_lane: int = 0) -> void:
 	_color_id = p_col_id.to_lower()
@@ -32,7 +32,7 @@ func setup(p_col_id: String, p_id: int = 0, p_lane: int = 0) -> void:
 		_shadow.texture = t_shadow
 	_shadow.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	_shadow.position = Vector2(0, 0)
-	_shadow.scale = Vector2(0.28, 0.15)
+	_shadow.scale = Vector2(0.26, 0.14)
 	_shadow.modulate = Color(0, 0, 0, 0.45)
 	_shadow.z_index = -1
 	add_child(_shadow)
@@ -100,7 +100,7 @@ func _process(delta: float) -> void:
 		# Shadow reacts to ground contact
 		if _shadow != null:
 			var shadow_factor: float = 1.0 - (bob / 2.8) * 0.16 + maxf(0.0, -bounce) * 0.06
-			_shadow.scale = Vector2(0.28 * shadow_factor, 0.15 * shadow_factor)
+			_shadow.scale = Vector2(0.26 * shadow_factor, 0.14 * shadow_factor)
 			_shadow.modulate.a = 0.45 * shadow_factor
 
 func animate_jump(delay: float) -> void:
@@ -130,8 +130,8 @@ func animate_jump(delay: float) -> void:
 		var tw_s := create_tween()
 		if delay > 0.0:
 			tw_s.tween_interval(delay)
-		tw_s.tween_property(_shadow, "scale", Vector2(0.14, 0.07), 0.08)
-		tw_s.tween_property(_shadow, "scale", Vector2(0.28, 0.15), 0.08)
+		tw_s.tween_property(_shadow, "scale", Vector2(0.13, 0.07), 0.08)
+		tw_s.tween_property(_shadow, "scale", Vector2(0.26, 0.14), 0.08)
 
 func _load_interim_sprite(path: String) -> Texture2D:
 	if ResourceLoader.exists(path):

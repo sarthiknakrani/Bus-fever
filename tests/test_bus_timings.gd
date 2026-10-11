@@ -389,12 +389,11 @@ func _run_all_timing_tests() -> void:
 		var v3 = ctrl_l1.vehicles[3]
 		if v3.state == VehicleModel.VehicleState.PARKED:
 			print("  [PASS] Vehicle 3 is PARKED at slot %d" % v3.reserved_slot)
-			# Event-driven boarding should immediately board matching red passengers on the loop
-			# Allow 0.4s for the stream of passengers to board
-			await create_timer(0.4).timeout
+			# Allow 0.75s for circulating passengers to reach the platform boarding zone cleanly
+			await create_timer(0.75).timeout
 			var occupancy = v3.passenger_occupancy
 			var pending = ctrl_l1.pending_boarders.get(3, 0)
-			print("  [MEASURED] Vehicle 3 occupancy + pending after 0.4s: %d" % (occupancy + pending))
+			print("  [MEASURED] Vehicle 3 occupancy + pending after 0.75s: %d" % (occupancy + pending))
 			if occupancy + pending > 0:
 				print("  [PASS] Event-driven boarding immediately initiated without waiting for full lap!")
 			else:
