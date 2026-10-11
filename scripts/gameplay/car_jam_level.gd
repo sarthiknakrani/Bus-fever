@@ -62,10 +62,10 @@ class PassengerRow extends RefCounted:
 	var is_feeder: bool = false
 	var passengers: Array[Dictionary] = [] # {"id": int, "color_id": String, "lane": int, "view": PassengerView, "state": String}
 
-const LANE_SPACING := 20.0
-const ROW_SPACING := 22.0
+const LANE_SPACING := 26.0
+const ROW_SPACING := 26.0
 const NUM_LANES := 4
-const PASSENGER_SPACING := 22.0
+const PASSENGER_SPACING := 26.0
 const MAX_INITIAL_LOOP_PASSENGERS := 40
 
 var passenger_track: Path2D
@@ -437,12 +437,16 @@ func _setup_visuals(lvl: CarJamLevelData) -> void:
 
 	for pid in all_passengers:
 		var p = all_passengers[pid]
-		if is_instance_valid(p["view"]): p["view"].queue_free()
-		if is_instance_valid(p["follower"]): p["follower"].queue_free()
+		if is_instance_valid(p.get("view", null)): p["view"].queue_free()
+		var pf = p.get("follower", null)
+		if is_instance_valid(pf): pf.queue_free()
 	all_passengers.clear()
 	circulating_ids.clear()
 	_feeder_passengers.clear()
 	_pending_feeder_passengers.clear()
+	_circulating_rows.clear()
+	_feeder_rows.clear()
+	_pending_feeder_rows.clear()
 	if is_instance_valid(passenger_track):
 		passenger_track.queue_free()
 		passenger_track = null
@@ -520,34 +524,79 @@ func _get_slot_world_pos(slot_id: int) -> Vector2:
 		return parking_root.position + slot_views[slot_id].position
 	return Vector2(0, PARKING_Y)
 
+func _generate_mixed_passenger_sequence(groups: Array[PassengerGroupData]) -> Array[Dictionary]:
+	var total_counts := {}
+	var total_passengers := 0
+	for g in groups:
+		total_counts[g.color_id] = total_counts.get(g.color_id, 0) + g.initial_count
+		total_passengers += g.initial_count
+
+	var colors: Array[String] = []
+	for c in total_counts:
+		colors.append(c)
+
+	var rng := RandomNumberGenerator.new()
+	var lvl_id: int = 1
+	if controller != null and controller.level_data != null:
+		lvl_id = controller.level_data.level_id
+	rng.seed = 202610 + lvl_id * 100
+
+	var remaining := total_counts.duplicate()
+	var result: Array[Dictionary] = []
+	var last_color := ""
+	var run_count := 0
+
+	for pid in total_passengers:
+		var candidates: Array[String] = []
+		for c in colors:
+			if remaining[c] > 0:
+				if c != last_color or run_count < 3:
+					candidates.append(c)
+		if candidates.is_empty():
+			for c in colors:
+				if remaining[c] > 0:
+					candidates.append(c)
+
+		var pick_idx := rng.randi() % candidates.size()
+		var chosen := candidates[pick_idx]
+		result.append({"id": pid, "color_id": chosen})
+		remaining[chosen] -= 1
+		if chosen == last_color:
+			run_count += 1
+		else:
+			last_color = chosen
+			run_count = 1
+
+	return result
+
 func _init_passenger_track() -> void:
 	passenger_track = Path2D.new()
 	var curve := Curve2D.new()
-	var h := 46.94
-	# Start at merge point (250, 0)
-	curve.add_point(Vector2(250, 0), Vector2(0, -h), Vector2(0, h))
+	var h := 52.47 # R=95.0 * 0.552285
+	# Start at merge point (260, 0)
+	curve.add_point(Vector2(260, 0), Vector2(0, -h), Vector2(0, h))
 	# Bottom right arc into bottom straight
-	curve.add_point(Vector2(165, 85), Vector2(h, 0), Vector2.ZERO)
+	curve.add_point(Vector2(165, 95), Vector2(h, 0), Vector2.ZERO)
 	# Bottom straight (above parking)
-	curve.add_point(Vector2(-165, 85), Vector2.ZERO, Vector2(-h, 0))
+	curve.add_point(Vector2(-165, 95), Vector2.ZERO, Vector2(-h, 0))
 	# Left semicircle
-	curve.add_point(Vector2(-250, 0), Vector2(0, h), Vector2(0, -h))
+	curve.add_point(Vector2(-260, 0), Vector2(0, h), Vector2(0, -h))
 	# Top left arc into top straight
-	curve.add_point(Vector2(-165, -85), Vector2(-h, 0), Vector2.ZERO)
+	curve.add_point(Vector2(-165, -95), Vector2(-h, 0), Vector2.ZERO)
 	# Top straight
-	curve.add_point(Vector2(165, -85), Vector2.ZERO, Vector2(h, 0))
-	# Close loop back to (250, 0)
-	curve.add_point(Vector2(250, 0), Vector2(0, -h), Vector2(0, h))
+	curve.add_point(Vector2(165, -95), Vector2.ZERO, Vector2(h, 0))
+	# Close loop back to (260, 0)
+	curve.add_point(Vector2(260, 0), Vector2(0, -h), Vector2(0, h))
 	passenger_track.curve = curve
 	
 	# CONTINUOUS FEEDER TRACK
 	feeder_track = Path2D.new()
 	feeder_track.name = "FeederTrack"
 	var f_curve := Curve2D.new()
-	# Smooth curve from plaza gate at (360, -180) merging into main loop at (250, 0)
-	f_curve.add_point(Vector2(360, -180), Vector2.ZERO, Vector2(-30, 45))
-	f_curve.add_point(Vector2(310, -90), Vector2(25, -40), Vector2(-25, 40))
-	f_curve.add_point(Vector2(250, 0), Vector2(0, -50), Vector2.ZERO)
+	# Smooth curve from plaza gate at (370, -190) merging into main loop at (260, 0)
+	f_curve.add_point(Vector2(370, -190), Vector2.ZERO, Vector2(-30, 45))
+	f_curve.add_point(Vector2(320, -95), Vector2(25, -40), Vector2(-25, 40))
+	f_curve.add_point(Vector2(260, 0), Vector2(0, -55), Vector2.ZERO)
 	feeder_track.curve = f_curve
 
 	# PREMIUM PLAZA INTEGRATION
@@ -580,7 +629,7 @@ func _init_passenger_track() -> void:
 	var total_span: float = float(controller.level_data.parking_slots_count - 1) * slot_spacing
 	for i in controller.level_data.parking_slots_count:
 		var slot_x: float = slot_views[i].position.x if i < slot_views.size() else (-total_span / 2.0 + float(i) * slot_spacing)
-		var closest: float = passenger_track.curve.get_closest_offset(Vector2(slot_x, 85.0))
+		var closest: float = passenger_track.curve.get_closest_offset(Vector2(slot_x, 95.0))
 		slot_boarding_points[i] = closest
 
 	_last_board_landing_time = 0.0
@@ -592,12 +641,8 @@ func _init_passenger_track() -> void:
 	_feeder_rows.clear()
 	_pending_feeder_rows.clear()
 
-	var all_queue_p: Array[Dictionary] = []
-	var pid = 0
-	for g in controller.queue.get_all_groups():
-		for j in g.initial_count:
-			all_queue_p.append({"id": pid, "color_id": g.color_id})
-			pid += 1
+	# Generate mixed and varied passenger color sequence
+	var all_queue_p: Array[Dictionary] = _generate_mixed_passenger_sequence(controller.queue.get_all_groups())
 
 	var total_rows = int(ceil(float(all_queue_p.size()) / float(NUM_LANES)))
 	var all_rows: Array[PassengerRow] = []
@@ -623,7 +668,7 @@ func _init_passenger_track() -> void:
 	for r in initial_rows_count:
 		var row = all_rows[r]
 		row.is_feeder = false
-		row.progress = 250.0 - float(r) * ROW_SPACING
+		row.progress = 260.0 - float(r) * ROW_SPACING
 		if row.progress < 0.0: row.progress += passenger_track.curve.get_baked_length()
 		
 		var pt_info = _get_curve_point_and_normal(passenger_track.curve, row.progress, true)
@@ -1618,7 +1663,7 @@ func _update_layout() -> void:
 		return
 
 	# 1. Determine local bounding sizes
-	var track_h = 240.0
+	var track_h = 260.0
 	var parking_h = 200.0
 	var board_cells_w = float(controller.level_data.board_size.x)
 	var board_cells_h = float(controller.level_data.board_size.y)

@@ -13,44 +13,44 @@ func _draw() -> void:
 		var f_shadow = f_pts.duplicate()
 		for i in f_shadow.size():
 			f_shadow[i] += Vector2(0, 8)
-		_draw_thick_path(f_shadow, bg_shadow, 118.0)
+		_draw_thick_path(f_shadow, bg_shadow, 146.0)
 		
 	if curve != null:
 		var points = curve.get_baked_points()
 		var shadow_pts = points.duplicate()
 		for i in shadow_pts.size():
 			shadow_pts[i] += Vector2(0, 8)
-		_draw_thick_path(shadow_pts, bg_shadow, 118.0)
+		_draw_thick_path(shadow_pts, bg_shadow, 146.0)
 
 	# 2. Feeder Track Layers (drawn first so loop overlays cleanly at merge point)
 	if feeder_curve != null:
 		var f_pts = feeder_curve.get_baked_points()
-		_draw_thick_path(f_pts, Color("475569"), 114.0) # Dark slate border
-		_draw_thick_path(f_pts, Color("64748b"), 104.0) # Medium grey track
-		_draw_thick_path(f_pts, Color("94a3b8"), 98.0)  # Light inner highlight
+		_draw_thick_path(f_pts, Color("475569"), 142.0) # Dark slate border
+		_draw_thick_path(f_pts, Color("64748b"), 132.0) # Medium grey track
+		_draw_thick_path(f_pts, Color("94a3b8"), 124.0) # Light inner highlight
 		
 		# Entrance Gate at feeder start point
 		if f_pts.size() > 0:
 			var entrance_pt = f_pts[0]
-			# Stylish entrance threshold arch / pill matching 104px track width
-			draw_circle(entrance_pt + Vector2(0, 6), 56.0, Color(0, 0, 0, 0.3))
-			draw_circle(entrance_pt, 54.0, Color("334155"))
-			draw_circle(entrance_pt, 48.0, Color("64748b"))
-			draw_circle(entrance_pt, 40.0, Color("f8fafc"))
+			# Stylish entrance threshold arch / pill matching 132px track width
+			draw_circle(entrance_pt + Vector2(0, 6), 68.0, Color(0, 0, 0, 0.3))
+			draw_circle(entrance_pt, 66.0, Color("334155"))
+			draw_circle(entrance_pt, 58.0, Color("64748b"))
+			draw_circle(entrance_pt, 48.0, Color("f8fafc"))
 			# Direction arrow pointing down-left into the track
 			var arrow_col = Color("38bdf8")
-			var p1 = entrance_pt + Vector2(16, -16)
-			var p2 = entrance_pt + Vector2(-12, 12)
-			draw_line(p1, p2, arrow_col, 7.0)
-			draw_line(p2, p2 + Vector2(18, 0), arrow_col, 7.0)
-			draw_line(p2, p2 + Vector2(0, -18), arrow_col, 7.0)
+			var p1 = entrance_pt + Vector2(20, -20)
+			var p2 = entrance_pt + Vector2(-15, 15)
+			draw_line(p1, p2, arrow_col, 8.0)
+			draw_line(p2, p2 + Vector2(22, 0), arrow_col, 8.0)
+			draw_line(p2, p2 + Vector2(0, -22), arrow_col, 8.0)
 
 	# 3. Main Circular Loop Layers
 	if curve != null:
 		var points = curve.get_baked_points()
-		_draw_thick_path(points, Color("475569"), 114.0) # Dark slate border
-		_draw_thick_path(points, Color("64748b"), 104.0) # Medium grey track
-		_draw_thick_path(points, Color("94a3b8"), 98.0)  # Light inner highlight
+		_draw_thick_path(points, Color("475569"), 142.0) # Dark slate border
+		_draw_thick_path(points, Color("64748b"), 132.0) # Medium grey track
+		_draw_thick_path(points, Color("94a3b8"), 124.0) # Light inner highlight
 
 func _draw_thick_path(pts: PackedVector2Array, color: Color, width: float) -> void:
 	var radius = width / 2.0
