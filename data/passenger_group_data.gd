@@ -7,10 +7,10 @@ class_name PassengerGroupData
 
 @export var group_id: int = 0
 @export var color_id: String = "blue"
-@export var initial_count: int = 4
-@export var remaining_count: int = 4
+@export var initial_count: int = 40
+@export var remaining_count: int = 40
 
-func _init(p_id: int = 0, p_color: String = "blue", p_count: int = 4) -> void:
+func _init(p_id: int = 0, p_color: String = "blue", p_count: int = 40) -> void:
 	group_id = p_id
 	color_id = p_color
 	initial_count = p_count

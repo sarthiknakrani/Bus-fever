@@ -26,7 +26,7 @@ const COLOR_ORANGE := "orange"
 @export var footprint: Array[Vector2i] = [Vector2i.ZERO] # Relative offsets from anchor
 @export var direction: int = Direction.UP
 @export var color_id: String = COLOR_BLUE
-@export var capacity: int = 4
+@export var capacity: int = 40
 @export var vehicle_type: String = "bus"
 
 static func dir_to_vector(dir: int) -> Vector2i:

@@ -39,6 +39,7 @@ var session_token: int = 0
 func load_level(lvl: CarJamLevelData) -> void:
 	session_token += 1
 	level_data = lvl
+	pending_boarders.clear()
 
 	board = CarJamBoardModel.new()
 	board.setup(lvl.board_size)
@@ -81,17 +82,10 @@ func tap_vehicle(vehicle_id: int) -> bool:
 		print("[QA %d] Tap Bus %d | State: %s | Legal: %s | Slots: %s | REJECTED: Game not playing" % [t0, vehicle_id, state_str, str(can_disp), slots_str])
 		return false
 
-	if v_log == null or not v_log.can_dispatch():
-		print("[QA %d] Tap Bus %d | State: %s | Legal: %s | Slots: %s | REJECTED: Invalid state" % [t0, vehicle_id, state_str, str(can_disp), slots_str])
-		return false
-	if state != GameState.PLAYING:
-		return false
-
 	var v: VehicleModel = vehicles.get(vehicle_id, null)
 	if v == null or not v.can_dispatch():
+		print("[QA %d] Tap Bus %d | State: %s | Legal: %s | Slots: %s | REJECTED: Invalid state" % [t0, vehicle_id, state_str, str(can_disp), slots_str])
 		return false
-
-	vehicle_selected.emit(vehicle_id)
 
 	# 1. Swept corridor collision check
 	var escape_res := board.check_swept_escape(v)
@@ -100,16 +94,16 @@ func tap_vehicle(vehicle_id: int) -> bool:
 		vehicle_blocked.emit(vehicle_id, escape_res["blocker_id"])
 		return false
 
-	# 2. Parking slot capacity check
-	var slot_id := parking.find_available_slot()
+	# 2. Atomic parking slot reservation
+	var slot_id := parking.reserve_slot(vehicle_id)
 	if slot_id == -1:
 		print("[QA %d] Tap Bus %d | State: %s | Legal: %s | Slots: %s | REJECTED: No Spot Available (Toast Triggered)" % [Time.get_ticks_msec(), vehicle_id, state_str, str(can_disp), slots_str])
-		# Parking is completely full!
 		parking_full_warning.emit()
 		return false
 
+	vehicle_selected.emit(vehicle_id)
+
 	# 3. Commit atomic dispatch
-	slot_id = parking.reserve_slot(vehicle_id)
 	print("[QA %d] Tap Bus %d | State: %s | Legal: %s | Slots: %s | ACCEPTED: Reserved Slot %d" % [Time.get_ticks_msec(), vehicle_id, state_str, str(can_disp), slots_str, slot_id])
 	v.state = VehicleModel.VehicleState.EXITING
 	v.reserved_slot = slot_id
@@ -131,50 +125,48 @@ func on_vehicle_arrived_at_slot(vehicle_id: int, slot_id: int, token: int) -> vo
 
 	var v: VehicleModel = vehicles.get(vehicle_id, null)
 	if v == null:
-			return
+		return
 
-	parking.confirm_arrival(slot_id, vehicle_id)
+	# Strictly validate slot ownership
+	if not parking.confirm_arrival(slot_id, vehicle_id):
+		push_error("Parking arrival confirmation failed for Bus %d at Slot %d" % [vehicle_id, slot_id])
+		return
+
 	v.state = VehicleModel.VehicleState.PARKED
 	v.reserved_slot = slot_id
 
 	vehicle_parked.emit(vehicle_id, slot_id)
 	parking_updated.emit()
 
-	# Run serialized boarding
-	_process_boarding_cycle(token)
 	_check_terminal_states()
 
 func on_vehicle_cleared_slot(vehicle_id: int, slot_id: int, token: int) -> void:
-	print("[QA %d] Bus %d cleared parking bounds. Slot %d released." % [Time.get_ticks_msec(), vehicle_id, slot_id])
 	if token != session_token:
 		return
 	
 	var v: VehicleModel = vehicles.get(vehicle_id, null)
 	if v != null:
 		v.state = VehicleModel.VehicleState.DEPARTING
-		v.reserved_slot = -1
 		
-	# Release the bay atomically as soon as bus physically clears it
-	parking.release_slot(slot_id)
+	# Mark slot as DEPARTING - it is NOT available to other buses yet!
+	parking.mark_departing(slot_id, vehicle_id)
 	parking_updated.emit()
-	
-	# Try boarding cycle just in case
-	_process_boarding_cycle(token)
 
 func on_vehicle_departed_from_slot(vehicle_id: int, slot_id: int, token: int) -> void:
-	print("[QA %d] Bus %d final exit completed off-screen." % [Time.get_ticks_msec(), vehicle_id])
+	print("[QA %d] Bus %d final exit completed off-screen. Slot %d now FREE." % [Time.get_ticks_msec(), vehicle_id, slot_id])
 	if token != session_token:
 		return
 
 	var v: VehicleModel = vehicles.get(vehicle_id, null)
 	if v != null:
 		v.state = VehicleModel.VehicleState.COMPLETED
+		v.reserved_slot = -1
 		
-	# Parking is already released by on_vehicle_cleared_slot, do not double-release
+	# ONLY release slot back to FREE when the bus has 100% departed and disappeared offscreen!
+	parking.release_slot(slot_id, vehicle_id)
+	parking_updated.emit()
 	vehicle_departed.emit(vehicle_id, slot_id)
 
-	# Re-evaluate boarding and check level clear
-	_process_boarding_cycle(token)
 	_check_terminal_states()
 
 
@@ -218,6 +210,8 @@ func commit_boarding(vehicle_id: int, color_id: String, token: int) -> void:
 	
 	if v.is_full():
 		v.state = VehicleModel.VehicleState.FULL
+		parking.mark_departing(slot_id, v.id)
+		parking_updated.emit()
 		vehicle_filled.emit(v.id, slot_id)
 		
 	_check_terminal_states()

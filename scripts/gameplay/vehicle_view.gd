@@ -126,7 +126,11 @@ func _setup_touch_area() -> void:
 	_touch_area.input_event.connect(_on_touch_input)
 	add_child(_touch_area)
 
+var is_dispatched: bool = false
+
 func _on_touch_input(_viewport: Node, event: InputEvent, _shape_idx: int) -> void:
+	if is_dispatched or is_in_parking:
+		return
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT and not mb.double_click:

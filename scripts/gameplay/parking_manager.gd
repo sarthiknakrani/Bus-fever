@@ -6,21 +6,27 @@ class_name CarJamParkingManager
 ## prevention, and clean arrival/release lifecycles.
 
 enum SlotState {
-	EMPTY,
-	RESERVED,
-	OCCUPIED,
-	RELEASING
+	FREE = 0,
+	EMPTY = 0,
+	RESERVED = 1,
+	OCCUPIED = 2,
+	DEPARTING = 3,
+	RELEASING = 3
 }
+
+# Compatibility aliases on class level
+const EMPTY: int = SlotState.FREE
+const RELEASING: int = SlotState.DEPARTING
 
 class ParkingSlot:
 	var slot_id: int = 0
-	var state: int = SlotState.EMPTY
+	var state: int = SlotState.FREE
 	var vehicle_id: int = -1
 	var is_unlocked: bool = false
 
 	func _init(id: int) -> void:
 		slot_id = id
-		state = SlotState.EMPTY
+		state = SlotState.FREE
 		vehicle_id = -1
 		# Default unlock rule: Slot 0 is VIP (locked), Slots 1-3 are normal (unlocked), Slots 4+ are locked
 		if id >= 1 and id <= 3:
@@ -29,7 +35,7 @@ class ParkingSlot:
 			is_unlocked = false
 
 	func is_available() -> bool:
-		return state == SlotState.EMPTY and is_unlocked
+		return state == SlotState.FREE and is_unlocked
 
 
 	func snapshot() -> Dictionary:
@@ -93,26 +99,37 @@ func reserve_slot(vehicle_id: int) -> int:
 	return available_id
 
 ## Called when vehicle movement reaches the parking slot.
+## Strictly validates ownership.
 func confirm_arrival(slot_id: int, vehicle_id: int) -> bool:
 	if slot_id < 0 or slot_id >= _slots.size():
 		return false
 	var slot: ParkingSlot = _slots[slot_id]
-	if slot.vehicle_id != vehicle_id:
+	if slot.vehicle_id != vehicle_id or slot.state != SlotState.RESERVED:
 		return false
 	slot.state = SlotState.OCCUPIED
 	return true
 
-## Marks a slot as RELEASING when vehicle departs.
-func mark_releasing(slot_id: int) -> void:
-	if slot_id >= 0 and slot_id < _slots.size():
-		_slots[slot_id].state = SlotState.RELEASING
-
-## Releases the slot back to EMPTY.
-func release_slot(slot_id: int) -> void:
+## Marks a slot as DEPARTING when vehicle starts departing.
+## The slot remains occupied/unavailable until departure is 100% complete.
+func mark_departing(slot_id: int, vehicle_id: int = -1) -> void:
 	if slot_id >= 0 and slot_id < _slots.size():
 		var slot: ParkingSlot = _slots[slot_id]
-		slot.state = SlotState.EMPTY
+		if vehicle_id == -1 or slot.vehicle_id == vehicle_id:
+			slot.state = SlotState.DEPARTING
+
+func mark_releasing(slot_id: int) -> void:
+	mark_departing(slot_id)
+
+## Releases the slot back to FREE once bus has fully completed departure offscreen.
+func release_slot(slot_id: int, vehicle_id: int = -1) -> bool:
+	if slot_id >= 0 and slot_id < _slots.size():
+		var slot: ParkingSlot = _slots[slot_id]
+		if vehicle_id != -1 and slot.vehicle_id != vehicle_id:
+			return false # Ownership mismatch, prevent stale release
+		slot.state = SlotState.FREE
 		slot.vehicle_id = -1
+		return true
+	return false
 
 func get_slot_for_vehicle(vehicle_id: int) -> int:
 	for s in _slots:

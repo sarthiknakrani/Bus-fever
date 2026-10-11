@@ -299,12 +299,119 @@ func _run_all_timing_tests() -> void:
 		print("  [FAIL] Boarding cadence spacing %.4fs deviates from ~0.033s" % avg_interval)
 		failures += 1
 
+	# Test 7: Parking Concurrency Protection (Atomic Reservation & No Double Booking)
+	print("\n--- TEST 7: Parking Concurrency Protection ---")
+	var parking_mgr = load("res://scripts/gameplay/parking_manager.gd").new()
+	parking_mgr.setup(7)
+	# Unlocked slots are 1, 2, 3
+	var r1 = parking_mgr.reserve_slot(101)
+	var r2 = parking_mgr.reserve_slot(102)
+	var r3 = parking_mgr.reserve_slot(103)
+	var r4 = parking_mgr.reserve_slot(104) # Should return -1 (no more unlocked slots free)
+
+	if r1 != -1 and r2 != -1 and r3 != -1 and r1 != r2 and r2 != r3 and r1 != r3:
+		print("  [PASS] Atomic slot reservation: 3 buses reserved 3 unique slots (%d, %d, %d)" % [r1, r2, r3])
+	else:
+		print("  [FAIL] Slot collision or invalid reservation: %d, %d, %d" % [r1, r2, r3])
+		failures += 1
+
+	if r4 == -1:
+		print("  [PASS] Overflow bus rejected when available unlocked slots are exhausted (-1 returned)")
+	else:
+		print("  [FAIL] Overflow bus improperly reserved slot %d" % r4)
+		failures += 1
+
+	# Test departing slot protection: Slot remains unavailable during entire departure
+	parking_mgr.confirm_arrival(r1, 101)
+	parking_mgr.mark_departing(r1, 101)
+	var r_retry = parking_mgr.reserve_slot(105)
+	if r_retry == -1:
+		print("  [PASS] Departing slot %d is locked and protected against reuse during departure" % r1)
+	else:
+		print("  [FAIL] Departing slot %d was prematurely reused by bus 105" % r1)
+		failures += 1
+
+	# Once offscreen departure is 100% complete, release slot
+	parking_mgr.release_slot(r1, 101)
+	var r_after_release = parking_mgr.reserve_slot(105)
+	if r_after_release == r1:
+		print("  [PASS] Slot %d successfully reused only after 100%% offscreen departure complete" % r1)
+	else:
+		print("  [FAIL] Slot %d was not properly freed after offscreen departure" % r1)
+		failures += 1
+
+	# Test 8: Continuous Passenger Feeder Setup & Distribution
+	print("\n--- TEST 8: Continuous Passenger Feeder & 240-Capacity Level ---")
+	var live_l1 = CarJamLevelScene.instantiate()
+	root.add_child(live_l1)
+	if not live_l1.is_node_ready():
+		live_l1._ready()
+	await create_timer(0.2).timeout
+
+	var total_initial_p = live_l1.circulating_ids.size()
+	var total_feeder_p = live_l1._feeder_passengers.size()
+	var total_pending_feeder = live_l1._pending_feeder_passengers.size()
+	var total_combined = total_initial_p + total_feeder_p + total_pending_feeder
+
+	print("  [MEASURED] Main loop passengers: %d" % total_initial_p)
+	print("  [MEASURED] Active feeder passengers on walkway: %d" % total_feeder_p)
+	print("  [MEASURED] Queued feeder passengers: %d" % total_pending_feeder)
+	print("  [MEASURED] Total level passengers: %d" % total_combined)
+
+	if total_combined == 240:
+		print("  [PASS] Total passengers matches 240 (6 buses x 40 capacity)")
+	else:
+		print("  [FAIL] Total passengers expected 240, got %d" % total_combined)
+		failures += 1
+
+	if total_initial_p == 40 and (total_feeder_p + total_pending_feeder) == 200:
+		print("  [PASS] Initial loop populated with 40 passengers; 200 streaming continuously via feeder!")
+	else:
+		print("  [FAIL] Distribution incorrect: initial=%d, feeder=%d, pending=%d" % [total_initial_p, total_feeder_p, total_pending_feeder])
+		failures += 1
+
+	# Test 9: Event-Driven Immediate Boarding Recovery (No Stalls)
+	print("\n--- TEST 9: Event-Driven Boarding Recovery ---")
+	# Tap vehicle 3 (Red)
+	var ctrl_l1: CarJamController = live_l1.controller
+	var initial_red_in_queue = 0
+	for g in ctrl_l1.queue.get_all_groups():
+		if g.color_id == "red":
+			initial_red_in_queue += g.remaining_count
+
+	var ok_tap = ctrl_l1.tap_vehicle(3)
+	if not ok_tap:
+		print("  [FAIL] Failed to tap vehicle 3 in Level 1")
+		failures += 1
+	else:
+		print("  [PASS] Vehicle 3 dispatched. Waiting for arrival (0.80s)...")
+		await create_timer(0.95).timeout
+		var v3 = ctrl_l1.vehicles[3]
+		if v3.state == VehicleModel.VehicleState.PARKED:
+			print("  [PASS] Vehicle 3 is PARKED at slot %d" % v3.reserved_slot)
+			# Event-driven boarding should immediately board matching red passengers on the loop
+			# Allow 0.4s for the stream of passengers to board
+			await create_timer(0.4).timeout
+			var occupancy = v3.passenger_occupancy
+			var pending = ctrl_l1.pending_boarders.get(3, 0)
+			print("  [MEASURED] Vehicle 3 occupancy + pending after 0.4s: %d" % (occupancy + pending))
+			if occupancy + pending > 0:
+				print("  [PASS] Event-driven boarding immediately initiated without waiting for full lap!")
+			else:
+				print("  [FAIL] Passengers stalled: no boarding initiated for parked bus")
+				failures += 1
+		else:
+			print("  [FAIL] Vehicle 3 failed to arrive at parking slot")
+			failures += 1
+
+	live_l1.queue_free()
+
 	# SUMMARY
 	print("\n==========================================")
 	if failures == 0:
-		print("=== ALL TIMING TESTS PASSED (0 FAILURES) ===")
+		print("=== ALL TIMING & GAMEPLAY TESTS PASSED (0 FAILURES) ===")
 	else:
-		print("=== %d TIMING TESTS FAILED ===" % failures)
+		print("=== %d TESTS FAILED ===" % failures)
 	print("==========================================\n")
 
 	quit(failures)

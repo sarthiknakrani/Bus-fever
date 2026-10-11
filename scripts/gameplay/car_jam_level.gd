@@ -57,22 +57,22 @@ var slot_views: Array[ParkingSlotView] = []
 
 # Continuous Passenger Track State
 var passenger_track: Path2D
+var feeder_track: Path2D
 var all_passengers: Dictionary = {}
 var circulating_ids: Array[int] = []
+var _feeder_passengers: Array[Dictionary] = []
+var _pending_feeder_passengers: Array[Dictionary] = []
 var _speed_logged: bool = false
 var slot_boarding_points: Dictionary = {}
 var _waiting_label: Label
 var track_time: float = 0.0
 var _last_board_landing_time: float = 0.0
 const PASSENGER_SPACING := 22.0
+const MAX_INITIAL_LOOP_PASSENGERS := 40
 @export var passenger_normal_speed: float = 660.0
 @export var passenger_sprint_speed: float = 900.0
 @export var bus_movement_duration_multiplier: float = 1.0
 const TRACK_SPEED := 40.0
-
-
-
-
 
 func _process(delta: float) -> void:
 	if passenger_track == null: return
@@ -84,77 +84,145 @@ func _process(delta: float) -> void:
 		print("[QA] Loop length: ", track_len, " px")
 		print("[QA] Normal lap: ", track_len / passenger_normal_speed, " s")
 		print("[QA] Sprint lap: ", track_len / passenger_sprint_speed, " s")
-		print("[QA] Normal delta/frame (60Hz): ", passenger_normal_speed / 60.0, " px")
-		print("[QA] Sprint delta/frame (60Hz): ", passenger_sprint_speed / 60.0, " px")
 
+	# ---------------------------------------------
+	# 1. CONTINUOUS FEEDER LOGIC
+	# ---------------------------------------------
+	if feeder_track != null and is_instance_valid(feeder_track):
+		var f_len = feeder_track.curve.get_baked_length()
+		
+		# A. Spawn pending passenger at feeder entrance (s = 0) if entrance is clear
+		if not _pending_feeder_passengers.is_empty():
+			var entrance_clear := true
+			if not _feeder_passengers.is_empty():
+				var last_feeder = _feeder_passengers.back()
+				if last_feeder["progress"] < PASSENGER_SPACING:
+					entrance_clear = false
+			
+			if entrance_clear:
+				var p_info = _pending_feeder_passengers.pop_front()
+				var pv := PassengerView.new()
+				pv.setup(p_info["color_id"])
+				var pf := PathFollow2D.new()
+				pf.loop = false
+				pf.rotates = false
+				pf.add_child(pv)
+				feeder_track.add_child(pf)
+				pf.progress = 0.0
+				
+				var p_obj = {
+					"id": p_info["id"],
+					"view": pv,
+					"follower": pf,
+					"color_id": p_info["color_id"],
+					"progress": 0.0,
+					"state": "FEEDER"
+				}
+				all_passengers[p_info["id"]] = p_obj
+				_feeder_passengers.append(p_obj)
+				
+		# B. Advance feeder passengers forward
+		for j in range(_feeder_passengers.size()):
+			var fp = _feeder_passengers[j]
+			if fp["state"] != "FEEDER": continue
+			var max_prog = f_len
+			if j > 0:
+				var prev_fp = _feeder_passengers[j - 1]
+				max_prog = prev_fp["progress"] - PASSENGER_SPACING
+			var target_p = minf(fp["progress"] + passenger_normal_speed * delta, max_prog)
+			fp["progress"] = target_p
+			fp["follower"].progress = target_p
+			
+		# C. Merge lead feeder passenger onto main track if entrance (progress 0) is clear
+		if not _feeder_passengers.is_empty():
+			var lead_fp = _feeder_passengers.front()
+			if lead_fp["progress"] >= f_len - 2.0:
+				var merge_clear := true
+				for cid in circulating_ids:
+					var cp = all_passengers.get(cid, null)
+					if cp != null and cp["state"] == "CIRCULATING":
+						var c_prog = cp["progress"]
+						if c_prog < PASSENGER_SPACING * 0.9 or c_prog > (track_len - PASSENGER_SPACING * 0.9):
+							merge_clear = false
+							break
+				if merge_clear:
+					_feeder_passengers.pop_front()
+					var pv = lead_fp["view"]
+					var old_pf = lead_fp["follower"]
+					var new_pf := PathFollow2D.new()
+					new_pf.loop = true
+					new_pf.rotates = false
+					passenger_track.add_child(new_pf)
+					old_pf.remove_child(pv)
+					new_pf.add_child(pv)
+					old_pf.queue_free()
+					
+					new_pf.progress = 0.0
+					lead_fp["follower"] = new_pf
+					lead_fp["progress"] = 0.0
+					lead_fp["state"] = "CIRCULATING"
+					circulating_ids.append(lead_fp["id"])
+
+	# ---------------------------------------------
+	# 2. CIRCULATING PASSENGERS ON MAIN TRACK
+	# ---------------------------------------------
 	var to_remove = []
-	
 	for i in circulating_ids.size():
 		var pid = circulating_ids[i]
-		var p = all_passengers[pid]
-		if p["state"] != "CIRCULATING": continue
+		var p = all_passengers.get(pid, null)
+		if p == null or p["state"] != "CIRCULATING": continue
 		
-		# ---------------------------------------------
-		# GAP CLOSING LOGIC
-		# ---------------------------------------------
+		# Gap closing logic
 		var speed = passenger_normal_speed
 		if circulating_ids.size() > 1:
 			var ahead_idx = (i + 1) % circulating_ids.size()
 			var ahead_id = circulating_ids[ahead_idx]
-			var p_ahead = all_passengers[ahead_id]
-			
-			var diff = p_ahead["progress"] - p["progress"]
-			if diff < 0: diff += track_len
-			
-			# If the gap is larger than ideal spacing, smoothly sprint to catch up!
-			if diff > PASSENGER_SPACING * 1.2:
-				speed = passenger_sprint_speed
-			elif diff < PASSENGER_SPACING * 0.8:
-				speed = passenger_normal_speed * 0.8
-		# ---------------------------------------------
-		
+			var p_ahead = all_passengers.get(ahead_id, null)
+			if p_ahead != null and p_ahead["state"] == "CIRCULATING":
+				var diff = p_ahead["progress"] - p["progress"]
+				if diff < 0: diff += track_len
+				if diff > PASSENGER_SPACING * 1.2:
+					speed = passenger_sprint_speed
+				elif diff < PASSENGER_SPACING * 0.8:
+					speed = passenger_normal_speed * 0.8
+					
 		var old_prog = p["progress"]
 		var dist_moved = speed * delta
 		
-		# Build a sorted list of crossing events
+		# Gate crossings check
+		var boarded := false
 		var crossings = []
 		for slot_idx in slot_boarding_points:
 			var trigger_prog = slot_boarding_points[slot_idx]
 			var dist_to_gate = trigger_prog - old_prog
-			if dist_to_gate < 0:
-				dist_to_gate += track_len
-				
-			# Passenger could loop multiple times in one frame at extreme speeds.
-			# We find EVERY time they cross this gate within dist_moved.
+			if dist_to_gate < 0: dist_to_gate += track_len
 			var d = dist_to_gate
 			while d <= dist_moved:
 				crossings.append({ "dist": d, "slot": slot_idx, "trigger": trigger_prog })
 				d += track_len
 				
 		crossings.sort_custom(func(a, b): return a["dist"] < b["dist"])
-		
-		var boarded = false
 		for cross in crossings:
-			var slot_idx = cross["slot"]
-			var trigger_prog = cross["trigger"]
-			var slot = controller.parking.get_slot(slot_idx)
-			
-			if slot and slot.state == CarJamParkingManager.SlotState.OCCUPIED and slot.vehicle_id != -1:
-				if controller.try_reserve_boarding(slot.vehicle_id, p["color_id"]):
-					p["state"] = "BOARDING"
-					to_remove.append(pid)
-					# DO NOT snap visual progress to trigger_prog; use real position!
-					p["progress"] = fmod(old_prog + dist_moved, track_len)
-					p["follower"].progress = p["progress"]
-					_animate_individual_boarding(p, slot.vehicle_id, slot_idx, trigger_prog)
-					boarded = true
-					break
-					
+			if _try_board_passenger(p, cross["slot"]):
+				boarded = true
+				to_remove.append(pid)
+				break
+				
+		# Platform area boarding check: If passenger is in the platform zone (0..600px)
+		# and already reached or passed an available matching bus
+		if not boarded and old_prog <= 600.0:
+			for slot_idx in slot_boarding_points:
+				var trigger_prog = slot_boarding_points[slot_idx]
+				if old_prog >= trigger_prog - 15.0 and old_prog <= 600.0:
+					if _try_board_passenger(p, slot_idx):
+						boarded = true
+						to_remove.append(pid)
+						break
+						
 		if not boarded:
 			p["progress"] = fmod(old_prog + dist_moved, track_len)
 			p["follower"].progress = p["progress"]
-						
-	# Remove boarded passengers from active loop array so gaps are recognized
+			
 	for pid in to_remove:
 		circulating_ids.erase(pid)
 	
@@ -333,9 +401,15 @@ func _setup_visuals(lvl: CarJamLevelData) -> void:
 		if is_instance_valid(p["view"]): p["view"].queue_free()
 		if is_instance_valid(p["follower"]): p["follower"].queue_free()
 	all_passengers.clear()
+	circulating_ids.clear()
+	_feeder_passengers.clear()
+	_pending_feeder_passengers.clear()
 	if is_instance_valid(passenger_track):
 		passenger_track.queue_free()
 		passenger_track = null
+	if is_instance_valid(feeder_track):
+		feeder_track.queue_free()
+		feeder_track = null
 	
 	if is_instance_valid(passenger_visuals):
 		for c in passenger_visuals.get_children():
@@ -417,15 +491,26 @@ func _init_passenger_track() -> void:
 	curve.add_point(Vector2(270, 0)) # Close loop
 	passenger_track.curve = curve
 	
+	# CONTINUOUS FEEDER TRACK
+	feeder_track = Path2D.new()
+	feeder_track.name = "FeederTrack"
+	var f_curve := Curve2D.new()
+	# Smooth curve from plaza gate at (380, -180) merging into main loop at (270, 0)
+	f_curve.add_point(Vector2(380, -180), Vector2.ZERO, Vector2(-30, 45))
+	f_curve.add_point(Vector2(320, -85), Vector2(30, -45), Vector2(-25, 45))
+	f_curve.add_point(Vector2(270, 0), Vector2(15, -40), Vector2.ZERO)
+	feeder_track.curve = f_curve
+
 	# PREMIUM PLAZA INTEGRATION
 	var plaza = preload("res://scripts/gameplay/plaza_environment.gd").new()
 	plaza.name = "PlazaEnvironment"
 	passenger_visuals.add_child(plaza)
 
-	# Use custom robust track renderer instead of Godot 4 Line2D nodes
+	# Use custom robust track renderer with both curves
 	var track_renderer = preload("res://scripts/gameplay/track_renderer.gd").new()
 	track_renderer.name = "TrackRenderer"
 	track_renderer.curve = curve
+	track_renderer.feeder_curve = f_curve
 	passenger_visuals.add_child(track_renderer)
 
 	_waiting_label = Label.new()
@@ -437,46 +522,79 @@ func _init_passenger_track() -> void:
 	_waiting_label.visible = false
 	passenger_visuals.add_child(_waiting_label)
 
+	passenger_visuals.add_child(feeder_track)
 	passenger_visuals.add_child(passenger_track)
 	
-	# Precalculate boarding crossing points
+	# Precalculate boarding crossing points for ALL parking slots
 	slot_boarding_points.clear()
-	for i in 5:
-		var slot_pos = _get_slot_world_pos(i)
-		# Approximate the X-coordinate on the track curve
-		var closest = passenger_track.curve.get_closest_offset(Vector2((i - 2) * 80.0, 90))
+	var slot_spacing := 76.0
+	var total_span: float = float(controller.level_data.parking_slots_count - 1) * slot_spacing
+	for i in controller.level_data.parking_slots_count:
+		var slot_x: float = slot_views[i].position.x if i < slot_views.size() else (-total_span / 2.0 + float(i) * slot_spacing)
+		var closest: float = passenger_track.curve.get_closest_offset(Vector2(slot_x, 90.0))
 		slot_boarding_points[i] = closest
 
 	_last_board_landing_time = 0.0
 	all_passengers.clear()
 	circulating_ids.clear()
+	_feeder_passengers.clear()
+	_pending_feeder_passengers.clear()
+
+	var all_queue_p: Array[Dictionary] = []
 	var pid = 0
 	for g in controller.queue.get_all_groups():
 		for j in g.initial_count:
-			var pv := PassengerView.new()
-			pv.setup(g.color_id)
-			var pf := PathFollow2D.new()
-			pf.loop = true
-			pf.rotates = false
-			pf.add_child(pv)
-			passenger_track.add_child(pf)
-			
-			var start_prog = pid * PASSENGER_SPACING
-			pf.progress = start_prog
-			
-			all_passengers[pid] = {
-				"id": pid,
-				"view": pv,
-				"follower": pf,
-				"color_id": g.color_id,
-				"progress": float(start_prog),
-				"state": "CIRCULATING"
-			}
-			circulating_ids.append(pid)
+			all_queue_p.append({"id": pid, "color_id": g.color_id})
 			pid += 1
 
+	# Place initial batch (up to MAX_INITIAL_LOOP_PASSENGERS) onto main track
+	var initial_count = mini(all_queue_p.size(), MAX_INITIAL_LOOP_PASSENGERS)
+	for i in range(initial_count):
+		var p_info = all_queue_p[i]
+		var pv := PassengerView.new()
+		pv.setup(p_info["color_id"])
+		var pf := PathFollow2D.new()
+		pf.loop = true
+		pf.rotates = false
+		pf.add_child(pv)
+		passenger_track.add_child(pf)
+		
+		var start_prog = float(i) * PASSENGER_SPACING
+		pf.progress = start_prog
+		
+		all_passengers[p_info["id"]] = {
+			"id": p_info["id"],
+			"view": pv,
+			"follower": pf,
+			"color_id": p_info["color_id"],
+			"progress": start_prog,
+			"state": "CIRCULATING"
+		}
+		circulating_ids.append(p_info["id"])
+
+	# Remaining passengers are queued for continuous feeding
+	for i in range(initial_count, all_queue_p.size()):
+		_pending_feeder_passengers.append(all_queue_p[i])
+
+func _try_board_passenger(p: Dictionary, slot_idx: int) -> bool:
+	if p.get("state", "") != "CIRCULATING":
+		return false
+	var slot = controller.parking.get_slot(slot_idx)
+	if slot == null or slot.state != CarJamParkingManager.SlotState.OCCUPIED or slot.vehicle_id == -1:
+		return false
+	var v = controller.vehicles.get(slot.vehicle_id, null)
+	if v == null or v.color_id != p["color_id"]:
+		return false
+		
+	if controller.try_reserve_boarding(slot.vehicle_id, p["color_id"]):
+		p["state"] = "BOARDING"
+		var trigger_prog = slot_boarding_points.get(slot_idx, p["progress"])
+		_animate_individual_boarding(p, slot.vehicle_id, slot_idx, trigger_prog)
+		return true
+	return false
+
 func _fill_passenger_track() -> void:
-	pass # Disabled. We initialized all passengers once.
+	pass # Managed continuously by feeder logic
 
 func _on_vehicle_tapped(vehicle_id: int) -> void:
 	_play_sfx("select")
@@ -566,6 +684,47 @@ func _on_vehicle_parked(vehicle_id: int, slot_id: int) -> void:
 		parked_vehicles_node.add_child(vv)
 		vv.global_transform = global_xform
 		slot_views[slot_id].set_state(CarJamParkingManager.SlotState.OCCUPIED)
+
+	# EVENT-DRIVEN BOARDING RECOVERY:
+	# Immediately launch boarding for matching circulating passengers on the platform
+	_recover_boarding_for_slot(slot_id)
+
+func _recover_boarding_for_slot(slot_id: int) -> void:
+	if passenger_track == null or controller == null: return
+	var slot = controller.parking.get_slot(slot_id)
+	if slot == null or slot.state != CarJamParkingManager.SlotState.OCCUPIED or slot.vehicle_id == -1:
+		return
+	var v = controller.vehicles.get(slot.vehicle_id, null)
+	if v == null or v.remaining_capacity() <= 0: return
+	
+	var track_len = passenger_track.curve.get_baked_length()
+	var trigger_prog: float = slot_boarding_points.get(slot_id, 0.0)
+	
+	# Find matching circulating passengers
+	var to_board: Array[int] = []
+	for pid in circulating_ids:
+		var p = all_passengers.get(pid, null)
+		if p != null and p["state"] == "CIRCULATING" and p["color_id"] == v.color_id:
+			to_board.append(pid)
+	
+	# Sort so that passengers closest to the slot trigger board first
+	to_board.sort_custom(func(a, b):
+		var pa = all_passengers[a]["progress"]
+		var pb = all_passengers[b]["progress"]
+		var da = trigger_prog - pa
+		if da < 0: da += track_len
+		var db = trigger_prog - pb
+		if db < 0: db += track_len
+		return da < db
+	)
+	
+	for pid in to_board:
+		var p = all_passengers.get(pid, null)
+		if p != null and p["state"] == "CIRCULATING":
+			if _try_board_passenger(p, slot_id):
+				circulating_ids.erase(pid)
+			else:
+				break
 
 func _on_vehicle_blocked(vehicle_id: int, _blocker_id: int) -> void:
 	_play_sfx("blocked")
@@ -1725,12 +1884,15 @@ func _animate_individual_boarding(p: Dictionary, vehicle_id: int, slot_id: int, 
 	
 	# Preserve exact live position to prevent snapping
 	var gpos = pv.global_position
-	pf.remove_child(pv)
-	passenger_visuals.add_child(pv)
+	if pf != null and is_instance_valid(pf):
+		pf.remove_child(pv)
+		pf.queue_free()
+		p["follower"] = null
+	if pv.get_parent() != passenger_visuals:
+		if pv.get_parent() != null:
+			pv.get_parent().remove_child(pv)
+		passenger_visuals.add_child(pv)
 	pv.global_position = gpos
-	
-	pf.queue_free()
-	p["follower"] = null
 	
 	var target_pos: Vector2
 	var vv: VehicleView = vehicle_views.get(vehicle_id, null)
@@ -1743,42 +1905,51 @@ func _animate_individual_boarding(p: Dictionary, vehicle_id: int, slot_id: int, 
 	else:
 		target_pos = transit_layer.to_global(final_local)
 	
-	pv.animate_jump(0.0)
-	
 	var travel_dist = gpos.distance_to(target_pos)
 	var now_sec := Time.get_ticks_msec() / 1000.0
-	var base_duration := clampf(travel_dist / 450.0, 0.16, 0.20)
+	var flight_duration := clampf(travel_dist / 450.0, 0.16, 0.20)
 	
 	# Paced landing schedule to sustain ~30 passengers/second uninterrupted throughput
 	var interval := 1.0 / VehicleMovement.TARGET_PASSENGER_BOARDING_RATE
-	var target_landing := maxf(now_sec + base_duration, _last_board_landing_time + interval)
+	var target_landing := maxf(now_sec + flight_duration, _last_board_landing_time + interval)
 	if now_sec > _last_board_landing_time + 0.12:
-		target_landing = now_sec + base_duration
+		target_landing = now_sec + flight_duration
 	_last_board_landing_time = target_landing
 	
-	var duration := maxf(target_landing - now_sec, 0.14)
-	var overlap_time = duration * 0.70
-	var fade_time = duration * 0.30
+	var start_delay := maxf(target_landing - flight_duration - now_sec, 0.0)
+	var overlap_time = flight_duration * 0.70
+	var fade_time = flight_duration * 0.30
+	
+	# Hop animation starts with flight
+	var tw_jump = create_tween()
+	if start_delay > 0.0:
+		tw_jump.tween_interval(start_delay)
+	tw_jump.tween_callback(func():
+		if is_instance_valid(pv):
+			pv.animate_jump(0.0)
+	)
 	
 	var tw = create_tween().set_parallel(true)
 	
 	# Travel straight to the actual bus center smoothly
-	tw.tween_property(pv, "global_position", target_pos, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(pv, "global_position", target_pos, flight_duration).set_delay(start_delay).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	
 	# When passenger overlaps bus, reparent it into the boarding layer
 	var tw_reparent = create_tween()
-	tw_reparent.tween_interval(overlap_time)
+	tw_reparent.tween_interval(start_delay + overlap_time)
 	tw_reparent.tween_callback(func():
 		if is_instance_valid(pv) and is_instance_valid(vv) and vv.boarding_layer != null:
 			pv.reparent(vv.boarding_layer, true)
 	)
 	
 	# Shrink/fade ONLY during the final portion when already overlapping the bus
-	tw.tween_property(pv, "scale", Vector2(0.2, 0.2), fade_time).set_delay(overlap_time).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tw.tween_property(pv, "modulate:a", 0.0, fade_time).set_delay(overlap_time).set_trans(Tween.TRANS_LINEAR)
+	tw.tween_property(pv, "scale", Vector2(0.2, 0.2), fade_time).set_delay(start_delay + overlap_time).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_property(pv, "modulate:a", 0.0, fade_time).set_delay(start_delay + overlap_time).set_trans(Tween.TRANS_LINEAR)
 	
 	var token = controller.session_token
-	tw.chain().tween_callback(self._on_individual_boarded.bind(p["id"], vehicle_id, p["color_id"], token))
+	var tw_done = create_tween()
+	tw_done.tween_interval(start_delay + flight_duration)
+	tw_done.tween_callback(self._on_individual_boarded.bind(p["id"], vehicle_id, p["color_id"], token))
 
 func _on_individual_boarded(pid: int, vehicle_id: int, color_id: String, token: int) -> void:
 	if token != controller.session_token: return
