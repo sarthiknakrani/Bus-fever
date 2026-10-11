@@ -81,10 +81,10 @@ func _run_all_tests() -> void:
 
 	await create_timer(0.1).timeout
 
-	if level.circulating_ids.size() == 40:
-		print("  [PASS] Initial loop populated with exactly 40 circulating passengers")
+	if level.circulating_ids.size() == 0:
+		print("  [PASS] Clean level start: 0 initial circulating passengers (no 40-passenger mass spawn)")
 	else:
-		print("  [FAIL] Expected 40 initial loop passengers, got %d" % level.circulating_ids.size())
+		print("  [FAIL] Expected 0 initial loop passengers, got %d" % level.circulating_ids.size())
 		failures += 1
 
 	# Check active passenger instances
@@ -98,7 +98,7 @@ func _run_all_tests() -> void:
 			var col: String = p_dict.get("color_id", "")
 			color_counts[col] = color_counts.get(col, 0) + 1
 
-	print("  [PASS] Verified %d active PassengerView instances on track" % active_views_count)
+	print("  [PASS] Verified %d initial active PassengerView instances on track (feeder streaming)" % active_views_count)
 	print("  [PASS] Active track color breakdown: %s" % str(color_counts))
 
 	# 4. Boarding Leap & Bus Occupancy Transition
@@ -116,8 +116,8 @@ func _run_all_tests() -> void:
 		print("  [FAIL] Bus %d failed to dock at Slot 1" % target_vid)
 		failures += 1
 
-	# Allow boarding for 1.0s so passengers reach doorway and land
-	await create_timer(1.0).timeout
+	# Allow feeder passengers travelling at 240 px/s to reach doorway and board
+	await create_timer(2.6).timeout
 	var v_model = level.controller.vehicles.get(target_vid, null)
 	var occ: int = v_model.passenger_occupancy if v_model else 0
 	var pend: int = level.controller.pending_boarders.get(target_vid, 0)

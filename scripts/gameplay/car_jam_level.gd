@@ -69,11 +69,11 @@ class PassengerRow extends RefCounted:
 	var is_feeder: bool = false
 	var passengers: Array[Dictionary] = [] # {"id": int, "color_id": String, "lane": int, "view": PassengerView, "state": String}
 
-const LANE_SPACING := 19.5
-const ROW_SPACING := 38.0
+const LANE_SPACING := 25.5
+const ROW_SPACING := 44.0
 const NUM_LANES := 4
-const PASSENGER_SPACING := 38.0
-const MAX_INITIAL_LOOP_PASSENGERS := 40
+const PASSENGER_SPACING := 44.0
+const MAX_INITIAL_LOOP_PASSENGERS := 0
 
 var passenger_track: Path2D
 var feeder_track: Path2D
@@ -92,8 +92,8 @@ var _waiting_label: Label
 var track_time: float = 0.0
 var _last_board_landing_time: float = 0.0
 
-@export var passenger_normal_speed: float = 660.0
-@export var passenger_sprint_speed: float = 900.0
+@export var passenger_normal_speed: float = 240.0
+@export var passenger_sprint_speed: float = 280.0
 @export var bus_movement_duration_multiplier: float = 1.0
 const TRACK_SPEED := 40.0
 
@@ -663,9 +663,9 @@ func _init_passenger_track() -> void:
 	feeder_track = Path2D.new()
 	feeder_track.name = "FeederTrack"
 	var f_curve := Curve2D.new()
-	# Smooth, deliberate curve from on-screen entrance gate at (285, -175) merging into loop at (270, 0)
-	f_curve.add_point(Vector2(285, -175), Vector2.ZERO, Vector2(-15, 45))
-	f_curve.add_point(Vector2(280, -88), Vector2(10, -40), Vector2(-10, 40))
+	# Smooth, continuous curve from offscreen entrance at (420, -240) merging into loop at (270, 0)
+	f_curve.add_point(Vector2(420, -240), Vector2.ZERO, Vector2(-40, 60))
+	f_curve.add_point(Vector2(320, -100), Vector2(30, -50), Vector2(-20, 45))
 	f_curve.add_point(Vector2(270, 0), Vector2(0, -45), Vector2.ZERO)
 	feeder_track.curve = f_curve
 

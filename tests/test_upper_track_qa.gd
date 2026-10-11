@@ -62,7 +62,7 @@ func _run_suite() -> void:
 	var sample_names = ["Top Straight", "Bottom Straight", "Left Arc", "Right Arc"]
 	
 	var all_contained = true
-	var char_height = 48.6 # Upright 2.5D sprite height (180px * 0.27)
+	var char_height = 160.0 * PassengerView.BASE_SCALE # Upright 2.5D sprite height (160px * 0.22 = 35.2px)
 	
 	for s_idx in range(sample_offsets.size()):
 		var prog = sample_offsets[s_idx]
@@ -77,17 +77,19 @@ func _run_suite() -> void:
 			var head_pos = lpos - Vector2(0, char_height)
 			
 			if s_name == "Top Straight":
-				var border_y = -115.0 - track_half_w # -194.0
+				var border_y = -115.0 - track_half_w # -196.0
 				if head_pos.y < border_y:
 					print("  [FAIL] %s Lane %d head (y=%.2f) extends beyond border (y=%.2f)!" % [s_name, lane, head_pos.y, border_y])
 					all_contained = false
 				else:
 					print("  [PASS] %s Lane %d (feet=%.2f, head=%.2f) inside border (%.2f)" % [s_name, lane, lpos.y, head_pos.y, border_y])
 			elif s_name == "Bottom Straight":
-				var inner_border_y = 115.0 - track_half_w # 36.0
+				var inner_border_y = 115.0 - track_half_w # 34.0
 				if head_pos.y < inner_border_y:
 					print("  [FAIL] %s Lane %d head (y=%.2f) extends into central opening (y=%.2f)!" % [s_name, lane, head_pos.y, inner_border_y])
 					all_contained = false
+				else:
+					print("  [PASS] %s Lane %d (feet=%.2f, head=%.2f) inside inner border (%.2f)" % [s_name, lane, lpos.y, head_pos.y, inner_border_y])
 
 	if all_contained:
 		print("  [PASS] All 4 lanes across top and bottom straights are 100% contained within track borders")
@@ -95,21 +97,19 @@ func _run_suite() -> void:
 	else:
 		failed += 1
 
-	# TEST 3: Feeder Entrance Gate Alignment
-	print("\n--- TEST 3: Feeder Entrance Gate Alignment ---")
+	# TEST 3: Feeder Offscreen Emergence (Priority 4 - No on-screen button cap or arrow)
+	print("\n--- TEST 3: Feeder Offscreen Emergence ---")
 	var f_track = level_scene.feeder_track
 	var f_start = f_track.curve.get_point_position(0)
-	var gate_radius = 54.0
-	var gate_right_x = f_start.x + gate_radius
 	var loop_right_x = 270.0 + track_half_w
-	print("  Feeder gate entrance start: ", f_start)
-	print("  Gate rightmost pixel: %.1f px (Loop right border: %.1f px)" % [gate_right_x, loop_right_x])
+	print("  Feeder track start: ", f_start)
+	print("  Loop right boundary: %.1f px" % loop_right_x)
 	
-	if gate_right_x <= loop_right_x:
-		print("  [PASS] Feeder gate sits cleanly inside the loop's right boundary (no edge clipping)")
+	if f_start.x > loop_right_x:
+		print("  [PASS] Feeder originates cleanly offscreen past the loop right border (passengers emerge naturally)")
 		passed += 1
 	else:
-		print("  [FAIL] Feeder gate extends past loop right flank by %.1f px!" % (gate_right_x - loop_right_x))
+		print("  [FAIL] Feeder start (%.1f) does not originate beyond loop right boundary (%.1f)!" % [f_start.x, loop_right_x])
 		failed += 1
 
 	# TEST 4: Live Responsive Layout & Board Prominence Across Resolutions

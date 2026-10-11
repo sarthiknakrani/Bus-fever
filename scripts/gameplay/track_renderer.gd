@@ -28,22 +28,6 @@ func _draw() -> void:
 		_draw_thick_path(f_pts, Color("475569"), 162.0) # Dark slate border
 		_draw_thick_path(f_pts, Color("64748b"), 150.0) # Medium grey track
 		_draw_thick_path(f_pts, Color("94a3b8"), 140.0) # Light inner highlight
-		
-		# Entrance Gate at feeder start point
-		if f_pts.size() > 0:
-			var entrance_pt = f_pts[0]
-			# Stylish entrance threshold arch / pill matching 150px track width
-			draw_circle(entrance_pt + Vector2(0, 6), 56.0, Color(0, 0, 0, 0.3))
-			draw_circle(entrance_pt, 54.0, Color("334155"))
-			draw_circle(entrance_pt, 48.0, Color("64748b"))
-			draw_circle(entrance_pt, 40.0, Color("f8fafc"))
-			# Direction arrow pointing down-left into the track
-			var arrow_col = Color("38bdf8")
-			var p1 = entrance_pt + Vector2(16, -16)
-			var p2 = entrance_pt + Vector2(-12, 12)
-			draw_line(p1, p2, arrow_col, 6.0)
-			draw_line(p2, p2 + Vector2(18, 0), arrow_col, 6.0)
-			draw_line(p2, p2 + Vector2(0, -18), arrow_col, 6.0)
 
 	# 3. Main Circular Loop Layers
 	if curve != null:

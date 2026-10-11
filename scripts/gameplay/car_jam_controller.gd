@@ -52,12 +52,31 @@ func load_level(lvl: CarJamLevelData) -> void:
 
 	boarding_scheduler = CarJamBoardingController.new()
 
+	# 0. Pre-validate level data
+	var val_res := CarJamLevelValidator.validate(lvl)
+	if not val_res["ok"]:
+		var val_err = "[CarJamController] FATAL: Level validation failed for '%s': %s" % [lvl.title, val_res["errors"]]
+		push_error(val_err)
+
 	vehicles.clear()
 	for vd in lvl.vehicles:
 		var vm := VehicleModel.new()
 		vm.setup_from_data(vd)
 		vehicles[vm.id] = vm
-		board.place_vehicle(vm)
+		var placed := board.place_vehicle(vm)
+		if not placed:
+			var conflicting_id: int = -1
+			var conflicting_cells: Array[Vector2i] = []
+			for c in vm.get_occupied_cells():
+				var occ := board.get_vehicle_at(c)
+				if occ != -1 and occ != vm.id:
+					conflicting_id = occ
+					conflicting_cells.append(c)
+			var diag := "[CarJamController] CRITICAL ERROR: Failed to place vehicle %d ('%s') on board! Overlaps vehicle ID %d at cell(s) %s" % [
+				vm.id, vm.code, conflicting_id, str(conflicting_cells)
+			]
+			push_error(diag)
+			assert(placed, diag)
 
 	state = GameState.PLAYING
 

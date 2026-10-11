@@ -10,7 +10,7 @@ func _init():
 	
 	var configs = [
 		{"id": 1, "code": "v1", "color": "blue",   "pos": Vector2i(2, 1), "dir": CarJamVehicleData.Direction.RIGHT, "fp": [Vector2i(0, 0), Vector2i(-1, 0)]},
-		{"id": 2, "code": "v2", "color": "red",    "pos": Vector2i(4, 1), "dir": CarJamVehicleData.Direction.RIGHT, "fp": [Vector2i(0, 0), Vector2i(-1, 0)]},
+		{"id": 2, "code": "v2", "color": "red",    "pos": Vector2i(4, 0), "dir": CarJamVehicleData.Direction.RIGHT, "fp": [Vector2i(0, 0), Vector2i(-1, 0)]},
 		{"id": 3, "code": "v3", "color": "yellow", "pos": Vector2i(1, 2), "dir": CarJamVehicleData.Direction.UP,    "fp": [Vector2i(0, 0), Vector2i(0, 1)]},
 		{"id": 4, "code": "v4", "color": "red",    "pos": Vector2i(2, 2), "dir": CarJamVehicleData.Direction.LEFT,  "fp": [Vector2i(0, 0), Vector2i(1, 0)]},
 		{"id": 5, "code": "v5", "color": "yellow", "pos": Vector2i(4, 2), "dir": CarJamVehicleData.Direction.DOWN,  "fp": [Vector2i(0, 0), Vector2i(0, -1)]},

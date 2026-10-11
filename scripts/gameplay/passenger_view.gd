@@ -15,7 +15,7 @@ var _is_boarding: bool = false
 var _last_pos: Vector2 = Vector2.ZERO
 var _facing_right: bool = true
 
-const BASE_SCALE := 0.27
+const BASE_SCALE := 0.22
 
 func setup(p_col_id: String, p_id: int = 0, p_lane: int = 0) -> void:
 	_color_id = p_col_id.to_lower()
@@ -82,7 +82,7 @@ func _process(delta: float) -> void:
 				_facing_right = false
 		_last_pos = current_pos
 
-		_anim_time += delta * 18.0 # Running cadence matching 660 px/s track pace
+		_anim_time += delta * 7.5 # Running cadence matching 240 px/s track pace
 		
 		# Grounded running bounce with stance/flight phases
 		var bounce: float = sin(_anim_time)

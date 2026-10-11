@@ -364,8 +364,8 @@ func _run_all_timing_tests() -> void:
 		print("  [FAIL] Total passengers expected 240, got %d" % total_combined)
 		failures += 1
 
-	if total_initial_p == 40 and (total_feeder_p + total_pending_feeder) == 200:
-		print("  [PASS] Initial loop populated with 40 passengers; 200 streaming continuously via feeder!")
+	if total_initial_p == 0 and total_combined == 240:
+		print("  [PASS] Zero initial mass spawn; all 240 passengers streaming progressively via feeder!")
 	else:
 		print("  [FAIL] Distribution incorrect: initial=%d, feeder=%d, pending=%d" % [total_initial_p, total_feeder_p, total_pending_feeder])
 		failures += 1
@@ -389,13 +389,13 @@ func _run_all_timing_tests() -> void:
 		var v3 = ctrl_l1.vehicles[3]
 		if v3.state == VehicleModel.VehicleState.PARKED:
 			print("  [PASS] Vehicle 3 is PARKED at slot %d" % v3.reserved_slot)
-			# Allow 0.75s for circulating passengers to reach the platform boarding zone cleanly
-			await create_timer(0.75).timeout
+			# Allow time for progressive feeder passengers travelling at 240 px/s to reach platform boarding zone
+			await create_timer(2.6).timeout
 			var occupancy = v3.passenger_occupancy
 			var pending = ctrl_l1.pending_boarders.get(3, 0)
-			print("  [MEASURED] Vehicle 3 occupancy + pending after 0.75s: %d" % (occupancy + pending))
+			print("  [MEASURED] Vehicle 3 occupancy + pending: %d" % (occupancy + pending))
 			if occupancy + pending > 0:
-				print("  [PASS] Event-driven boarding immediately initiated without waiting for full lap!")
+				print("  [PASS] Event-driven boarding immediately initiated as feeder passengers reach slot!")
 			else:
 				print("  [FAIL] Passengers stalled: no boarding initiated for parked bus")
 				failures += 1
