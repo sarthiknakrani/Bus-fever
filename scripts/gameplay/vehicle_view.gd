@@ -57,6 +57,12 @@ func set_parking_mode(in_parking: bool) -> void:
 	is_in_parking = in_parking
 	if _badge_node != null:
 		_badge_node.visible = in_parking
+		if in_parking:
+			_badge_node.global_rotation = 0.0
+
+func _process(_delta: float) -> void:
+	if _badge_node != null and _badge_node.visible:
+		_badge_node.global_rotation = 0.0
 
 func _build_visuals() -> void:
 	# Clear existing interim visuals

@@ -49,6 +49,7 @@ var result_btn: TextureButton
 
 var _toast_panel: PanelContainer
 var _toast_tween: Tween
+var _last_toast_time: float = -999.0
 
 # Authoritative Controller
 var controller: CarJamController
@@ -164,8 +165,9 @@ func _process(delta: float) -> void:
 			var lead_row = _feeder_rows.front()
 			if lead_row.progress >= f_len - 1.0:
 				var merge_clear := true
+				var clearance_buffer := ROW_SPACING * 1.35
 				for cr in _circulating_rows:
-					if cr.progress < ROW_SPACING or cr.progress > (track_len - ROW_SPACING):
+					if cr.progress < clearance_buffer or cr.progress > (track_len - clearance_buffer):
 						merge_clear = false
 						break
 				if merge_clear:
@@ -310,7 +312,7 @@ func _build_scene_hierarchy() -> void:
 	board_root = Node2D.new()
 	board_root.name = "BoardRoot"
 	board_root.rotation = deg_to_rad(45)
-	board_root.scale = Vector2(1.0, 0.6) # Isometric-ish tilt
+	board_root.scale = Vector2(1.0, 0.72) # Isometric 2.5D toy depth
 	
 	board_root.position = Vector2(0, BOARD_Y)
 	world_root.add_child(board_root)
@@ -790,7 +792,7 @@ func _on_vehicle_dispatch_started(vehicle_id: int, slot_id: int, corridor: Array
 	# full turn inside the corridor before entering the bay vertically.
 	# This guarantees the bus never sweeps sideways across VIP or other
 	# parking slots.
-	var corridor_pos := Vector2(target_slot_pos.x, PARKING_Y + 100.0)
+	var corridor_pos := Vector2(target_slot_pos.x, target_slot_pos.y + 110.0)
 
 	# Dynamically calculate the parking scale to perfectly fit the slot bounds
 	var max_w = 88.0
@@ -1703,13 +1705,13 @@ func _update_layout() -> void:
 	var board_cells_w = float(controller.level_data.board_size.x)
 	var board_cells_h = float(controller.level_data.board_size.y)
 	var board_local_size = max(board_cells_w, board_cells_h) * CELL_SIZE
-	# Rotated 45 deg, scale (1.0, 0.6)
+	# Rotated 45 deg, scale (1.0, 0.72)
 	var board_pixel_w = board_local_size * sqrt(2.0)
-	var board_pixel_h = board_pixel_w * 0.6
+	var board_pixel_h = board_pixel_w * 0.72
 	
 	# 2. Determine required margins and total logical dimensions
-	# Safe areas on screen (top header, bottom boosters)
-	var screen_safe_h = vp_size.y - 450.0 # leave 150 top, 300 bottom
+	# Safe areas on screen (top header: ~140, bottom boosters: ~180)
+	var screen_safe_h = vp_size.y - 320.0
 	var screen_safe_w = vp_size.x * 0.95
 
 	# Ensure we fit the parking strip which might be wider than the board
@@ -1888,33 +1890,48 @@ func _create_procedural_glossy_button(btn_text: String, bg_color: Color, border_
 	return wrapper
 
 func _show_parking_full_toast() -> void:
+	var now := Time.get_ticks_msec() / 1000.0
+	if now - _last_toast_time < 0.8:
+		return
+	_last_toast_time = now
+
 	if _toast_panel == null:
 		_toast_panel = PanelContainer.new()
 		var sb = StyleBoxFlat.new()
-		sb.bg_color = Color(0, 0, 0, 0.7)
-		sb.set_corner_radius_all(20)
+		sb.bg_color = Color(0.12, 0.15, 0.22, 0.90)
+		sb.set_corner_radius_all(14)
+		sb.border_width_left = 1
+		sb.border_width_top = 1
+		sb.border_width_right = 1
+		sb.border_width_bottom = 2
+		sb.border_color = Color(0.95, 0.4, 0.4, 0.8)
+		sb.shadow_color = Color(0, 0, 0, 0.35)
+		sb.shadow_size = 6
+		sb.shadow_offset = Vector2(0, 3)
 		_toast_panel.add_theme_stylebox_override("panel", sb)
 		
 		var m = MarginContainer.new()
-		m.add_theme_constant_override("margin_left", 20)
-		m.add_theme_constant_override("margin_right", 20)
-		m.add_theme_constant_override("margin_top", 10)
-		m.add_theme_constant_override("margin_bottom", 10)
+		m.add_theme_constant_override("margin_left", 16)
+		m.add_theme_constant_override("margin_right", 16)
+		m.add_theme_constant_override("margin_top", 8)
+		m.add_theme_constant_override("margin_bottom", 8)
 		_toast_panel.add_child(m)
 		
 		var hb = HBoxContainer.new()
+		hb.add_theme_constant_override("separation", 8)
 		m.add_child(hb)
 		
 		var icon = Label.new()
-		icon.text = "!"
-		icon.add_theme_font_size_override("font_size", 24)
-		icon.add_theme_color_override("font_color", Color(1, 0.3, 0.3))
+		icon.text = "⚠️"
+		icon.add_theme_font_size_override("font_size", 16)
 		hb.add_child(icon)
 		
 		var lbl = Label.new()
-		lbl.text = "NO SPOT AVAILABLE"
-		lbl.add_theme_font_size_override("font_size", 12)
-		lbl.add_theme_color_override("font_color", Color.WHITE)
+		lbl.text = "NO PARKING SPOT AVAILABLE"
+		lbl.add_theme_font_size_override("font_size", 13)
+		lbl.add_theme_color_override("font_color", Color("fef2f2"))
+		lbl.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
+		lbl.add_theme_constant_override("outline_size", 2)
 		hb.add_child(lbl)
 		
 		_toast_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1925,22 +1942,20 @@ func _show_parking_full_toast() -> void:
 		
 		hud.add_child(_toast_panel)
 		
-	# Center it visually on screen
-	_toast_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	# Push it slightly up so it's not strictly covering center interaction
-	_toast_panel.position.y -= 150
+	# Anchor safely below the TopBar without obscuring the passenger loop
+	_toast_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	_toast_panel.position.y = 80.0
 	
 	if _toast_tween:
 		_toast_tween.kill()
 		
 	_toast_panel.visible = true
+	_toast_panel.modulate.a = 0.0
 	
 	_toast_tween = create_tween()
-	# Only fade in if it's not already fully visible
-	if _toast_panel.modulate.a < 1.0:
-		_toast_tween.tween_property(_toast_panel, "modulate:a", 1.0, 0.15).set_trans(Tween.TRANS_SINE)
-	_toast_tween.tween_interval(1.0)
-	_toast_tween.tween_property(_toast_panel, "modulate:a", 0.0, 0.25).set_trans(Tween.TRANS_SINE)
+	_toast_tween.tween_property(_toast_panel, "modulate:a", 1.0, 0.15).set_trans(Tween.TRANS_SINE)
+	_toast_tween.tween_interval(1.2)
+	_toast_tween.tween_property(_toast_panel, "modulate:a", 0.0, 0.3).set_trans(Tween.TRANS_SINE)
 	_toast_tween.tween_callback(func(): _toast_panel.visible = false)
 
 func _on_home_pressed() -> void:
