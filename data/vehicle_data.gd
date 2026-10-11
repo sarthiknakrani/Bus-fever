@@ -18,6 +18,7 @@ const COLOR_YELLOW := "yellow"
 const COLOR_GREEN := "green"
 const COLOR_PURPLE := "purple"
 const COLOR_ORANGE := "orange"
+const COLOR_PINK := "pink"
 
 @export var id: int = 0
 @export var code: String = "A"
@@ -58,6 +59,7 @@ static func color_to_rgb(col_id: String) -> Color:
 		COLOR_GREEN: return Color("22c55e")
 		COLOR_PURPLE: return Color("a855f7")
 		COLOR_ORANGE: return Color("f97316")
+		COLOR_PINK: return Color("ec4899")
 		_: return Color.WHITE
 
 func get_occupied_cells(pos: Vector2i = anchor) -> Array[Vector2i]:

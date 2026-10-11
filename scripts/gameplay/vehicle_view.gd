@@ -6,6 +6,7 @@ signal tapped(vehicle_id: int)
 var vehicle_id: int = -1
 var vehicle_code: String = "A"
 var vehicle_color: Color = Color("3b82f6")
+var vehicle_color_id: String = "blue"
 var vehicle_dir: int = 0
 var vehicle_capacity: int = 4
 var vehicle_footprint: Array[Vector2i] = [Vector2i.ZERO]
@@ -30,6 +31,7 @@ var boarding_layer: Node2D
 func setup(p_id: int, p_code: String, p_col_id: String, p_dir: int, p_cap: int, p_footprint: Array[Vector2i] = [Vector2i.ZERO]) -> void:
 	vehicle_id = p_id
 	vehicle_code = p_code
+	vehicle_color_id = p_col_id.to_lower()
 	vehicle_color = CarJamVehicleData.color_to_rgb(p_col_id)
 	vehicle_dir = p_dir
 	vehicle_capacity = p_cap
@@ -63,7 +65,7 @@ func _build_visuals() -> void:
 			c.queue_free()
 	_wheels.clear()
 	
-	# Determine Premium Asset
+	# Determine Asset properties
 	var length_str = "short"
 	if vehicle_footprint.size() > 2:
 		length_str = "long"
@@ -73,19 +75,37 @@ func _build_visuals() -> void:
 	elif vehicle_dir == CarJamVehicleData.Direction.LEFT: dir_str = "left"
 	elif vehicle_dir == CarJamVehicleData.Direction.RIGHT: dir_str = "right"
 	
-	var col_str = "red"
-	if vehicle_color.is_equal_approx(CarJamVehicleData.color_to_rgb("blue")): col_str = "blue"
-	elif vehicle_color.is_equal_approx(CarJamVehicleData.color_to_rgb("yellow")): col_str = "yellow"
+	# Centralized 7-color mapping with graceful fallback
+	var valid_colors := ["red", "blue", "yellow", "orange", "green", "purple", "pink"]
+	var col_str := "red"
+	if vehicle_color_id in valid_colors:
+		col_str = vehicle_color_id
+	else:
+		for c in valid_colors:
+			if vehicle_color.is_equal_approx(CarJamVehicleData.color_to_rgb(c)):
+				col_str = c
+				break
 	
-	var tex_path = "res://assets/sprites/premium_buses/bus_%s_%s_%s.png" % [length_str, col_str, dir_str]
-	var tex_bus = _load_interim_sprite(tex_path)
+	var tex_paths := [
+		"res://assets/sprites/premium_buses/bus_%s_%s_%s.png" % [length_str, col_str, dir_str],
+		"res://assets/buses/%s_%s_%s.png" % [length_str, col_str, dir_str],
+		"res://assets/buses/%s_%s.png" % [col_str, dir_str]
+	]
+	
+	var tex_bus: Texture2D = null
+	for p in tex_paths:
+		tex_bus = _load_interim_sprite(p)
+		if tex_bus != null:
+			break
 	
 	_base_sprite = Sprite2D.new()
+	_base_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	if tex_bus:
 		_base_sprite.texture = tex_bus
+	else:
+		push_warning("VehicleView: Missing bus texture for %s %s %s" % [length_str, col_str, dir_str])
 	
-	# The asset is pre-scaled accurately to the WxH grid, we just center it.
-	# The default Sprite2D is centered on its origin, which matches the node's center.
+	# Center sprite on node's origin matching geometric center
 	add_child(_base_sprite)
 	
 	# Boarding Layer and Anchor
@@ -155,42 +175,8 @@ func play_badge_pulse() -> void:
 func _setup_capacity_badge() -> void:
 	if _badge_node != null: return
 	
-	var arrow_draw := Node2D.new()
-	arrow_draw.draw.connect(func():
-		var ci = arrow_draw.get_canvas_item()
-		var p1 = Vector2(0, -22)
-		var p2 = Vector2(-12, -4)
-		var p3 = Vector2(-4, -4)
-		var p4 = Vector2(-4, 18)
-		var p5 = Vector2(4, 18)
-		var p6 = Vector2(4, -4)
-		var p7 = Vector2(12, -4)
-		var pts = PackedVector2Array([p1, p2, p3, p4, p5, p6, p7])
-		var col = Color.WHITE
-		# shadow
-		var shadow_pts = PackedVector2Array()
-		for p in pts:
-			shadow_pts.append(p + Vector2(0, 4))
-		arrow_draw.draw_polygon(shadow_pts, PackedColorArray([Color(0,0,0,0.4)]))
-		arrow_draw.draw_polygon(pts, PackedColorArray([col]))
-		
-		# Add a thick, crisp outline so the white arrow is highly visible against yellow buses
-		var outline_pts = PackedVector2Array([p1, p2, p3, p4, p5, p6, p7, p1])
-		arrow_draw.draw_polyline(outline_pts, Color.BLACK, 5.0, true)
-	)
-	
-	if vehicle_dir == CarJamVehicleData.Direction.UP:
-		arrow_draw.rotation = 0
-	elif vehicle_dir == CarJamVehicleData.Direction.DOWN:
-		arrow_draw.rotation = PI
-	elif vehicle_dir == CarJamVehicleData.Direction.LEFT:
-		arrow_draw.rotation = -PI / 2.0
-	elif vehicle_dir == CarJamVehicleData.Direction.RIGHT:
-		arrow_draw.rotation = PI / 2.0
-		
-	# Add it to self, because there is no _v_root in the current vehicle_view.gd!
-	add_child(arrow_draw)
-	
+	# The professional directional arrow is integrated directly into the glossy bus roof art.
+	# We only create the parking capacity badge here.
 	_badge_node = Node2D.new()
 	_badge_node.name = "CapacityBadge"
 	_badge_node.position = Vector2.ZERO # Centered perfectly on the geometric center of the bus footprint
