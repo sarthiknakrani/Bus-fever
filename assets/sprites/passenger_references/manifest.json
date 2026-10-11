@@ -1,0 +1,61 @@
+{
+  "purpose": "Original user-supplied Bus Fever passenger character reference images. Not finished walking animations.",
+  "files": [
+    {
+      "color": "yellow",
+      "file": "original_character_art/passenger_yellow_reference.png",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA",
+      "sha256": "5af760c5d3758e098b10aec876fe81ff31a4c5167858ef8348744d1ce69a6028"
+    },
+    {
+      "color": "blue",
+      "file": "original_character_art/passenger_blue_reference.png",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA",
+      "sha256": "6b3c02b7a25aa7ac1cbc93a564e4d8c1713c9a00674b2f402df7f6fbacd889dd"
+    },
+    {
+      "color": "red",
+      "file": "original_character_art/passenger_red_reference.png",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA",
+      "sha256": "fecfe2f7584f65ddb3ea00b5b1ca2e97b3a650023c6a259c663457e729cc3403"
+    },
+    {
+      "color": "purple",
+      "file": "original_character_art/passenger_purple_reference.png",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA",
+      "sha256": "747b971d27e2a0f70baf4f6d7eaf8f42d58dc983271fa1653d6a5b9af0f81ca5"
+    },
+    {
+      "color": "orange",
+      "file": "original_character_art/passenger_orange_reference.png",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA",
+      "sha256": "6f820df2688c2ec3d66edf14c83b3a4c8d16e340dc362dafc87689163c7d5f90"
+    },
+    {
+      "color": "pink",
+      "file": "original_character_art/passenger_pink_reference.png",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA",
+      "sha256": "7867d8588d75e6c09496d3d8b743b50f4a06a996e84145df3d6aeac8fd6e4c20"
+    },
+    {
+      "color": "brown",
+      "file": "original_character_art/passenger_brown_reference.png",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA",
+      "sha256": "c7bbd1385ac09e7f4ee148f7efe3811af8df99b47ecac96cff88a3a4d0074772"
+    }
+  ]
+}

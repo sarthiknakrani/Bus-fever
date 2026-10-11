@@ -1,15 +1,13 @@
 extends Node2D
 class_name PassengerView
 
+## Authentic User-Supplied Passenger Art View
+## Renders authentic glossy 3D toy chibi characters (yellow, blue, red, green, purple, orange, pink, brown)
+## with natural path-following orientation, rhythmic running bounce/lean, and boarding jump.
+
 var _color_id: String = "red"
 var _visual_node: Node2D
-
-var _leg_l: Sprite2D
-var _leg_r: Sprite2D
-var _arm_l: Sprite2D
-var _arm_r: Sprite2D
-var _body: Sprite2D
-var _head: Sprite2D
+var _char_sprite: Sprite2D
 var _shadow: Sprite2D
 
 var _anim_time: float = 0.0
@@ -17,125 +15,117 @@ var _is_boarding: bool = false
 var _last_pos: Vector2 = Vector2.ZERO
 var _facing_right: bool = true
 
+const BASE_SCALE := 0.30
+
 func setup(p_col_id: String) -> void:
-	_color_id = p_col_id
+	_color_id = p_col_id.to_lower()
 	
 	_visual_node = Node2D.new()
+	_visual_node.name = "VisualNode"
 	add_child(_visual_node)
 	
-	var t_head = _load_interim_sprite("res://assets/sprites/premium_passengers/head_" + _color_id + ".png")
-	var t_body = _load_interim_sprite("res://assets/sprites/premium_passengers/body_" + _color_id + ".png")
-	var t_arm  = _load_interim_sprite("res://assets/sprites/premium_passengers/arm_" + _color_id + ".png")
-	var t_leg  = _load_interim_sprite("res://assets/sprites/premium_passengers/leg_" + _color_id + ".png")
-	var t_shadow = _load_interim_sprite("res://assets/sprites/premium_passengers/passenger_shadow.png")
-	
+	# Authentic ground contact shadow
+	var t_shadow := _load_interim_sprite("res://assets/sprites/premium_passengers/passenger_shadow.png")
 	_shadow = Sprite2D.new()
-	if t_shadow: _shadow.texture = t_shadow
-	_shadow.position = Vector2(0, 16)
+	_shadow.name = "Shadow"
+	if t_shadow != null:
+		_shadow.texture = t_shadow
+	_shadow.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	_shadow.position = Vector2(0, 0)
+	_shadow.scale = Vector2(0.28, 0.15)
+	_shadow.modulate = Color(0, 0, 0, 0.45)
+	_shadow.z_index = -1
 	add_child(_shadow)
 	
-	# Right Arm (Back) - closer for side-profile
-	_arm_r = _create_limb(t_arm, Vector2(4, -18), Vector2(0, 10), -1)
-	_arm_r.modulate = Color(0.4, 0.4, 0.4)
+	# Load authentic 3D toy character sprite
+	var tex_paths := [
+		"res://assets/sprites/passengers/passenger_%s.png" % _color_id,
+		"res://assets/sprites/passenger_references/original_character_art/passenger_%s_reference.png" % _color_id
+	]
+	var tex_char: Texture2D = null
+	for p in tex_paths:
+		tex_char = _load_interim_sprite(p)
+		if tex_char != null:
+			break
+			
+	if tex_char == null:
+		push_warning("PassengerView: Missing authentic sprite for color '%s', falling back to blue" % _color_id)
+		tex_char = _load_interim_sprite("res://assets/sprites/passengers/passenger_blue.png")
+		
+	_char_sprite = Sprite2D.new()
+	_char_sprite.name = "CharacterSprite"
+	_char_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	if tex_char != null:
+		_char_sprite.texture = tex_char
 	
-	# Right Leg (Back) - closer for side-profile, offset slightly to be visible
-	_leg_r = _create_limb(t_leg, Vector2(3, -8), Vector2(0, 12), -1)
-	_leg_r.modulate = Color(0.4, 0.4, 0.4)
+	# In our 192x192 canvas, the ground contact is at y = 180 (84px below center 96)
+	# Setting offset to Vector2(0, -84) aligns the feet precisely at (0, 0) in local space
+	_char_sprite.offset = Vector2(0, -84)
+	_visual_node.add_child(_char_sprite)
 	
-	# Left Leg (Front)
-	_leg_l = _create_limb(t_leg, Vector2(-3, -8), Vector2(0, 12), 4)
-	
-	# Body
-	_body = Sprite2D.new()
-	if t_body: _body.texture = t_body
-	_body.position = Vector2(0, -20)
-	_body.z_index = 2
-	_visual_node.add_child(_body)
-	
-	# Left Arm (Front)
-	_arm_l = _create_limb(t_arm, Vector2(-2, -18), Vector2(0, 10), 5)
-	
-	# Head
-	_head = Sprite2D.new()
-	if t_head: _head.texture = t_head
-	_head.position = Vector2(0, -42)
-	_head.z_index = 6
-	_visual_node.add_child(_head)
-	
-	_visual_node.scale = Vector2(0.85, 0.85)
-	if _shadow: _shadow.scale = Vector2(0.85, 0.85)
-	
-	_anim_time = randf() * 1.0
-
-func _create_limb(tex: Texture2D, pos: Vector2, offset: Vector2, z: int) -> Sprite2D:
-	var pivot = Node2D.new()
-	pivot.position = pos
-	pivot.z_index = z
-	_visual_node.add_child(pivot)
-	
-	var spr = Sprite2D.new()
-	if tex: spr.texture = tex
-	spr.position = offset # offset visual so rotation is from joint
-	pivot.add_child(spr)
-	return spr
+	_visual_node.scale = Vector2(BASE_SCALE, BASE_SCALE)
+	_anim_time = randf() * 2.0 * PI
 
 func _process(delta: float) -> void:
 	if not _is_boarding:
-		_anim_time += delta * 24.0 # Running cycle matching fast 660 px/s track pace
-		
-		var leg_swing = sin(_anim_time) * 1.2
-		
-		# Animate limbs (pivot is the parent of the sprite)
-		_leg_l.get_parent().rotation = leg_swing
-		_leg_r.get_parent().rotation = -leg_swing
-		_arm_l.get_parent().rotation = -leg_swing * 0.7
-		_arm_r.get_parent().rotation = leg_swing * 0.7
-		
-		# Body bounce
-		var bounce = abs(sin(_anim_time)) * 3.0
-		_body.position.y = -20 - bounce
-		_head.position.y = -42 - bounce
-		
-		# Head bob
-		_head.rotation = sin(_anim_time * 0.5) * 0.05
-		
-		# Handle natural 2D orientation
+		# Handle natural 2D orientation along the track
 		var current_pos = global_position
 		if _last_pos != Vector2.ZERO:
 			var dx = current_pos.x - _last_pos.x
-			if dx > 0.5 and not _facing_right:
+			if dx > 0.4 and not _facing_right:
 				_facing_right = true
-				_visual_node.scale.x = abs(_visual_node.scale.x)
-			elif dx < -0.5 and _facing_right:
+			elif dx < -0.4 and _facing_right:
 				_facing_right = false
-				_visual_node.scale.x = -abs(_visual_node.scale.x)
 		_last_pos = current_pos
+
+		_anim_time += delta * 18.0 # Running cadence matching 660 px/s track pace
+		
+		# Rhythmic running bounce and subtle squash/stretch
+		var bob: float = absf(sin(_anim_time)) * 2.2
+		var squash: float = 1.0 + sin(_anim_time * 2.0) * 0.035
+		var stretch: float = 1.0 - sin(_anim_time * 2.0) * 0.035
+		
+		var facing_sign: float = 1.0 if _facing_right else -1.0
+		_char_sprite.position.y = -bob
+		_char_sprite.scale = Vector2(facing_sign * squash, stretch)
+		
+		# Subtle running tilt in motion direction
+		_char_sprite.rotation = facing_sign * deg_to_rad(3.5) * (1.0 + 0.2 * sin(_anim_time))
+		
+		# Shadow expands slightly when feet hit ground, contracts when in air
+		if _shadow != null:
+			var shadow_scale_factor = 1.0 - (bob / 2.2) * 0.12
+			_shadow.scale = Vector2(0.28 * shadow_scale_factor, 0.15 * shadow_scale_factor)
 
 func animate_jump(delay: float) -> void:
 	if not is_inside_tree(): return
 	_is_boarding = true
 	
-	# Reset walking rotations
-	_leg_l.get_parent().rotation = 0
-	_leg_r.get_parent().rotation = 0
-	_arm_l.get_parent().rotation = -0.5 # Arms up for jump!
-	_arm_r.get_parent().rotation = 0.5
-	_head.rotation = 0
+	# Reset running pose
+	_char_sprite.rotation = 0.0
+	_char_sprite.position.y = 0.0
 	
-	var tw = create_tween()
+	var facing_sign := 1.0 if _facing_right else -1.0
+	var tw := create_tween()
 	if delay > 0.0:
 		tw.tween_interval(delay)
-	var orig_y = _visual_node.position.y
-	# Snappy boarding leap animation (0.16s total)
-	tw.tween_property(_visual_node, "position:y", orig_y - 20.0, 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw.tween_property(_visual_node, "position:y", orig_y, 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		
+	# Boarding leap arc
+	tw.tween_property(_char_sprite, "position:y", -24.0, 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(_char_sprite, "position:y", 0.0, 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	
-	var tw2 = create_tween()
+	var tw2 := create_tween()
 	if delay > 0.0:
 		tw2.tween_interval(delay)
-	var base_scale = _visual_node.scale
-	tw2.tween_property(_visual_node, "scale", Vector2(base_scale.x * 0.8, base_scale.y * 1.2), 0.08)
-	tw2.tween_property(_visual_node, "scale", base_scale, 0.08)
+	tw2.tween_property(_char_sprite, "scale", Vector2(facing_sign * 0.85, 1.2), 0.08)
+	tw2.tween_property(_char_sprite, "scale", Vector2(facing_sign, 1.0), 0.08)
+	
+	if _shadow != null:
+		var tw_s := create_tween()
+		if delay > 0.0:
+			tw_s.tween_interval(delay)
+		tw_s.tween_property(_shadow, "scale", Vector2(0.14, 0.07), 0.08)
+		tw_s.tween_property(_shadow, "scale", Vector2(0.28, 0.15), 0.08)
 
 func _load_interim_sprite(path: String) -> Texture2D:
 	if ResourceLoader.exists(path):
