@@ -291,8 +291,9 @@ func _setup_controller() -> void:
 
 func _load_current_level() -> void:
 	var lvl_num = 1
-	if GameController:
-		lvl_num = GameController.current_level_number
+	var gc = get_tree().root.get_node_or_null("GameController") if is_inside_tree() and get_tree() and get_tree().root else null
+	if gc:
+		lvl_num = gc.current_level_number
 		
 	var lvl: CarJamLevelData = null
 	var path = "res://levels/level_%03d.tres" % lvl_num
@@ -583,20 +584,15 @@ func _on_vehicle_filled(vehicle_id: int, slot_id: int) -> void:
 	if vv == null:
 		return
 
-	# Schedule departure after brief acknowledgment
-	var tw := create_tween()
-	tw.tween_interval(0.40)
-	tw.tween_callback(func():
-		_play_sfx("depart")
-		var slot_pos := _get_slot_world_pos(slot_id)
-		VehicleMovement.animate_departure(
-			vv,
-			slot_pos,
-			controller.session_token,
-			controller,
-			vehicle_id,
-			slot_id
-		)
+	_play_sfx("depart")
+	var slot_pos := _get_slot_world_pos(slot_id)
+	VehicleMovement.animate_departure(
+		vv,
+		slot_pos,
+		controller.session_token,
+		controller,
+		vehicle_id,
+		slot_id
 	)
 
 func _on_vehicle_departed(_vehicle_id: int, slot_id: int) -> void:
@@ -671,7 +667,8 @@ func _build_hud() -> void:
 	top_bar.add_child(btn_restart)
 
 	level_title_label = Label.new()
-	level_title_label.text = "Level " + str(GameController.current_level_number if GameController else 1)
+	var top_gc = get_tree().root.get_node_or_null("GameController") if is_inside_tree() and get_tree() and get_tree().root else null
+	level_title_label.text = "Level " + str(top_gc.current_level_number if top_gc else 1)
 	level_title_label.add_theme_font_size_override("font_size", 30)
 	level_title_label.add_theme_color_override("font_color", Color("ffffff"))
 	level_title_label.add_theme_color_override("font_outline_color", Color("1e293b"))
@@ -996,7 +993,8 @@ func _build_hud() -> void:
 	p_btn_home.pivot_offset = Vector2(49, 21)
 	p_btn_home.pressed.connect(func():
 		get_tree().paused = false
-		if GameController: GameController.goto_scene("res://scenes/main.tscn")
+		var p_gc = get_tree().root.get_node_or_null("GameController") if get_tree() and get_tree().root else null
+		if p_gc: p_gc.goto_scene("res://scenes/main.tscn")
 	)
 	btm_hbox.add_child(p_btn_home)
 

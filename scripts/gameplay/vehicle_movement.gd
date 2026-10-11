@@ -1,6 +1,10 @@
 extends RefCounted
 class_name VehicleMovement
 
+## Centrally defined animation timing constants (seconds)
+const BUS_ARRIVAL_DURATION: float = 1.0
+const BUS_DEPARTURE_DURATION: float = 0.9
+
 ## Handles smooth 2D visual tweening for vehicle dispatch and departure.
 ## Separated from authoritative simulation logic for clean restart safety and testability.
 
@@ -93,8 +97,9 @@ static func animate_dispatch(
 	curve.add_point(slot_pos, Vector2(0.0, 130.0), Vector2.ZERO)
 
 	# Derive front vector (the bus sprite's "front" in its NATIVE puzzle orientation).
+	var v_dir: int = vehicle_node.get("vehicle_dir") if vehicle_node.get("vehicle_dir") != null else CarJamVehicleData.Direction.UP
 	var front_native := Vector2(0, -1)
-	match vehicle_node.vehicle_dir:
+	match v_dir:
 		CarJamVehicleData.Direction.DOWN: front_native = Vector2(0, 1)
 		CarJamVehicleData.Direction.UP: front_native = Vector2(0, -1)
 		CarJamVehicleData.Direction.LEFT: front_native = Vector2(-1, 0)
@@ -104,14 +109,16 @@ static func animate_dispatch(
 	# When the tangent at curve end is (0, -1), the rotation that aligns
 	# front_native onto (0, -1) is exactly this:
 	var final_rot_target := 0.0
-	match vehicle_node.vehicle_dir:
+	match v_dir:
 		CarJamVehicleData.Direction.DOWN: final_rot_target = PI
 		CarJamVehicleData.Direction.UP: final_rot_target = 0.0
 		CarJamVehicleData.Direction.LEFT: final_rot_target = PI / 2.0
 		CarJamVehicleData.Direction.RIGHT: final_rot_target = -PI / 2.0
 
 	var start_scale: Vector2 = vehicle_node.scale
-	var duration: float = 1.55 * duration_mult
+	var duration: float = BUS_ARRIVAL_DURATION * duration_mult
+	var t_dispatch_start: float = Time.get_ticks_msec() / 1000.0
+	print("[QA] Bus %d ARRIVAL START at %.3f (Target: %.2fs)" % [vehicle_id, t_dispatch_start, duration])
 
 	var curve_callable := Callable(
 		VehicleMovement, "_update_curve"
@@ -128,12 +135,17 @@ static func animate_dispatch(
 	tw.tween_method(curve_callable, 0.0, 1.0, duration) \
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
-	var lambda_func := func(v_node, t_scale, ctrl, v_id, s_id, tok):
+	var lambda_func := func(v_node, t_scale, ctrl, v_id, s_id, tok, t_start_sec):
+		var t_arrival_end: float = Time.get_ticks_msec() / 1000.0
+		print("[QA] Bus %d ARRIVAL COMPLETE at %.3f (Actual: %.3fs | Target: %.2fs)" % [
+			v_id, t_arrival_end, t_arrival_end - t_start_sec, BUS_ARRIVAL_DURATION * duration_mult
+		])
 		if is_instance_valid(v_node):
-			v_node.set_parking_mode(true)
+			if v_node.has_method("set_parking_mode"):
+				v_node.set_parking_mode(true)
 
 			# QA arrival check
-			var dir_str: String = CarJamVehicleData.dir_to_string(v_node.vehicle_dir)
+			var dir_str: String = CarJamVehicleData.dir_to_string(v_dir)
 			var front_vec: Vector2 = front_native.rotated(v_node.rotation)
 			var bay_axis: Vector2 = Vector2(0, -1)
 			var ang_diff: float = rad_to_deg(front_vec.angle_to(bay_axis))
@@ -147,20 +159,13 @@ static func animate_dispatch(
 				[ang_diff, center_err])
 
 			v_node.z_index = 10
-			# Settle bounce — ONLY touches scale. Position and rotation
-			# must remain frozen at slot_pos / final_rot_target from here on.
-			var settle_tw: Tween = v_node.create_tween()
-			settle_tw.tween_property(v_node, "scale", t_scale * 1.05, 0.12) \
-				.set_trans(Tween.TRANS_SINE)
-			settle_tw.tween_property(v_node, "scale", t_scale, 0.18) \
-				.set_trans(Tween.TRANS_BOUNCE)
-			# Snap rotation to target so it never drifts from frame
-			# quantization noise during the settle.
 			v_node.rotation = final_rot_target
+			v_node.position = slot_pos
+			v_node.scale = t_scale
 		ctrl.on_vehicle_arrived_at_slot(v_id, s_id, tok)
 
 	tw.tween_callback(lambda_func.bind(
-		vehicle_node, target_scale, controller, vehicle_id, slot_id, token
+		vehicle_node, target_scale, controller, vehicle_id, slot_id, token, t_dispatch_start
 	))
 
 
@@ -176,44 +181,81 @@ static func animate_departure(
 	if vehicle_node == null or not is_instance_valid(vehicle_node):
 		return
 
-	vehicle_node.set_parking_mode(false)
+	if vehicle_node.has_method("set_parking_mode"):
+		vehicle_node.set_parking_mode(false)
 	vehicle_node.z_index = 200 # Ensure it renders above other elements while exiting
-	
-	print("[QA %d] Bus %d reverse started." % [Time.get_ticks_msec(), vehicle_id])
-	
-	var dep = VehicleDepartureController.new()
-	dep.vehicle = vehicle_node
-	dep.controller = controller
-	dep.vehicle_id = vehicle_id
-	dep.slot_id = slot_id
-	dep.token = token
-	dep.slot_pos = slot_pos
-	dep.reverse_target_y = slot_pos.y + 195.0
-	
-	var curve = Curve2D.new()
-	var vp_rect = vehicle_node.get_viewport_rect()
-	var global_right_x = (vp_rect.size.x / 2.0) + 400.0 
-	var exit_global = Vector2(global_right_x, 0)
-	var exit_local = vehicle_node.get_parent().get_global_transform().affine_inverse() * exit_global
-	
-	var final_target = Vector2(exit_local.x, dep.reverse_target_y - 15.0)
-	var start_pos = Vector2(slot_pos.x, dep.reverse_target_y)
-	
-	curve.add_point(start_pos, Vector2.ZERO, Vector2(0, -60.0))
-	curve.add_point(final_target, Vector2(-160.0, 0), Vector2.ZERO)
-	
-	dep.curve = curve
-	dep.curve_len = curve.get_baked_length()
-	
-	var front_native = Vector2(0, -1)
-	match vehicle_node.vehicle_dir:
+
+	var t_dep_start: float = Time.get_ticks_msec() / 1000.0
+	var total_duration: float = BUS_DEPARTURE_DURATION * duration_mult
+	print("[QA] Bus %d DEPARTURE START at %.3f (Target: %.2fs)" % [vehicle_id, t_dep_start, total_duration])
+
+	var reverse_pos: Vector2 = slot_pos + Vector2(0.0, 185.0)
+
+	var curve := Curve2D.new()
+	var vp_rect := vehicle_node.get_viewport_rect()
+	var global_right_x := (vp_rect.size.x / 2.0) + 400.0
+	var exit_global := Vector2(global_right_x, 0.0)
+	var exit_local: Vector2 = vehicle_node.get_parent().get_global_transform().affine_inverse() * exit_global
+
+	var final_target := Vector2(exit_local.x, reverse_pos.y - 15.0)
+	curve.add_point(reverse_pos, Vector2.ZERO, Vector2(0.0, -60.0))
+	curve.add_point(final_target, Vector2(-160.0, 0.0), Vector2.ZERO)
+
+	var v_dir: int = vehicle_node.get("vehicle_dir") if vehicle_node.get("vehicle_dir") != null else CarJamVehicleData.Direction.UP
+	var front_native := Vector2(0, -1)
+	match v_dir:
 		CarJamVehicleData.Direction.DOWN: front_native = Vector2(0, 1)
 		CarJamVehicleData.Direction.UP: front_native = Vector2(0, -1)
 		CarJamVehicleData.Direction.LEFT: front_native = Vector2(-1, 0)
 		CarJamVehicleData.Direction.RIGHT: front_native = Vector2(1, 0)
-	dep.front_native = front_native
-	
-	vehicle_node.add_child(dep)
+
+	var t_reverse: float = 0.28 * duration_mult
+	var t_exit: float = total_duration - t_reverse
+	var t_clear: float = t_reverse * 0.60
+
+	# 1. Slot release tracker (runs when bus has physically cleared the slot footprint)
+	var bay_cleared := false
+	var lambda_clear := func():
+		if not bay_cleared and is_instance_valid(controller):
+			bay_cleared = true
+			var t_c: float = Time.get_ticks_msec() / 1000.0
+			print("[QA] Bus %d BAY CLEARED at %.3f (After: %.3fs)" % [vehicle_id, t_c, t_c - t_dep_start])
+			controller.on_vehicle_cleared_slot(vehicle_id, slot_id, token)
+
+	# Parallel trigger for early slot release at ~0.17s
+	var clear_tw := vehicle_node.create_tween()
+	clear_tw.tween_interval(t_clear)
+	clear_tw.tween_callback(lambda_clear)
+
+	# Main movement tween: Reverse (0.28s) -> Exit curve (0.62s) = 0.90s total
+	var tw := vehicle_node.create_tween()
+
+	# Phase 1: Reverse straight down out of slot
+	tw.tween_property(vehicle_node, "position:y", reverse_pos.y, t_reverse) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+
+	# Ensure bay is cleared by the end of reverse if not already
+	tw.tween_callback(lambda_clear)
+
+	# Phase 2: Forward curve turning right and exiting offscreen
+	var start_scale: Vector2 = vehicle_node.scale
+	var curve_callable := Callable(VehicleMovement, "_update_curve").bind(
+		curve, vehicle_node, start_scale, start_scale, true, front_native
+	)
+	tw.tween_method(curve_callable, 0.0, 1.0, t_exit) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+
+	# Phase 3: Departure complete (completely offscreen and disappeared at exactly 0.90s)
+	tw.tween_callback(func():
+		var t_dep_end: float = Time.get_ticks_msec() / 1000.0
+		print("[QA] Bus %d DEPARTURE COMPLETE at %.3f (Actual: %.3fs | Target: %.2fs)" % [
+			vehicle_id, t_dep_end, t_dep_end - t_dep_start, total_duration
+		])
+		if is_instance_valid(vehicle_node):
+			vehicle_node.visible = false
+		if is_instance_valid(controller):
+			controller.on_vehicle_departed_from_slot(vehicle_id, slot_id, token)
+	)
 
 static func _update_curve(t: float, curve: Curve2D, v_node: Node2D, target_scale: Vector2, start_scale: Vector2, drive_forward: bool, front_native: Vector2, _force_final_rot: bool = false, _final_rot_target: float = 0.0) -> void:
 	if not is_instance_valid(v_node): return
