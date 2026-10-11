@@ -48,6 +48,7 @@ func _update_visual_state() -> void:
 func _on_draw_lines() -> void:
 	var is_vip = (slot_id == 0)
 	var is_locked = (slot_id >= 4)
+	var is_reserved = (slot_state == CarJamParkingManager.SlotState.RESERVED)
 	
 	# Approved blue-grey UI styling
 	var border_color = Color("e2e8f0")
@@ -59,6 +60,9 @@ func _on_draw_lines() -> void:
 	elif is_locked:
 		border_color = Color("94a3b8", 0.6)
 		inner_color = Color("64748b", 0.5)
+	elif is_reserved:
+		border_color = Color("38bdf8")
+		inner_color = Color("0284c7", 0.75)
 		
 	var w = SLOT_WIDTH
 	var h = SLOT_HEIGHT

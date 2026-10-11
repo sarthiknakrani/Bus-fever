@@ -47,6 +47,7 @@ var level_title_label: Label
 var result_title_label: Label
 var result_btn: TextureButton
 
+var _toast_container: CenterContainer
 var _toast_panel: PanelContainer
 var _toast_tween: Tween
 var _last_toast_time: float = -999.0
@@ -80,6 +81,8 @@ var _feeder_rows: Array[PassengerRow] = []
 var _pending_feeder_rows: Array[PassengerRow] = []
 var _speed_logged: bool = false
 var slot_boarding_points: Dictionary = {}
+var _platform_start_prog: float = 160.0
+var _platform_end_prog: float = 510.0
 var _waiting_label: Label
 var track_time: float = 0.0
 var _last_board_landing_time: float = 0.0
@@ -230,7 +233,7 @@ func _process(delta: float) -> void:
 			var dist_to_trigger = trigger_prog - old_prog
 			if dist_to_trigger < 0: dist_to_trigger += track_len
 			
-			var in_boarding_zone: bool = (old_prog >= 160.0 and old_prog <= 510.0)
+			var in_boarding_zone: bool = (old_prog >= (_platform_start_prog - 20.0) and old_prog <= (_platform_end_prog + 20.0))
 			var reached: bool = in_boarding_zone and ((dist_to_trigger <= dist_moved) or (abs(old_prog - trigger_prog) < 15.0))
 			if reached:
 				var slot = controller.parking.get_slot(slot_idx)
@@ -622,6 +625,8 @@ func _init_passenger_track() -> void:
 	# Close loop back to (270, 0)
 	curve.add_point(Vector2(270, 0), Vector2(0, -h), Vector2(0, h))
 	passenger_track.curve = curve
+	_platform_start_prog = curve.get_closest_offset(curve.get_point_position(1))
+	_platform_end_prog = curve.get_closest_offset(curve.get_point_position(2))
 	
 	# CONTINUOUS FEEDER TRACK
 	feeder_track = Path2D.new()
@@ -661,10 +666,18 @@ func _init_passenger_track() -> void:
 	slot_boarding_points.clear()
 	var slot_spacing := 76.0
 	var total_span: float = float(controller.level_data.parking_slots_count - 1) * slot_spacing
+	var min_trig: float = 999999.0
+	var max_trig: float = -999999.0
 	for i in controller.level_data.parking_slots_count:
 		var slot_x: float = slot_views[i].position.x if i < slot_views.size() else (-total_span / 2.0 + float(i) * slot_spacing)
 		var closest: float = passenger_track.curve.get_closest_offset(Vector2(slot_x, 115.0))
 		slot_boarding_points[i] = closest
+		min_trig = minf(min_trig, closest)
+		max_trig = maxf(max_trig, closest)
+
+	if not slot_boarding_points.is_empty():
+		_platform_start_prog = min_trig - 25.0
+		_platform_end_prog = max_trig + 25.0
 
 	_last_board_landing_time = 0.0
 	all_passengers.clear()
@@ -875,7 +888,8 @@ func _recover_boarding_for_slot(slot_id: int) -> void:
 		# Only board rows physically on the bottom platform approaching the slot
 		var dist_to_trig = trigger_prog - row.progress
 		if dist_to_trig < 0: dist_to_trig += track_len
-		var is_at_boarding_exit: bool = (dist_to_trig <= 360.0 and row.progress >= 160.0 and row.progress <= 510.0)
+		var platform_span: float = (_platform_end_prog - _platform_start_prog) + 40.0
+		var is_at_boarding_exit: bool = (dist_to_trig <= platform_span and row.progress >= (_platform_start_prog - 20.0) and row.progress <= (_platform_end_prog + 20.0))
 		if not is_at_boarding_exit:
 			continue
 
@@ -1712,8 +1726,8 @@ func _update_layout() -> void:
 		return
 
 	# 1. Determine local bounding sizes
-	var track_h = 260.0
-	var parking_h = 200.0
+	var track_h = 240.0
+	var parking_h = 160.0
 	var board_cells_w = float(controller.level_data.board_size.x)
 	var board_cells_h = float(controller.level_data.board_size.y)
 	var board_local_size = max(board_cells_w, board_cells_h) * CELL_SIZE
@@ -1722,55 +1736,47 @@ func _update_layout() -> void:
 	var board_pixel_h = board_pixel_w * 0.72
 	
 	# 2. Determine required margins and total logical dimensions
-	# Safe areas on screen (top header: ~140, bottom boosters: ~180)
-	var screen_safe_h = vp_size.y - 320.0
-	var screen_safe_w = vp_size.x * 0.95
+	# Top safe area (~120px: TopBar), bottom safe area (~160px: booster bar + padding)
+	var screen_safe_h = vp_size.y - 280.0
+	var screen_safe_w = vp_size.x * 0.94
 
 	# Ensure we fit the parking strip which might be wider than the board
 	var slot_spacing = 76.0 # MATCHES what we set earlier
 	var parking_w = float(max(1, controller.level_data.parking_slots_count - 1)) * slot_spacing + 40.0
+	var board_padded_w = board_pixel_w + 100.0
+	var required_w = maxf(maxf(parking_w, board_padded_w), 540.0)
 	
-	# We need some extra width for buses to exit the board cleanly without clipping
-	var board_padded_w = board_pixel_w + 120.0 
-	
-	var required_w = maxf(parking_w, board_padded_w)
-	required_w = maxf(required_w, 600.0) # minimum width to ensure UI fits
-	
-	# Stack vertically with comfortable gaps
+	# Baseline content height with clean corridor below parking for turning buses
+	var min_gap = 26.0
+	var bus_corridor_gap = 90.0
+	var base_content_h = track_h + min_gap + parking_h + bus_corridor_gap + board_pixel_h
+
 	var scale_w = screen_safe_w / required_w
-	var scale_h = screen_safe_h / (track_h + 120.0 + parking_h + board_pixel_h)
-	var scale_factor = clampf(min(scale_w, scale_h), 0.4, 2.0)
+	var scale_h = screen_safe_h / base_content_h
+	var scale_factor = clampf(min(scale_w, scale_h), 0.45, 1.40)
 	
-	# Compute how much logical vertical space we have available with this scale
+	# Compute logical space available at this scale
 	var available_local_h = screen_safe_h / scale_factor
-	
-	# Distribute the remaining vertical space evenly into the 2 gaps
-	var remaining_h = available_local_h - (track_h + parking_h + board_pixel_h)
-	# But cap the gaps so they don't look completely ridiculous
-	var gap = clampf(remaining_h / 4.0, 20.0, 100.0)
-	
-	var total_content_h = track_h + gap + parking_h + gap + board_pixel_h
-	
-	
-	# Scale factor was calculated above for dynamic gap
-	
+	var extra_h = maxf(0.0, available_local_h - base_content_h)
+
+	# Distribute extra height gracefully: comfortable spacing between track/parking and bus corridor
+	var gap_tp = clampf(min_gap + extra_h * 0.18, 24.0, 48.0)
+	var gap_pb = clampf(bus_corridor_gap + extra_h * 0.32, 85.0, 130.0)
+	var total_content_h = track_h + gap_tp + parking_h + gap_pb + board_pixel_h
+
 	# Apply scale to world root
 	world_root.scale = Vector2(scale_factor, scale_factor)
 	world_root.position = Vector2.ZERO
 	
-	# 4. Center the stacked layout around the middle of the safe area
+	# Center the stacked layout vertically inside available safe area
 	var half_h = (vp_size.y / 2.0) / scale_factor
-	var top_y = -half_h + (150.0 / scale_factor) # Start drawing below the header
-	
-	# Or dynamically center the content block vertically in the available space:
-	available_local_h = (screen_safe_h / scale_factor)
-	var start_y = top_y + (available_local_h - total_content_h) / 2.0 + (track_h / 2.0)
+	var top_y = -half_h + (125.0 / scale_factor)
+	var center_offset = maxf(0.0, (available_local_h - total_content_h) * 0.40)
+	var start_y = top_y + center_offset + (track_h / 2.0)
 	
 	var track_y = start_y
-	var parking_y = track_y + (track_h / 2.0) + gap + (parking_h / 2.0)
-	var bottom_ui_top_y = half_h - (120.0 / scale_factor)
-	var parking_bottom_y = parking_y + (parking_h / 2.0)
-	var board_y = (parking_bottom_y + bottom_ui_top_y) / 2.0
+	var parking_y = track_y + (track_h / 2.0) + gap_tp + (parking_h / 2.0)
+	var board_y = parking_y + (parking_h / 2.0) + gap_pb + (board_pixel_h / 2.0)
 	
 	# Passenger track prominent in upper section
 	if passenger_track_root != null:
@@ -1908,8 +1914,17 @@ func _show_parking_full_toast() -> void:
 		return
 	_last_toast_time = now
 
-	if _toast_panel == null:
+	if _toast_container == null:
+		_toast_container = CenterContainer.new()
+		_toast_container.name = "ToastContainer"
+		_toast_container.set_anchors_preset(Control.PRESET_TOP_WIDE)
+		_toast_container.offset_top = 72.0
+		_toast_container.offset_bottom = 104.0
+		_toast_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		safe_area_root.add_child(_toast_container)
+
 		_toast_panel = PanelContainer.new()
+		_toast_panel.name = "ToastPanel"
 		var sb = StyleBoxFlat.new()
 		sb.bg_color = Color(0.14, 0.16, 0.22, 0.94)
 		sb.set_corner_radius_all(12)
@@ -1925,19 +1940,22 @@ func _show_parking_full_toast() -> void:
 		
 		var m = MarginContainer.new()
 		m.add_theme_constant_override("margin_left", 12)
-		m.add_theme_constant_override("margin_right", 12)
+		m.add_theme_constant_override("margin_right", 14)
 		m.add_theme_constant_override("margin_top", 4)
 		m.add_theme_constant_override("margin_bottom", 4)
 		_toast_panel.add_child(m)
 		
 		var hb = HBoxContainer.new()
-		hb.add_theme_constant_override("separation", 6)
+		hb.add_theme_constant_override("separation", 7)
+		hb.alignment = BoxContainer.ALIGNMENT_CENTER
 		m.add_child(hb)
 		
-		var icon = Label.new()
-		icon.text = "⚠️"
-		icon.add_theme_font_size_override("font_size", 13)
-		hb.add_child(icon)
+		var icon_rect = TextureRect.new()
+		icon_rect.texture = load("res://assets/ui/icons/warning_icon.svg")
+		icon_rect.ignore_texture_size = true
+		icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon_rect.custom_minimum_size = Vector2(16, 16)
+		hb.add_child(icon_rect)
 		
 		var lbl = Label.new()
 		lbl.text = "PARKING FULL"
@@ -1947,20 +1965,15 @@ func _show_parking_full_toast() -> void:
 		lbl.add_theme_constant_override("outline_size", 2)
 		hb.add_child(lbl)
 		
+		_toast_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_toast_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		m.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		hb.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		icon_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		
-		safe_area_root.add_child(_toast_panel)
+		_toast_container.add_child(_toast_panel)
 		
-	# Anchor safely below TopBar (y=24..68) and above passenger track (y>=120)
-	_toast_panel.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	_toast_panel.offset_top = 70.0
-	_toast_panel.offset_bottom = 96.0
-	_toast_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	
 	if _toast_tween:
 		_toast_tween.kill()
 		
