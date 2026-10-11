@@ -55,27 +55,60 @@ var controller: CarJamController
 var vehicle_views: Dictionary = {} # int id -> VehicleView
 var slot_views: Array[ParkingSlotView] = []
 
-# Continuous Passenger Track State
+# Continuous Passenger Track State (4-Across Formation)
+class PassengerRow extends RefCounted:
+	var row_id: int = 0
+	var progress: float = 0.0
+	var is_feeder: bool = false
+	var passengers: Array[Dictionary] = [] # {"id": int, "color_id": String, "lane": int, "view": PassengerView, "state": String}
+
+const LANE_SPACING := 20.0
+const ROW_SPACING := 22.0
+const NUM_LANES := 4
+const PASSENGER_SPACING := 22.0
+const MAX_INITIAL_LOOP_PASSENGERS := 40
+
 var passenger_track: Path2D
 var feeder_track: Path2D
 var all_passengers: Dictionary = {}
 var circulating_ids: Array[int] = []
 var _feeder_passengers: Array[Dictionary] = []
 var _pending_feeder_passengers: Array[Dictionary] = []
+var _circulating_rows: Array[PassengerRow] = []
+var _feeder_rows: Array[PassengerRow] = []
+var _pending_feeder_rows: Array[PassengerRow] = []
 var _speed_logged: bool = false
 var slot_boarding_points: Dictionary = {}
 var _waiting_label: Label
 var track_time: float = 0.0
 var _last_board_landing_time: float = 0.0
-const PASSENGER_SPACING := 22.0
-const MAX_INITIAL_LOOP_PASSENGERS := 40
+
 @export var passenger_normal_speed: float = 660.0
 @export var passenger_sprint_speed: float = 900.0
 @export var bus_movement_duration_multiplier: float = 1.0
 const TRACK_SPEED := 40.0
 
+func _get_curve_point_and_normal(c: Curve2D, offset: float, is_loop: bool = false) -> Dictionary:
+	var curve_len := c.get_baked_length()
+	var clamped_offset: float = fmod(offset, curve_len) if is_loop else clampf(offset, 0.0, curve_len)
+	if clamped_offset < 0.0: clamped_offset += curve_len
+	var p0 := c.sample_baked(clamped_offset)
+	var next_offset: float = fmod(clamped_offset + 1.0, curve_len) if is_loop else minf(clamped_offset + 1.0, curve_len)
+	var p1 := c.sample_baked(next_offset)
+	if p1.distance_squared_to(p0) < 0.0001:
+		var prev_offset = maxf(clamped_offset - 1.0, 0.0)
+		p1 = p0
+		p0 = c.sample_baked(prev_offset)
+	var tangent := (p1 - p0).normalized()
+	var normal := Vector2(-tangent.y, tangent.x)
+	return {"pos": p0, "tangent": tangent, "normal": normal}
+
+func _calc_lane_pos(center_pos: Vector2, normal: Vector2, lane: int) -> Vector2:
+	var lane_offset: float = (float(lane) - 1.5) * LANE_SPACING
+	return center_pos + normal * lane_offset
+
 func _process(delta: float) -> void:
-	if passenger_track == null: return
+	if passenger_track == null or controller == null: return
 	if controller.state != CarJamController.GameState.PLAYING: return
 	
 	var track_len = passenger_track.curve.get_baked_length()
@@ -86,145 +119,150 @@ func _process(delta: float) -> void:
 		print("[QA] Sprint lap: ", track_len / passenger_sprint_speed, " s")
 
 	# ---------------------------------------------
-	# 1. CONTINUOUS FEEDER LOGIC
+	# 1. CONTINUOUS FEEDER LOGIC (4-across Rows)
 	# ---------------------------------------------
 	if feeder_track != null and is_instance_valid(feeder_track):
 		var f_len = feeder_track.curve.get_baked_length()
 		
-		# A. Spawn pending passenger at feeder entrance (s = 0) if entrance is clear
-		if not _pending_feeder_passengers.is_empty():
+		# A. Spawn pending row at feeder entrance (s = 0) if entrance is clear
+		if not _pending_feeder_rows.is_empty():
 			var entrance_clear := true
-			if not _feeder_passengers.is_empty():
-				var last_feeder = _feeder_passengers.back()
-				if last_feeder["progress"] < PASSENGER_SPACING:
+			if not _feeder_rows.is_empty():
+				var last_feeder = _feeder_rows.back()
+				if last_feeder.progress < ROW_SPACING:
 					entrance_clear = false
 			
 			if entrance_clear:
-				var p_info = _pending_feeder_passengers.pop_front()
-				var pv := PassengerView.new()
-				pv.setup(p_info["color_id"])
-				var pf := PathFollow2D.new()
-				pf.loop = false
-				pf.rotates = false
-				pf.add_child(pv)
-				feeder_track.add_child(pf)
-				pf.progress = 0.0
+				var next_row: PassengerRow = _pending_feeder_rows.pop_front()
+				next_row.progress = 0.0
+				next_row.is_feeder = true
+				var f_pt_info = _get_curve_point_and_normal(feeder_track.curve, 0.0, false)
+				for p in next_row.passengers:
+					var pv := PassengerView.new()
+					pv.setup(p["color_id"])
+					passenger_visuals.add_child(pv)
+					p["view"] = pv
+					p["state"] = "FEEDER"
+					var lpos = _calc_lane_pos(f_pt_info["pos"], f_pt_info["normal"], p["lane"])
+					pv.position = lpos
+					all_passengers[p["id"]] = p
+					_feeder_passengers.append(p)
+					_pending_feeder_passengers.erase(p)
+				_feeder_rows.append(next_row)
 				
-				var p_obj = {
-					"id": p_info["id"],
-					"view": pv,
-					"follower": pf,
-					"color_id": p_info["color_id"],
-					"progress": 0.0,
-					"state": "FEEDER"
-				}
-				all_passengers[p_info["id"]] = p_obj
-				_feeder_passengers.append(p_obj)
-				
-		# B. Advance feeder passengers forward
-		for j in range(_feeder_passengers.size()):
-			var fp = _feeder_passengers[j]
-			if fp["state"] != "FEEDER": continue
+		# B. Advance feeder rows forward
+		for j in range(_feeder_rows.size()):
+			var f_row = _feeder_rows[j]
 			var max_prog = f_len
 			if j > 0:
-				var prev_fp = _feeder_passengers[j - 1]
-				max_prog = prev_fp["progress"] - PASSENGER_SPACING
-			var target_p = minf(fp["progress"] + passenger_normal_speed * delta, max_prog)
-			fp["progress"] = target_p
-			fp["follower"].progress = target_p
+				max_prog = _feeder_rows[j - 1].progress - ROW_SPACING
+			var target_p = minf(f_row.progress + passenger_normal_speed * delta, max_prog)
+			f_row.progress = target_p
 			
-		# C. Merge lead feeder passenger onto main track if entrance (progress 0) is clear
-		if not _feeder_passengers.is_empty():
-			var lead_fp = _feeder_passengers.front()
-			if lead_fp["progress"] >= f_len - 2.0:
+		# C. Merge lead feeder row onto main loop if entrance (progress 0) is clear
+		if not _feeder_rows.is_empty():
+			var lead_row = _feeder_rows.front()
+			if lead_row.progress >= f_len - 1.0:
 				var merge_clear := true
-				for cid in circulating_ids:
-					var cp = all_passengers.get(cid, null)
-					if cp != null and cp["state"] == "CIRCULATING":
-						var c_prog = cp["progress"]
-						if c_prog < PASSENGER_SPACING * 0.9 or c_prog > (track_len - PASSENGER_SPACING * 0.9):
-							merge_clear = false
-							break
+				for cr in _circulating_rows:
+					if cr.progress < ROW_SPACING or cr.progress > (track_len - ROW_SPACING):
+						merge_clear = false
+						break
 				if merge_clear:
-					_feeder_passengers.pop_front()
-					var pv = lead_fp["view"]
-					var old_pf = lead_fp["follower"]
-					var new_pf := PathFollow2D.new()
-					new_pf.loop = true
-					new_pf.rotates = false
-					passenger_track.add_child(new_pf)
-					old_pf.remove_child(pv)
-					new_pf.add_child(pv)
-					old_pf.queue_free()
-					
-					new_pf.progress = 0.0
-					lead_fp["follower"] = new_pf
-					lead_fp["progress"] = 0.0
-					lead_fp["state"] = "CIRCULATING"
-					circulating_ids.append(lead_fp["id"])
+					_feeder_rows.pop_front()
+					lead_row.progress = 0.0
+					lead_row.is_feeder = false
+					for p in lead_row.passengers:
+						p["state"] = "CIRCULATING"
+						circulating_ids.append(p["id"])
+						_feeder_passengers.erase(p)
+					_circulating_rows.append(lead_row)
+
+		# D. Update positions of passengers in active feeder rows
+		for f_row in _feeder_rows:
+			var f_pt_info = _get_curve_point_and_normal(feeder_track.curve, f_row.progress, false)
+			for p in f_row.passengers:
+				if p["state"] == "FEEDER" and is_instance_valid(p.get("view")):
+					var lpos = _calc_lane_pos(f_pt_info["pos"], f_pt_info["normal"], p["lane"])
+					p["view"].position = lpos
 
 	# ---------------------------------------------
-	# 2. CIRCULATING PASSENGERS ON MAIN TRACK
+	# 2. CIRCULATING ROWS ON MAIN TRACK
 	# ---------------------------------------------
-	var to_remove = []
-	for i in circulating_ids.size():
-		var pid = circulating_ids[i]
-		var p = all_passengers.get(pid, null)
-		if p == null or p["state"] != "CIRCULATING": continue
-		
-		# Gap closing logic
+	_circulating_rows.sort_custom(func(a, b): return a.progress > b.progress)
+
+	var empty_rows: Array[PassengerRow] = []
+
+	for i in range(_circulating_rows.size()):
+		var row = _circulating_rows[i]
+		if row.passengers.is_empty():
+			empty_rows.append(row)
+			continue
+
+		# Gap closing: check distance to row ahead
 		var speed = passenger_normal_speed
-		if circulating_ids.size() > 1:
-			var ahead_idx = (i + 1) % circulating_ids.size()
-			var ahead_id = circulating_ids[ahead_idx]
-			var p_ahead = all_passengers.get(ahead_id, null)
-			if p_ahead != null and p_ahead["state"] == "CIRCULATING":
-				var diff = p_ahead["progress"] - p["progress"]
-				if diff < 0: diff += track_len
-				if diff > PASSENGER_SPACING * 1.2:
-					speed = passenger_sprint_speed
-				elif diff < PASSENGER_SPACING * 0.8:
-					speed = passenger_normal_speed * 0.8
-					
-		var old_prog = p["progress"]
+		var dist_ahead = track_len
+		if _circulating_rows.size() > 1:
+			var ahead_row: PassengerRow
+			if i == 0:
+				ahead_row = _circulating_rows.back()
+				dist_ahead = (ahead_row.progress + track_len) - row.progress
+			else:
+				ahead_row = _circulating_rows[i - 1]
+				dist_ahead = ahead_row.progress - row.progress
+
+			if dist_ahead > ROW_SPACING * 1.3:
+				speed = passenger_sprint_speed
+			elif dist_ahead < ROW_SPACING * 0.9:
+				speed = passenger_normal_speed * 0.75
+
+		var old_prog = row.progress
 		var dist_moved = speed * delta
-		
-		# Gate crossings check
-		var boarded := false
-		var crossings = []
+		if _circulating_rows.size() > 1 and dist_ahead <= ROW_SPACING + 1.0:
+			dist_moved = minf(dist_moved, maxf(dist_ahead - ROW_SPACING, 0.0))
+
+		# Boarding checks across parking slots
+		var to_board_from_row: Array[Dictionary] = []
 		for slot_idx in slot_boarding_points:
-			var trigger_prog = slot_boarding_points[slot_idx]
-			var dist_to_gate = trigger_prog - old_prog
-			if dist_to_gate < 0: dist_to_gate += track_len
-			var d = dist_to_gate
-			while d <= dist_moved:
-				crossings.append({ "dist": d, "slot": slot_idx, "trigger": trigger_prog })
-				d += track_len
-				
-		crossings.sort_custom(func(a, b): return a["dist"] < b["dist"])
-		for cross in crossings:
-			if _try_board_passenger(p, cross["slot"]):
-				boarded = true
-				to_remove.append(pid)
-				break
-				
-		# Platform area boarding check: If passenger is in the platform zone (0..600px)
-		# and already reached or passed an available matching bus
-		if not boarded and old_prog <= 600.0:
-			for slot_idx in slot_boarding_points:
-				var trigger_prog = slot_boarding_points[slot_idx]
-				if old_prog >= trigger_prog - 15.0 and old_prog <= 600.0:
-					if _try_board_passenger(p, slot_idx):
-						boarded = true
-						to_remove.append(pid)
-						break
-						
-		if not boarded:
-			p["progress"] = fmod(old_prog + dist_moved, track_len)
-			p["follower"].progress = p["progress"]
+			var trigger_prog: float = slot_boarding_points[slot_idx]
+			var dist_to_trigger = trigger_prog - old_prog
+			if dist_to_trigger < 0: dist_to_trigger += track_len
 			
-	for pid in to_remove:
-		circulating_ids.erase(pid)
+			var reached = (dist_to_trigger <= dist_moved) or (abs(old_prog - trigger_prog) < 15.0 and old_prog >= 50.0 and old_prog <= 550.0)
+			if reached:
+				var slot = controller.parking.get_slot(slot_idx)
+				if slot != null and slot.state == CarJamParkingManager.SlotState.OCCUPIED and slot.vehicle_id != -1:
+					var v = controller.vehicles.get(slot.vehicle_id, null)
+					if v != null and v.remaining_capacity() > 0:
+						for p in row.passengers:
+							if p["state"] == "CIRCULATING" and p["color_id"] == v.color_id:
+								if controller.try_reserve_boarding(v.id, p["color_id"]):
+									p["state"] = "BOARDING"
+									_animate_individual_boarding(p, v.id, slot_idx, trigger_prog)
+									to_board_from_row.append(p)
+									circulating_ids.erase(p["id"])
+									if v.remaining_capacity() <= 0:
+										break
+
+		for bp in to_board_from_row:
+			row.passengers.erase(bp)
+
+		if row.passengers.is_empty():
+			empty_rows.append(row)
+		else:
+			row.progress = fmod(old_prog + dist_moved, track_len)
+
+	for er in empty_rows:
+		_circulating_rows.erase(er)
+
+	# Update visual positions of all circulating passengers
+	for row in _circulating_rows:
+		var pt_info = _get_curve_point_and_normal(passenger_track.curve, row.progress, true)
+		for p in row.passengers:
+			if p["state"] == "CIRCULATING" and is_instance_valid(p.get("view")):
+				var lpos = _calc_lane_pos(pt_info["pos"], pt_info["normal"], p["lane"])
+				p["view"].position = lpos
+
 	
 	# Isometric manual Y-sorting for buses based on global screen Y
 	if vehicle_layer != null:
@@ -324,6 +362,7 @@ func _build_scene_hierarchy() -> void:
 
 	passenger_visuals = Node2D.new()
 	passenger_visuals.name = "PassengerVisuals"
+	passenger_visuals.y_sort_enabled = true
 	passenger_track_root.add_child(passenger_visuals)
 
 	boarding_effects = Node2D.new()
@@ -484,21 +523,31 @@ func _get_slot_world_pos(slot_id: int) -> Vector2:
 func _init_passenger_track() -> void:
 	passenger_track = Path2D.new()
 	var curve := Curve2D.new()
-	var points = 32
-	for i in points:
-		var t = float(i) / points * TAU
-		curve.add_point(Vector2(cos(t) * 270, sin(t) * 90))
-	curve.add_point(Vector2(270, 0)) # Close loop
+	var h := 46.94
+	# Start at merge point (250, 0)
+	curve.add_point(Vector2(250, 0), Vector2(0, -h), Vector2(0, h))
+	# Bottom right arc into bottom straight
+	curve.add_point(Vector2(165, 85), Vector2(h, 0), Vector2.ZERO)
+	# Bottom straight (above parking)
+	curve.add_point(Vector2(-165, 85), Vector2.ZERO, Vector2(-h, 0))
+	# Left semicircle
+	curve.add_point(Vector2(-250, 0), Vector2(0, h), Vector2(0, -h))
+	# Top left arc into top straight
+	curve.add_point(Vector2(-165, -85), Vector2(-h, 0), Vector2.ZERO)
+	# Top straight
+	curve.add_point(Vector2(165, -85), Vector2.ZERO, Vector2(h, 0))
+	# Close loop back to (250, 0)
+	curve.add_point(Vector2(250, 0), Vector2(0, -h), Vector2(0, h))
 	passenger_track.curve = curve
 	
 	# CONTINUOUS FEEDER TRACK
 	feeder_track = Path2D.new()
 	feeder_track.name = "FeederTrack"
 	var f_curve := Curve2D.new()
-	# Smooth curve from plaza gate at (380, -180) merging into main loop at (270, 0)
-	f_curve.add_point(Vector2(380, -180), Vector2.ZERO, Vector2(-30, 45))
-	f_curve.add_point(Vector2(320, -85), Vector2(30, -45), Vector2(-25, 45))
-	f_curve.add_point(Vector2(270, 0), Vector2(15, -40), Vector2.ZERO)
+	# Smooth curve from plaza gate at (360, -180) merging into main loop at (250, 0)
+	f_curve.add_point(Vector2(360, -180), Vector2.ZERO, Vector2(-30, 45))
+	f_curve.add_point(Vector2(310, -90), Vector2(25, -40), Vector2(-25, 40))
+	f_curve.add_point(Vector2(250, 0), Vector2(0, -50), Vector2.ZERO)
 	feeder_track.curve = f_curve
 
 	# PREMIUM PLAZA INTEGRATION
@@ -531,7 +580,7 @@ func _init_passenger_track() -> void:
 	var total_span: float = float(controller.level_data.parking_slots_count - 1) * slot_spacing
 	for i in controller.level_data.parking_slots_count:
 		var slot_x: float = slot_views[i].position.x if i < slot_views.size() else (-total_span / 2.0 + float(i) * slot_spacing)
-		var closest: float = passenger_track.curve.get_closest_offset(Vector2(slot_x, 90.0))
+		var closest: float = passenger_track.curve.get_closest_offset(Vector2(slot_x, 85.0))
 		slot_boarding_points[i] = closest
 
 	_last_board_landing_time = 0.0
@@ -539,6 +588,9 @@ func _init_passenger_track() -> void:
 	circulating_ids.clear()
 	_feeder_passengers.clear()
 	_pending_feeder_passengers.clear()
+	_circulating_rows.clear()
+	_feeder_rows.clear()
+	_pending_feeder_rows.clear()
 
 	var all_queue_p: Array[Dictionary] = []
 	var pid = 0
@@ -547,34 +599,54 @@ func _init_passenger_track() -> void:
 			all_queue_p.append({"id": pid, "color_id": g.color_id})
 			pid += 1
 
-	# Place initial batch (up to MAX_INITIAL_LOOP_PASSENGERS) onto main track
-	var initial_count = mini(all_queue_p.size(), MAX_INITIAL_LOOP_PASSENGERS)
-	for i in range(initial_count):
-		var p_info = all_queue_p[i]
-		var pv := PassengerView.new()
-		pv.setup(p_info["color_id"])
-		var pf := PathFollow2D.new()
-		pf.loop = true
-		pf.rotates = false
-		pf.add_child(pv)
-		passenger_track.add_child(pf)
-		
-		var start_prog = float(i) * PASSENGER_SPACING
-		pf.progress = start_prog
-		
-		all_passengers[p_info["id"]] = {
-			"id": p_info["id"],
-			"view": pv,
-			"follower": pf,
-			"color_id": p_info["color_id"],
-			"progress": start_prog,
-			"state": "CIRCULATING"
-		}
-		circulating_ids.append(p_info["id"])
+	var total_rows = int(ceil(float(all_queue_p.size()) / float(NUM_LANES)))
+	var all_rows: Array[PassengerRow] = []
+	for r in total_rows:
+		var row = PassengerRow.new()
+		row.row_id = r
+		for k in NUM_LANES:
+			var idx = r * NUM_LANES + k
+			if idx < all_queue_p.size():
+				var p_info = all_queue_p[idx]
+				var p_obj = {
+					"id": p_info["id"],
+					"color_id": p_info["color_id"],
+					"lane": k,
+					"view": null,
+					"state": "PENDING"
+				}
+				row.passengers.append(p_obj)
+		all_rows.append(row)
 
-	# Remaining passengers are queued for continuous feeding
-	for i in range(initial_count, all_queue_p.size()):
-		_pending_feeder_passengers.append(all_queue_p[i])
+	# Place initial batch (up to 10 rows = 40 passengers) onto main track
+	var initial_rows_count = mini(all_rows.size(), int(MAX_INITIAL_LOOP_PASSENGERS / NUM_LANES))
+	for r in initial_rows_count:
+		var row = all_rows[r]
+		row.is_feeder = false
+		row.progress = 250.0 - float(r) * ROW_SPACING
+		if row.progress < 0.0: row.progress += passenger_track.curve.get_baked_length()
+		
+		var pt_info = _get_curve_point_and_normal(passenger_track.curve, row.progress, true)
+		for p in row.passengers:
+			var pv := PassengerView.new()
+			pv.setup(p["color_id"])
+			passenger_visuals.add_child(pv)
+			p["view"] = pv
+			p["state"] = "CIRCULATING"
+			var lpos = _calc_lane_pos(pt_info["pos"], pt_info["normal"], p["lane"])
+			pv.position = lpos
+			
+			all_passengers[p["id"]] = p
+			circulating_ids.append(p["id"])
+		_circulating_rows.append(row)
+
+	# Remaining rows queued for continuous feeding
+	for r in range(initial_rows_count, all_rows.size()):
+		var row = all_rows[r]
+		row.is_feeder = true
+		_pending_feeder_rows.append(row)
+		for p in row.passengers:
+			_pending_feeder_passengers.append(p)
 
 func _try_board_passenger(p: Dictionary, slot_idx: int) -> bool:
 	if p.get("state", "") != "CIRCULATING":
@@ -700,31 +772,36 @@ func _recover_boarding_for_slot(slot_id: int) -> void:
 	var track_len = passenger_track.curve.get_baked_length()
 	var trigger_prog: float = slot_boarding_points.get(slot_id, 0.0)
 	
-	# Find matching circulating passengers
-	var to_board: Array[int] = []
-	for pid in circulating_ids:
-		var p = all_passengers.get(pid, null)
-		if p != null and p["state"] == "CIRCULATING" and p["color_id"] == v.color_id:
-			to_board.append(pid)
-	
-	# Sort so that passengers closest to the slot trigger board first
-	to_board.sort_custom(func(a, b):
-		var pa = all_passengers[a]["progress"]
-		var pb = all_passengers[b]["progress"]
-		var da = trigger_prog - pa
+	# Find matching rows and sort by proximity to trigger_prog
+	var rows_to_check = _circulating_rows.duplicate()
+	rows_to_check.sort_custom(func(a, b):
+		var da = trigger_prog - a.progress
 		if da < 0: da += track_len
-		var db = trigger_prog - pb
+		var db = trigger_prog - b.progress
 		if db < 0: db += track_len
 		return da < db
 	)
 	
-	for pid in to_board:
-		var p = all_passengers.get(pid, null)
-		if p != null and p["state"] == "CIRCULATING":
-			if _try_board_passenger(p, slot_id):
-				circulating_ids.erase(pid)
-			else:
-				break
+	var empty_rows: Array[PassengerRow] = []
+	for row in rows_to_check:
+		if v.remaining_capacity() <= 0: break
+		var to_remove: Array[Dictionary] = []
+		for p in row.passengers:
+			if p["state"] == "CIRCULATING" and p["color_id"] == v.color_id:
+				if controller.try_reserve_boarding(v.id, p["color_id"]):
+					p["state"] = "BOARDING"
+					_animate_individual_boarding(p, v.id, slot_id, trigger_prog)
+					to_remove.append(p)
+					circulating_ids.erase(p["id"])
+					if v.remaining_capacity() <= 0:
+						break
+		for p in to_remove:
+			row.passengers.erase(p)
+		if row.passengers.is_empty():
+			empty_rows.append(row)
+			
+	for er in empty_rows:
+		_circulating_rows.erase(er)
 
 func _on_vehicle_blocked(vehicle_id: int, _blocker_id: int) -> void:
 	_play_sfx("blocked")
@@ -1541,7 +1618,7 @@ func _update_layout() -> void:
 		return
 
 	# 1. Determine local bounding sizes
-	var track_h = 180.0
+	var track_h = 240.0
 	var parking_h = 200.0
 	var board_cells_w = float(controller.level_data.board_size.x)
 	var board_cells_h = float(controller.level_data.board_size.y)
@@ -1880,7 +1957,7 @@ func _load_interim_sprite(path: String) -> Texture2D:
 
 func _animate_individual_boarding(p: Dictionary, vehicle_id: int, slot_id: int, exact_prog: float) -> void:
 	var pv: PassengerView = p["view"]
-	var pf: PathFollow2D = p["follower"]
+	var pf: PathFollow2D = p.get("follower", null)
 	
 	# Preserve exact live position to prevent snapping
 	var gpos = pv.global_position

@@ -161,7 +161,7 @@ func _run_all_timing_tests() -> void:
 
 	# Test 4: Full Game Level 1 Live Dispatch & Boarding
 	print("\n--- TEST 4: Live Level 1 Scene Verification ---")
-	var level_scene = CarJamLevelScene.instantiate()
+	var level_scene: CarJamLevel = CarJamLevelScene.instantiate() as CarJamLevel
 	root.add_child(level_scene)
 	if not level_scene.is_node_ready():
 		level_scene._ready()
@@ -214,7 +214,7 @@ func _run_all_timing_tests() -> void:
 	mock_gc.set("current_level_number", 2)
 	root.add_child(mock_gc)
 
-	var l2_scene = CarJamLevelScene.instantiate()
+	var l2_scene: CarJamLevel = CarJamLevelScene.instantiate() as CarJamLevel
 	root.add_child(l2_scene)
 	if not l2_scene.is_node_ready():
 		l2_scene._ready()
@@ -342,7 +342,7 @@ func _run_all_timing_tests() -> void:
 
 	# Test 8: Continuous Passenger Feeder Setup & Distribution
 	print("\n--- TEST 8: Continuous Passenger Feeder & 240-Capacity Level ---")
-	var live_l1 = CarJamLevelScene.instantiate()
+	var live_l1: CarJamLevel = CarJamLevelScene.instantiate() as CarJamLevel
 	root.add_child(live_l1)
 	if not live_l1.is_node_ready():
 		live_l1._ready()
