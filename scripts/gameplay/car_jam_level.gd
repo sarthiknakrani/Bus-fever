@@ -524,6 +524,37 @@ func _get_slot_world_pos(slot_id: int) -> Vector2:
 		return parking_root.position + slot_views[slot_id].position
 	return Vector2(0, PARKING_Y)
 
+## Build the flat per-passenger color sequence from the universal
+## PassengerSequence. Returns [] if the universal layer cannot produce a
+## valid plan for this level (caller falls back to the legacy RNG
+## generator). Output shape mirrors the legacy mixed generator so the
+## downstream 4-lane row / feeder logic is unchanged.
+##
+## The universal layer (scripts/universal/) is the authoritative source
+## of color, identity, quantity, sequence, and boarding eligibility.
+## This function is the only adapter between that logic and the visual
+## track / feeder layout.
+func _build_universal_passenger_queue() -> Array[Dictionary]:
+	if controller == null or controller.level_data == null:
+		return []
+	var UniversalIntegration = load("res://scripts/universal/level_integration.gd")
+	var UniversalSequence = load("res://scripts/universal/passenger_sequence.gd")
+	if UniversalIntegration == null or UniversalSequence == null:
+		return []
+	var lvl = controller.level_data
+	var slot_count = controller.parking.get_slot_count() if controller.parking != null else 4
+	var runtime = UniversalIntegration.build_runtime(lvl, MAX_INITIAL_LOOP_PASSENGERS, slot_count)
+	var validation = runtime.get("validation", null)
+	if validation == null or not validation.solvable:
+		return []
+	var seq = runtime["sequence"]
+	if seq == null:
+		return []
+	var out: Array[Dictionary] = []
+	for p in seq.all():
+		out.append({"id": int(p.id), "color_id": String(p.color)})
+	return out
+
 func _generate_mixed_passenger_sequence(groups: Array[PassengerGroupData]) -> Array[Dictionary]:
 	var total_counts := {}
 	var total_passengers := 0
@@ -641,8 +672,12 @@ func _init_passenger_track() -> void:
 	_feeder_rows.clear()
 	_pending_feeder_rows.clear()
 
-	# Generate mixed and varied passenger color sequence
-	var all_queue_p: Array[Dictionary] = _generate_mixed_passenger_sequence(controller.queue.get_all_groups())
+	# Universal authoritative source: prefer the wave-plan-driven
+	# PassengerSequence. The legacy mixed RNG generator is only used as a
+	# fallback if the universal layer refuses the level (e.g. malformed).
+	var all_queue_p: Array[Dictionary] = _build_universal_passenger_queue()
+	if all_queue_p.is_empty():
+		all_queue_p = _generate_mixed_passenger_sequence(controller.queue.get_all_groups())
 
 	var total_rows = int(ceil(float(all_queue_p.size()) / float(NUM_LANES)))
 	var all_rows: Array[PassengerRow] = []
