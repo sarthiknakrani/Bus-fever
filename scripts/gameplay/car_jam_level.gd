@@ -1730,6 +1730,9 @@ func _build_hud() -> void:
 	rc_close_btn.pressed.connect(_confirm_restart_no)
 	rc_wrapper.add_child(rc_close_btn)
 
+	# 8. Parking Full Toast Popup
+	_setup_toast_ui()
+
 
 func _update_layout() -> void:
 	if world_root == null:
@@ -1923,6 +1926,82 @@ func _create_procedural_glossy_button(btn_text: String, bg_color: Color, border_
 	
 	return wrapper
 
+func _setup_toast_ui() -> void:
+	if _toast_container != null:
+		return
+	_toast_container = CenterContainer.new()
+	_toast_container.name = "ToastContainer"
+	_toast_container.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_toast_container.offset_left = 0.0
+	_toast_container.offset_top = 0.0
+	_toast_container.offset_right = 0.0
+	_toast_container.offset_bottom = 0.0
+	_toast_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_toast_container.z_index = 10
+	if hud != null:
+		hud.add_child(_toast_container)
+	elif safe_area_root != null:
+		safe_area_root.add_child(_toast_container)
+	else:
+		add_child(_toast_container)
+
+	_toast_panel = PanelContainer.new()
+	_toast_panel.name = "ToastPanel"
+	_toast_panel.visible = false
+	var sb = StyleBoxFlat.new()
+	sb.bg_color = Color(0.14, 0.16, 0.22, 0.94)
+	sb.set_corner_radius_all(12)
+	sb.border_width_left = 1
+	sb.border_width_top = 1
+	sb.border_width_right = 1
+	sb.border_width_bottom = 2
+	sb.border_color = Color(0.95, 0.35, 0.35, 0.85)
+	sb.shadow_color = Color(0, 0, 0, 0.30)
+	sb.shadow_size = 4
+	sb.shadow_offset = Vector2(0, 2)
+	_toast_panel.add_theme_stylebox_override("panel", sb)
+	
+	var m = MarginContainer.new()
+	m.add_theme_constant_override("margin_left", 14)
+	m.add_theme_constant_override("margin_right", 14)
+	m.add_theme_constant_override("margin_top", 4)
+	m.add_theme_constant_override("margin_bottom", 4)
+	_toast_panel.add_child(m)
+	
+	var hb = HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 8)
+	hb.alignment = BoxContainer.ALIGNMENT_CENTER
+	m.add_child(hb)
+	
+	var icon_rect = TextureRect.new()
+	icon_rect.texture = load("res://assets/ui/icons/warning_icon.svg")
+	icon_rect.ignore_texture_size = true
+	icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon_rect.custom_minimum_size = Vector2(16, 16)
+	hb.add_child(icon_rect)
+	
+	var lbl = Label.new()
+	lbl.text = "PARKING FULL"
+	lbl.add_theme_font_size_override("font_size", 12)
+	lbl.add_theme_color_override("font_color", Color("fef2f2"))
+	lbl.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
+	lbl.add_theme_constant_override("outline_size", 2)
+	hb.add_child(lbl)
+	
+	_toast_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_toast_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	m.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	
+	_toast_panel.resized.connect(func():
+		if is_instance_valid(_toast_panel):
+			_toast_panel.pivot_offset = _toast_panel.size / 2.0
+	)
+	
+	_toast_container.add_child(_toast_panel)
+
 func _show_parking_full_toast() -> void:
 	var now := Time.get_ticks_msec() / 1000.0
 	# Strict debounce: if toast is already active or triggered within 1.4s, don't re-trigger or spam
@@ -1931,72 +2010,16 @@ func _show_parking_full_toast() -> void:
 	_last_toast_time = now
 
 	if _toast_container == null:
-		_toast_container = CenterContainer.new()
-		_toast_container.name = "ToastContainer"
-		_toast_container.set_anchors_preset(Control.PRESET_TOP_WIDE)
-		_toast_container.offset_top = 72.0
-		_toast_container.offset_bottom = 104.0
-		_toast_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		safe_area_root.add_child(_toast_container)
-
-		_toast_panel = PanelContainer.new()
-		_toast_panel.name = "ToastPanel"
-		var sb = StyleBoxFlat.new()
-		sb.bg_color = Color(0.14, 0.16, 0.22, 0.94)
-		sb.set_corner_radius_all(12)
-		sb.border_width_left = 1
-		sb.border_width_top = 1
-		sb.border_width_right = 1
-		sb.border_width_bottom = 2
-		sb.border_color = Color(0.95, 0.35, 0.35, 0.85)
-		sb.shadow_color = Color(0, 0, 0, 0.30)
-		sb.shadow_size = 4
-		sb.shadow_offset = Vector2(0, 2)
-		_toast_panel.add_theme_stylebox_override("panel", sb)
-		
-		var m = MarginContainer.new()
-		m.add_theme_constant_override("margin_left", 12)
-		m.add_theme_constant_override("margin_right", 14)
-		m.add_theme_constant_override("margin_top", 4)
-		m.add_theme_constant_override("margin_bottom", 4)
-		_toast_panel.add_child(m)
-		
-		var hb = HBoxContainer.new()
-		hb.add_theme_constant_override("separation", 7)
-		hb.alignment = BoxContainer.ALIGNMENT_CENTER
-		m.add_child(hb)
-		
-		var icon_rect = TextureRect.new()
-		icon_rect.texture = load("res://assets/ui/icons/warning_icon.svg")
-		icon_rect.ignore_texture_size = true
-		icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		icon_rect.custom_minimum_size = Vector2(16, 16)
-		hb.add_child(icon_rect)
-		
-		var lbl = Label.new()
-		lbl.text = "PARKING FULL"
-		lbl.add_theme_font_size_override("font_size", 12)
-		lbl.add_theme_color_override("font_color", Color("fef2f2"))
-		lbl.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
-		lbl.add_theme_constant_override("outline_size", 2)
-		hb.add_child(lbl)
-		
-		_toast_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_toast_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		m.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		hb.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		icon_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		
-		_toast_container.add_child(_toast_panel)
+		_setup_toast_ui()
 		
 	if _toast_tween:
 		_toast_tween.kill()
 		
 	_toast_panel.visible = true
 	_toast_panel.modulate.a = 0.0
-	_toast_panel.scale = Vector2(0.92, 0.92)
+	_toast_panel.reset_size()
 	_toast_panel.pivot_offset = _toast_panel.size / 2.0
+	_toast_panel.scale = Vector2(0.92, 0.92)
 	
 	_toast_tween = create_tween()
 	_toast_tween.set_parallel(true)
