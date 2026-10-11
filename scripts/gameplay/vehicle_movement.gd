@@ -85,6 +85,11 @@ static func animate_dispatch(
 		# directly under the slot, well clear of the parking rect.
 		P2 = Vector2(slot_pos.x, slot_pos.y + 100.0)
 
+	# Ensure upward-moving buses do not overshoot above the corridor waypoint
+	# into the parking bays prior to docking through P2.
+	if forward_world.y < -0.5:
+		P1.y = maxf(P1.y, P2.y + 10.0)
+
 	var curve := Curve2D.new()
 	# P0 - bus on the board; out tangent = puzzle direction.
 	curve.add_point(start_pos, Vector2.ZERO, forward_world * 120.0)

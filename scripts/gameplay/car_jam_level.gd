@@ -63,10 +63,10 @@ class PassengerRow extends RefCounted:
 	var is_feeder: bool = false
 	var passengers: Array[Dictionary] = [] # {"id": int, "color_id": String, "lane": int, "view": PassengerView, "state": String}
 
-const LANE_SPACING := 26.0
-const ROW_SPACING := 26.0
+const LANE_SPACING := 24.0
+const ROW_SPACING := 34.0
 const NUM_LANES := 4
-const PASSENGER_SPACING := 26.0
+const PASSENGER_SPACING := 34.0
 const MAX_INITIAL_LOOP_PASSENGERS := 40
 
 var passenger_track: Path2D
@@ -140,7 +140,7 @@ func _process(delta: float) -> void:
 				var f_pt_info = _get_curve_point_and_normal(feeder_track.curve, 0.0, false)
 				for p in next_row.passengers:
 					var pv := PassengerView.new()
-					pv.setup(p["color_id"])
+					pv.setup(p["color_id"], p["id"], p["lane"])
 					passenger_visuals.add_child(pv)
 					p["view"] = pv
 					p["state"] = "FEEDER"
@@ -605,31 +605,31 @@ func _generate_mixed_passenger_sequence(groups: Array[PassengerGroupData]) -> Ar
 func _init_passenger_track() -> void:
 	passenger_track = Path2D.new()
 	var curve := Curve2D.new()
-	var h := 52.47 # R=95.0 * 0.552285
-	# Start at merge point (260, 0)
-	curve.add_point(Vector2(260, 0), Vector2(0, -h), Vector2(0, h))
+	var h := 63.51 # R=115.0 * 0.552285
+	# Start at merge point (270, 0)
+	curve.add_point(Vector2(270, 0), Vector2(0, -h), Vector2(0, h))
 	# Bottom right arc into bottom straight
-	curve.add_point(Vector2(165, 95), Vector2(h, 0), Vector2.ZERO)
+	curve.add_point(Vector2(155, 115), Vector2(h, 0), Vector2.ZERO)
 	# Bottom straight (above parking)
-	curve.add_point(Vector2(-165, 95), Vector2.ZERO, Vector2(-h, 0))
-	# Left semicircle
-	curve.add_point(Vector2(-260, 0), Vector2(0, h), Vector2(0, -h))
+	curve.add_point(Vector2(-155, 115), Vector2.ZERO, Vector2(-h, 0))
+	# Left semicircle apex
+	curve.add_point(Vector2(-270, 0), Vector2(0, h), Vector2(0, -h))
 	# Top left arc into top straight
-	curve.add_point(Vector2(-165, -95), Vector2(-h, 0), Vector2.ZERO)
+	curve.add_point(Vector2(-155, -115), Vector2(-h, 0), Vector2.ZERO)
 	# Top straight
-	curve.add_point(Vector2(165, -95), Vector2.ZERO, Vector2(h, 0))
-	# Close loop back to (260, 0)
-	curve.add_point(Vector2(260, 0), Vector2(0, -h), Vector2(0, h))
+	curve.add_point(Vector2(155, -115), Vector2.ZERO, Vector2(h, 0))
+	# Close loop back to (270, 0)
+	curve.add_point(Vector2(270, 0), Vector2(0, -h), Vector2(0, h))
 	passenger_track.curve = curve
 	
 	# CONTINUOUS FEEDER TRACK
 	feeder_track = Path2D.new()
 	feeder_track.name = "FeederTrack"
 	var f_curve := Curve2D.new()
-	# Smooth curve from plaza gate at (370, -190) merging into main loop at (260, 0)
+	# Smooth curve from plaza gate at (370, -190) merging into main loop at (270, 0)
 	f_curve.add_point(Vector2(370, -190), Vector2.ZERO, Vector2(-30, 45))
-	f_curve.add_point(Vector2(320, -95), Vector2(25, -40), Vector2(-25, 40))
-	f_curve.add_point(Vector2(260, 0), Vector2(0, -55), Vector2.ZERO)
+	f_curve.add_point(Vector2(325, -95), Vector2(25, -40), Vector2(-25, 40))
+	f_curve.add_point(Vector2(270, 0), Vector2(0, -60), Vector2.ZERO)
 	feeder_track.curve = f_curve
 
 	# PREMIUM PLAZA INTEGRATION
@@ -662,7 +662,7 @@ func _init_passenger_track() -> void:
 	var total_span: float = float(controller.level_data.parking_slots_count - 1) * slot_spacing
 	for i in controller.level_data.parking_slots_count:
 		var slot_x: float = slot_views[i].position.x if i < slot_views.size() else (-total_span / 2.0 + float(i) * slot_spacing)
-		var closest: float = passenger_track.curve.get_closest_offset(Vector2(slot_x, 95.0))
+		var closest: float = passenger_track.curve.get_closest_offset(Vector2(slot_x, 115.0))
 		slot_boarding_points[i] = closest
 
 	_last_board_landing_time = 0.0
@@ -705,13 +705,13 @@ func _init_passenger_track() -> void:
 	for r in initial_rows_count:
 		var row = all_rows[r]
 		row.is_feeder = false
-		row.progress = 260.0 - float(r) * ROW_SPACING
+		row.progress = 270.0 - float(r) * ROW_SPACING
 		if row.progress < 0.0: row.progress += passenger_track.curve.get_baked_length()
 		
 		var pt_info = _get_curve_point_and_normal(passenger_track.curve, row.progress, true)
 		for p in row.passengers:
 			var pv := PassengerView.new()
-			pv.setup(p["color_id"])
+			pv.setup(p["color_id"], p["id"], p["lane"])
 			passenger_visuals.add_child(pv)
 			p["view"] = pv
 			p["state"] = "CIRCULATING"
@@ -2076,6 +2076,12 @@ func _animate_individual_boarding(p: Dictionary, vehicle_id: int, slot_id: int, 
 		target_pos = vv.boarding_anchor.global_position
 	else:
 		target_pos = transit_layer.to_global(final_local)
+
+	# Doorway fan-in offset to prevent multi-passenger stacking on a single point
+	var lane_idx: int = p.get("lane", 0)
+	var fan_offset := Vector2((float(lane_idx) - 1.5) * 8.0, 0.0)
+	target_pos += fan_offset
+	pv.z_index = 100
 	
 	var travel_dist = gpos.distance_to(target_pos)
 	var now_sec := Time.get_ticks_msec() / 1000.0
@@ -2103,19 +2109,12 @@ func _animate_individual_boarding(p: Dictionary, vehicle_id: int, slot_id: int, 
 	
 	var tw = create_tween().set_parallel(true)
 	
-	# Travel straight to the actual bus center smoothly
+	# Travel straight to the actual bus doorway smoothly
 	tw.tween_property(pv, "global_position", target_pos, flight_duration).set_delay(start_delay).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	
-	# When passenger overlaps bus, reparent it into the boarding layer
-	var tw_reparent = create_tween()
-	tw_reparent.tween_interval(start_delay + overlap_time)
-	tw_reparent.tween_callback(func():
-		if is_instance_valid(pv) and is_instance_valid(vv) and vv.boarding_layer != null:
-			pv.reparent(vv.boarding_layer, true)
-	)
-	
-	# Shrink/fade ONLY during the final portion when already overlapping the bus
-	tw.tween_property(pv, "scale", Vector2(0.2, 0.2), fade_time).set_delay(start_delay + overlap_time).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	# Shrink/fade cleanly during the final entry portion without reparenting scale pop
+	var start_pv_scale: Vector2 = pv.scale
+	tw.tween_property(pv, "scale", start_pv_scale * 0.6, fade_time).set_delay(start_delay + overlap_time).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	tw.tween_property(pv, "modulate:a", 0.0, fade_time).set_delay(start_delay + overlap_time).set_trans(Tween.TRANS_LINEAR)
 	
 	var token = controller.session_token

@@ -15,9 +15,9 @@ var _is_boarding: bool = false
 var _last_pos: Vector2 = Vector2.ZERO
 var _facing_right: bool = true
 
-const BASE_SCALE := 0.30
+const BASE_SCALE := 0.28
 
-func setup(p_col_id: String) -> void:
+func setup(p_col_id: String, p_id: int = 0, p_lane: int = 0) -> void:
 	_color_id = p_col_id.to_lower()
 	
 	_visual_node = Node2D.new()
@@ -64,38 +64,44 @@ func setup(p_col_id: String) -> void:
 	_visual_node.add_child(_char_sprite)
 	
 	_visual_node.scale = Vector2(BASE_SCALE, BASE_SCALE)
-	_anim_time = randf() * 2.0 * PI
+	# Organic per-passenger phase desynchronization
+	if p_id != 0 or p_lane != 0:
+		_anim_time = float((p_id * 17 + p_lane * 23) % 100) / 100.0 * TAU
+	else:
+		_anim_time = randf() * TAU
 
 func _process(delta: float) -> void:
 	if not _is_boarding:
-		# Handle natural 2D orientation along the track
+		# Handle natural 2D orientation along the track with hysteresis to prevent flutter
 		var current_pos = global_position
 		if _last_pos != Vector2.ZERO:
 			var dx = current_pos.x - _last_pos.x
-			if dx > 0.4 and not _facing_right:
+			if dx > 0.6 and not _facing_right:
 				_facing_right = true
-			elif dx < -0.4 and _facing_right:
+			elif dx < -0.6 and _facing_right:
 				_facing_right = false
 		_last_pos = current_pos
 
 		_anim_time += delta * 18.0 # Running cadence matching 660 px/s track pace
 		
-		# Rhythmic running bounce and subtle squash/stretch
-		var bob: float = absf(sin(_anim_time)) * 2.2
-		var squash: float = 1.0 + sin(_anim_time * 2.0) * 0.035
-		var stretch: float = 1.0 - sin(_anim_time * 2.0) * 0.035
+		# Grounded running bounce with stance/flight phases
+		var bounce: float = sin(_anim_time)
+		var bob: float = maxf(0.0, bounce) * 2.8
+		var squash: float = 1.0 - maxf(0.0, -bounce) * 0.04 + maxf(0.0, bounce) * 0.025
+		var stretch: float = 1.0 + maxf(0.0, bounce) * 0.035 - maxf(0.0, -bounce) * 0.02
 		
 		var facing_sign: float = 1.0 if _facing_right else -1.0
 		_char_sprite.position.y = -bob
 		_char_sprite.scale = Vector2(facing_sign * squash, stretch)
 		
 		# Subtle running tilt in motion direction
-		_char_sprite.rotation = facing_sign * deg_to_rad(3.5) * (1.0 + 0.2 * sin(_anim_time))
+		_char_sprite.rotation = facing_sign * deg_to_rad(3.0) * (1.0 + 0.25 * bounce)
 		
-		# Shadow expands slightly when feet hit ground, contracts when in air
+		# Shadow reacts to ground contact
 		if _shadow != null:
-			var shadow_scale_factor = 1.0 - (bob / 2.2) * 0.12
-			_shadow.scale = Vector2(0.28 * shadow_scale_factor, 0.15 * shadow_scale_factor)
+			var shadow_factor: float = 1.0 - (bob / 2.8) * 0.16 + maxf(0.0, -bounce) * 0.06
+			_shadow.scale = Vector2(0.28 * shadow_factor, 0.15 * shadow_factor)
+			_shadow.modulate.a = 0.45 * shadow_factor
 
 func animate_jump(delay: float) -> void:
 	if not is_inside_tree(): return
