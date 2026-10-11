@@ -364,8 +364,8 @@ func _run_all_timing_tests() -> void:
 		print("  [FAIL] Total passengers expected 240, got %d" % total_combined)
 		failures += 1
 
-	if total_initial_p == 0 and total_combined == 240:
-		print("  [PASS] Zero initial mass spawn; all 240 passengers streaming progressively via feeder!")
+	if total_initial_p == 160 and (total_feeder_p + total_pending_feeder) == 80:
+		print("  [PASS] Oval starts densely packed (160 passengers); 80 passengers waiting in feeder queue!")
 	else:
 		print("  [FAIL] Distribution incorrect: initial=%d, feeder=%d, pending=%d" % [total_initial_p, total_feeder_p, total_pending_feeder])
 		failures += 1

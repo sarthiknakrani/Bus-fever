@@ -82,7 +82,7 @@ func _process(delta: float) -> void:
 				_facing_right = false
 		_last_pos = current_pos
 
-		_anim_time += delta * 7.5 # Running cadence matching 240 px/s track pace
+		_anim_time += delta * 4.5 # Natural walking/jogging cadence matching 130 px/s track pace
 		
 		# Grounded running bounce with stance/flight phases
 		var bounce: float = sin(_anim_time)

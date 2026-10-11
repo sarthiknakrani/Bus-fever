@@ -81,10 +81,10 @@ func _run_all_tests() -> void:
 
 	await create_timer(0.1).timeout
 
-	if level.circulating_ids.size() == 0:
-		print("  [PASS] Clean level start: 0 initial circulating passengers (no 40-passenger mass spawn)")
+	if level.circulating_ids.size() == 160:
+		print("  [PASS] Main oval densely packed at start: 160 passengers (40 rows x 4 lanes)")
 	else:
-		print("  [FAIL] Expected 0 initial loop passengers, got %d" % level.circulating_ids.size())
+		print("  [FAIL] Expected 160 initial loop passengers, got %d" % level.circulating_ids.size())
 		failures += 1
 
 	# Check active passenger instances
@@ -98,7 +98,7 @@ func _run_all_tests() -> void:
 			var col: String = p_dict.get("color_id", "")
 			color_counts[col] = color_counts.get(col, 0) + 1
 
-	print("  [PASS] Verified %d initial active PassengerView instances on track (feeder streaming)" % active_views_count)
+	print("  [PASS] Verified %d initial active PassengerView instances on main oval" % active_views_count)
 	print("  [PASS] Active track color breakdown: %s" % str(color_counts))
 
 	# 4. Boarding Leap & Bus Occupancy Transition
