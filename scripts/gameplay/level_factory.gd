@@ -30,7 +30,10 @@ static func create_level_1() -> CarJamLevelData:
 		v.anchor = cfg["pos"]
 		v.initial_anchor = cfg["pos"]
 		v.direction = cfg["dir"]
-		v.footprint = cfg["footprint"]
+		var fp: Array[Vector2i] = []
+		for p in cfg["footprint"]:
+			fp.append(p)
+		v.footprint = fp
 		lvl.vehicles.append(v)
 
 	# Ordered passenger groups: 6 groups of 40 passengers = 240 total

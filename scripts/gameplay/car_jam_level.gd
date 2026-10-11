@@ -26,6 +26,7 @@ var parking_slots_node: Node2D
 var parked_vehicles_node: Node2D
 
 var passenger_track_root: Node2D
+var passenger_track_bg: Node2D
 var passenger_visuals: Node2D
 var boarding_paths_root: Node2D
 var boarding_effects: Node2D
@@ -64,7 +65,7 @@ class PassengerRow extends RefCounted:
 	var is_feeder: bool = false
 	var passengers: Array[Dictionary] = [] # {"id": int, "color_id": String, "lane": int, "view": PassengerView, "state": String}
 
-const LANE_SPACING := 22.0
+const LANE_SPACING := 19.5
 const ROW_SPACING := 38.0
 const NUM_LANES := 4
 const PASSENGER_SPACING := 38.0
@@ -233,7 +234,11 @@ func _process(delta: float) -> void:
 			var dist_to_trigger = trigger_prog - old_prog
 			if dist_to_trigger < 0: dist_to_trigger += track_len
 			
-			var in_boarding_zone: bool = (old_prog >= (_platform_start_prog - 20.0) and old_prog <= (_platform_end_prog + 20.0))
+			var in_boarding_zone: bool
+			if _platform_start_prog <= _platform_end_prog:
+				in_boarding_zone = (old_prog >= (_platform_start_prog - 20.0) and old_prog <= (_platform_end_prog + 20.0))
+			else:
+				in_boarding_zone = (old_prog >= (_platform_start_prog - 20.0) or old_prog <= (_platform_end_prog + 20.0))
 			var reached: bool = in_boarding_zone and ((dist_to_trigger <= dist_moved) or (abs(old_prog - trigger_prog) < 15.0))
 			if reached:
 				var slot = controller.parking.get_slot(slot_idx)
@@ -366,6 +371,11 @@ func _build_scene_hierarchy() -> void:
 	passenger_track_root.position = Vector2(0, PASSENGER_TRACK_Y)
 	world_root.add_child(passenger_track_root)
 
+	passenger_track_bg = Node2D.new()
+	passenger_track_bg.name = "PassengerTrackBg"
+	passenger_track_bg.z_index = -2
+	passenger_track_root.add_child(passenger_track_bg)
+
 	passenger_visuals = Node2D.new()
 	passenger_visuals.name = "PassengerVisuals"
 	passenger_visuals.y_sort_enabled = true
@@ -460,6 +470,10 @@ func _setup_visuals(lvl: CarJamLevelData) -> void:
 		feeder_track.queue_free()
 		feeder_track = null
 	
+	if is_instance_valid(passenger_track_bg):
+		for c in passenger_track_bg.get_children():
+			c.queue_free()
+
 	if is_instance_valid(passenger_visuals):
 		for c in passenger_visuals.get_children():
 			c.queue_free()
@@ -632,23 +646,24 @@ func _init_passenger_track() -> void:
 	feeder_track = Path2D.new()
 	feeder_track.name = "FeederTrack"
 	var f_curve := Curve2D.new()
-	# Smooth curve from plaza gate at (370, -190) merging into main loop at (270, 0)
-	f_curve.add_point(Vector2(370, -190), Vector2.ZERO, Vector2(-30, 45))
-	f_curve.add_point(Vector2(325, -95), Vector2(25, -40), Vector2(-25, 40))
-	f_curve.add_point(Vector2(270, 0), Vector2(0, -60), Vector2.ZERO)
+	# Smooth, deliberate curve from on-screen entrance gate at (285, -175) merging into loop at (270, 0)
+	f_curve.add_point(Vector2(285, -175), Vector2.ZERO, Vector2(-15, 45))
+	f_curve.add_point(Vector2(280, -88), Vector2(10, -40), Vector2(-10, 40))
+	f_curve.add_point(Vector2(270, 0), Vector2(0, -45), Vector2.ZERO)
 	feeder_track.curve = f_curve
 
 	# PREMIUM PLAZA INTEGRATION
 	var plaza = preload("res://scripts/gameplay/plaza_environment.gd").new()
 	plaza.name = "PlazaEnvironment"
-	passenger_visuals.add_child(plaza)
+	passenger_track_bg.add_child(plaza)
 
-	# Use custom robust track renderer with both curves
+	# Dedicated background track renderer (z_index = -2) so it NEVER occludes passengers
 	var track_renderer = preload("res://scripts/gameplay/track_renderer.gd").new()
 	track_renderer.name = "TrackRenderer"
 	track_renderer.curve = curve
 	track_renderer.feeder_curve = f_curve
-	passenger_visuals.add_child(track_renderer)
+	track_renderer.z_index = -2
+	passenger_track_bg.add_child(track_renderer)
 
 	_waiting_label = Label.new()
 	_waiting_label.add_theme_font_size_override("font_size", 20)
@@ -659,8 +674,8 @@ func _init_passenger_track() -> void:
 	_waiting_label.visible = false
 	passenger_visuals.add_child(_waiting_label)
 
-	passenger_visuals.add_child(feeder_track)
-	passenger_visuals.add_child(passenger_track)
+	passenger_track_root.add_child(feeder_track)
+	passenger_track_root.add_child(passenger_track)
 	
 	# Precalculate boarding crossing points for ALL parking slots
 	slot_boarding_points.clear()
@@ -1720,14 +1735,13 @@ func _update_layout() -> void:
 	if world_root == null:
 		return
 	var vp := get_viewport()
-	var vp_size: Vector2 = vp.get_visible_rect().size if vp != null else Vector2(720, 1280)
-	if DisplayServer.get_name() == "headless": vp_size = Vector2(720, 1280)
-	if vp_size.x <= 0 or vp_size.y <= 0:
-		return
+	var vp_size: Vector2 = vp.get_visible_rect().size if vp != null else Vector2.ZERO
+	if vp_size.x <= 0.0 or vp_size.y <= 0.0:
+		vp_size = Vector2(720, 1280)
 
 	# 1. Determine local bounding sizes
 	var track_h = 240.0
-	var parking_h = 160.0
+	var parking_h = 150.0
 	var board_cells_w = float(controller.level_data.board_size.x)
 	var board_cells_h = float(controller.level_data.board_size.y)
 	var board_local_size = max(board_cells_w, board_cells_h) * CELL_SIZE
@@ -1736,33 +1750,35 @@ func _update_layout() -> void:
 	var board_pixel_h = board_pixel_w * 0.72
 	
 	# 2. Determine required margins and total logical dimensions
-	# Top safe area (~120px: TopBar), bottom safe area (~160px: booster bar + padding)
-	var screen_safe_h = vp_size.y - 280.0
+	# Top safe area (~110px: TopBar), bottom safe area (~140px: booster bar + padding)
+	var screen_safe_h = vp_size.y - 250.0
 	var screen_safe_w = vp_size.x * 0.94
 
-	# Ensure we fit the parking strip which might be wider than the board
+	# Ensure we fit parking strip, board clearance, and track system with feeder
 	var slot_spacing = 76.0 # MATCHES what we set earlier
 	var parking_w = float(max(1, controller.level_data.parking_slots_count - 1)) * slot_spacing + 40.0
 	var board_padded_w = board_pixel_w + 100.0
-	var required_w = maxf(maxf(parking_w, board_padded_w), 540.0)
+	var track_system_w = 702.0 # Full track system span (R=115, apex=270, border 162px)
+	var required_w = maxf(maxf(parking_w, board_padded_w), track_system_w)
 	
 	# Baseline content height with clean corridor below parking for turning buses
-	var min_gap = 26.0
-	var bus_corridor_gap = 90.0
-	var base_content_h = track_h + min_gap + parking_h + bus_corridor_gap + board_pixel_h
+	var min_gap_tp = 22.0
+	var bus_corridor_gap = 95.0
+	var base_content_h = track_h + min_gap_tp + parking_h + bus_corridor_gap + board_pixel_h
 
 	var scale_w = screen_safe_w / required_w
-	var scale_h = screen_safe_h / base_content_h
-	var scale_factor = clampf(min(scale_w, scale_h), 0.45, 1.40)
+	var scale_h = screen_safe_h / (base_content_h + 30.0)
+	var scale_factor = clampf(min(scale_w, scale_h), 0.42, 2.20)
 	
 	# Compute logical space available at this scale
 	var available_local_h = screen_safe_h / scale_factor
 	var extra_h = maxf(0.0, available_local_h - base_content_h)
 
 	# Distribute extra height gracefully: comfortable spacing between track/parking and bus corridor
-	var gap_tp = clampf(min_gap + extra_h * 0.18, 24.0, 48.0)
-	var gap_pb = clampf(bus_corridor_gap + extra_h * 0.32, 85.0, 130.0)
+	var gap_tp = clampf(min_gap_tp + extra_h * 0.12, 22.0, 52.0)
+	var gap_pb = clampf(bus_corridor_gap + extra_h * 0.24, 95.0, 150.0)
 	var total_content_h = track_h + gap_tp + parking_h + gap_pb + board_pixel_h
+	var remaining_h = maxf(0.0, available_local_h - total_content_h)
 
 	# Apply scale to world root
 	world_root.scale = Vector2(scale_factor, scale_factor)
@@ -1770,9 +1786,9 @@ func _update_layout() -> void:
 	
 	# Center the stacked layout vertically inside available safe area
 	var half_h = (vp_size.y / 2.0) / scale_factor
-	var top_y = -half_h + (125.0 / scale_factor)
-	var center_offset = maxf(0.0, (available_local_h - total_content_h) * 0.40)
-	var start_y = top_y + center_offset + (track_h / 2.0)
+	var top_safe_y = -half_h + (110.0 / scale_factor)
+	var top_y = top_safe_y + clampf(remaining_h * 0.22, 0.0, 50.0)
+	var start_y = top_y + (track_h / 2.0)
 	
 	var track_y = start_y
 	var parking_y = track_y + (track_h / 2.0) + gap_tp + (parking_h / 2.0)
