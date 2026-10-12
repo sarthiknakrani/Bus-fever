@@ -52,13 +52,10 @@ class ParkingSlot:
 
 var _slots: Array[ParkingSlot] = []
 
-func setup(slot_count: int = 4, custom_unlocked_ids: Array[int] = []) -> void:
+func setup(slot_count: int = 4) -> void:
 	_slots.clear()
 	for i in slot_count:
-		var slot := ParkingSlot.new(i)
-		if not custom_unlocked_ids.is_empty():
-			slot.is_unlocked = custom_unlocked_ids.has(i)
-		_slots.append(slot)
+		_slots.append(ParkingSlot.new(i))
 
 func get_slot_count() -> int:
 	return _slots.size()

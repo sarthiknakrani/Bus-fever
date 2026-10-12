@@ -131,45 +131,13 @@ func _test_2_level_2_initialization() -> void:
 	if gc: gc.current_level_number = 1
 	l.queue_free()
 
-func _get_accounting_test_level() -> CarJamLevelData:
-	var lvl := CarJamLevelData.new()
-	lvl.board_size = Vector2i(5, 5)
-	lvl.parking_slots_count = 7
-	var configs := [
-		{"id": 1, "code": "v1_yellow", "color": "yellow", "pos": Vector2i(1, 0), "footprint": [Vector2i(0, 0), Vector2i(0, 1)], "dir": CarJamVehicleData.Direction.DOWN},
-		{"id": 2, "code": "v2_blue",   "color": "blue",   "pos": Vector2i(3, 1), "footprint": [Vector2i(0, 0), Vector2i(-1, 0)], "dir": CarJamVehicleData.Direction.LEFT},
-		{"id": 3, "code": "v3_red",    "color": "red",    "pos": Vector2i(1, 2), "footprint": [Vector2i(0, 0), Vector2i(1, 0)], "dir": CarJamVehicleData.Direction.RIGHT},
-		{"id": 4, "code": "v4_yellow", "color": "yellow", "pos": Vector2i(3, 4), "footprint": [Vector2i(0, 0), Vector2i(0, -1)], "dir": CarJamVehicleData.Direction.UP},
-		{"id": 5, "code": "v5_blue",   "color": "blue",   "pos": Vector2i(2, 3), "footprint": [Vector2i(0, 0), Vector2i(0, 1)], "dir": CarJamVehicleData.Direction.DOWN},
-		{"id": 6, "code": "v6_red",    "color": "red",    "pos": Vector2i(1, 3), "footprint": [Vector2i(0, 0), Vector2i(-1, 0)], "dir": CarJamVehicleData.Direction.LEFT},
-	]
-	for cfg in configs:
-		var v := CarJamVehicleData.new()
-		v.id = cfg["id"]
-		v.code = cfg["code"]
-		v.color_id = cfg["color"]
-		v.capacity = 40
-		v.anchor = cfg["pos"]
-		v.initial_anchor = cfg["pos"]
-		v.direction = cfg["dir"]
-		var fp: Array[Vector2i] = []
-		for p in cfg["footprint"]:
-			fp.append(p)
-		v.footprint = fp
-		lvl.vehicles.append(v)
-	var queue_colors: Array[String] = ["red", "blue", "yellow", "red", "blue", "yellow"]
-	for i in queue_colors.size():
-		var g := PassengerGroupData.new(i, queue_colors[i], 40)
-		lvl.passenger_groups.append(g)
-	return lvl
-
 # -----------------------------------------------------------------
 # 3. Partial Bus Boarding
 # -----------------------------------------------------------------
 func _test_3_partial_bus_boarding() -> void:
 	print("\n--- TEST 3: Partial Bus Boarding ---")
 	var c := CarJamController.new()
-	var lvl: CarJamLevelData = _get_accounting_test_level()
+	var lvl: CarJamLevelData = load("res://levels/level_001.tres")
 	c.load_level(lvl)
 
 	# Park Bus 3 (Red, capacity 40)
@@ -223,7 +191,7 @@ func _test_3_partial_bus_boarding() -> void:
 func _test_4_repeated_returning_colors() -> void:
 	print("\n--- TEST 4: Repeated Returning Colors (Independent Group Accounting) ---")
 	var c := CarJamController.new()
-	var lvl: CarJamLevelData = _get_accounting_test_level()
+	var lvl: CarJamLevelData = load("res://levels/level_001.tres")
 	c.load_level(lvl)
 
 	# Group 0: red, 40 (passengers 0..39)
@@ -268,7 +236,7 @@ func _test_4_repeated_returning_colors() -> void:
 func _test_5_two_matching_buses_parked_simultaneously() -> void:
 	print("\n--- TEST 5: Two Matching Buses Parked Simultaneously ---")
 	var c := CarJamController.new()
-	var lvl: CarJamLevelData = _get_accounting_test_level()
+	var lvl: CarJamLevelData = load("res://levels/level_001.tres")
 	c.load_level(lvl)
 
 	# Bus 3 (Red, slot 0) and Bus 6 (Red, slot 1)
@@ -321,7 +289,7 @@ func _test_5_two_matching_buses_parked_simultaneously() -> void:
 func _test_6_rapid_boarding_reservations() -> void:
 	print("\n--- TEST 6: Rapid Boarding Reservations (Capacity Guard) ---")
 	var c := CarJamController.new()
-	var lvl: CarJamLevelData = _get_accounting_test_level()
+	var lvl: CarJamLevelData = load("res://levels/level_001.tres")
 	c.load_level(lvl)
 
 	var v3: VehicleModel = c.vehicles[3]
@@ -353,7 +321,7 @@ func _test_6_rapid_boarding_reservations() -> void:
 func _test_7_repeated_completion_callback_idempotence() -> void:
 	print("\n--- TEST 7: Repeated Completion Callback Idempotence ---")
 	var c := CarJamController.new()
-	var lvl: CarJamLevelData = _get_accounting_test_level()
+	var lvl: CarJamLevelData = load("res://levels/level_001.tres")
 	c.load_level(lvl)
 
 	var v3: VehicleModel = c.vehicles[3]
@@ -390,7 +358,7 @@ func _test_7_repeated_completion_callback_idempotence() -> void:
 func _test_8_callback_after_restart() -> void:
 	print("\n--- TEST 8: Callback After Restart (Session Token Isolation) ---")
 	var c := CarJamController.new()
-	var lvl: CarJamLevelData = _get_accounting_test_level()
+	var lvl: CarJamLevelData = load("res://levels/level_001.tres")
 	c.load_level(lvl)
 
 	var old_token = c.session_token
@@ -418,7 +386,7 @@ func _test_8_callback_after_restart() -> void:
 func _test_9_callback_after_scene_change() -> void:
 	print("\n--- TEST 9: Callback After Scene Change ---")
 	var c := CarJamController.new()
-	var lvl: CarJamLevelData = _get_accounting_test_level()
+	var lvl: CarJamLevelData = load("res://levels/level_001.tres")
 	c.load_level(lvl)
 
 	# Stale callback with obsolete token 9999
@@ -435,7 +403,7 @@ func _test_9_callback_after_scene_change() -> void:
 func _test_10_pause_resume_during_boarding() -> void:
 	print("\n--- TEST 10: Pause / Resume During Boarding ---")
 	var c := CarJamController.new()
-	var lvl: CarJamLevelData = _get_accounting_test_level()
+	var lvl: CarJamLevelData = load("res://levels/level_001.tres")
 	c.load_level(lvl)
 
 	var v3 = c.vehicles[3]
@@ -470,7 +438,7 @@ func _test_10_pause_resume_during_boarding() -> void:
 func _test_11_passenger_cancellation_rollback() -> void:
 	print("\n--- TEST 11: Passenger Cancellation Rollback ---")
 	var c := CarJamController.new()
-	var lvl: CarJamLevelData = _get_accounting_test_level()
+	var lvl: CarJamLevelData = load("res://levels/level_001.tres")
 	c.load_level(lvl)
 
 	var v3 = c.vehicles[3]
@@ -514,7 +482,7 @@ func _test_11_passenger_cancellation_rollback() -> void:
 func _test_12_final_passenger_and_vehicle_completion() -> void:
 	print("\n--- TEST 12: Final Passenger and Vehicle Completion (Win State) ---")
 	var c := CarJamController.new()
-	var lvl: CarJamLevelData = _get_accounting_test_level()
+	var lvl: CarJamLevelData = load("res://levels/level_001.tres")
 	c.load_level(lvl)
 
 	var level_completed_fired := [false]
@@ -566,7 +534,7 @@ func _test_12_final_passenger_and_vehicle_completion() -> void:
 func _test_13_negative_invalid_group_id() -> void:
 	print("\n--- TEST 13 (NEGATIVE): Valid Passenger Has Invalid Group ID ---")
 	var c := CarJamController.new()
-	var lvl: CarJamLevelData = _get_accounting_test_level()
+	var lvl: CarJamLevelData = load("res://levels/level_001.tres")
 	c.load_level(lvl)
 
 	var v3 = c.vehicles[3]
@@ -600,7 +568,7 @@ func _test_13_negative_invalid_group_id() -> void:
 func _test_14_negative_wrong_group_color() -> void:
 	print("\n--- TEST 14 (NEGATIVE): Passenger Assigned to Wrong Color Group ---")
 	var c := CarJamController.new()
-	var lvl: CarJamLevelData = _get_accounting_test_level()
+	var lvl: CarJamLevelData = load("res://levels/level_001.tres")
 	c.load_level(lvl)
 
 	var v3 = c.vehicles[3]
@@ -635,7 +603,7 @@ func _test_14_negative_wrong_group_color() -> void:
 func _test_15_negative_group_exhausted_zero_remaining() -> void:
 	print("\n--- TEST 15 (NEGATIVE): Exact Group Has Zero Remaining Demand ---")
 	var c := CarJamController.new()
-	var lvl: CarJamLevelData = _get_accounting_test_level()
+	var lvl: CarJamLevelData = load("res://levels/level_001.tres")
 	c.load_level(lvl)
 
 	var v3 = c.vehicles[3]
@@ -666,7 +634,7 @@ func _test_15_negative_group_exhausted_zero_remaining() -> void:
 func _test_16_negative_later_same_color_group_has_demand_while_requested_group_exhausted() -> void:
 	print("\n--- TEST 16 (NEGATIVE): No Wrong-Group Fallback When Requested Group Exhausted ---")
 	var c := CarJamController.new()
-	var lvl: CarJamLevelData = _get_accounting_test_level()
+	var lvl: CarJamLevelData = load("res://levels/level_001.tres")
 	c.load_level(lvl)
 
 	var v3 = c.vehicles[3]
@@ -702,7 +670,7 @@ func _test_16_negative_later_same_color_group_has_demand_while_requested_group_e
 func _test_17_negative_illegal_state_modifications() -> void:
 	print("\n--- TEST 17 (NEGATIVE): Illegal State Transition Enforcement ---")
 	var c := CarJamController.new()
-	var lvl: CarJamLevelData = _get_accounting_test_level()
+	var lvl: CarJamLevelData = load("res://levels/level_001.tres")
 	c.load_level(lvl)
 
 	# 1. Unknown passenger
@@ -767,7 +735,7 @@ func _test_17_negative_illegal_state_modifications() -> void:
 func _test_18_negative_duplicate_commit() -> void:
 	print("\n--- TEST 18 (NEGATIVE): Duplicate Commit Idempotence & Counter Invariance ---")
 	var c := CarJamController.new()
-	var lvl: CarJamLevelData = _get_accounting_test_level()
+	var lvl: CarJamLevelData = load("res://levels/level_001.tres")
 	c.load_level(lvl)
 
 	var v3 = c.vehicles[3]
@@ -807,7 +775,7 @@ func _test_18_negative_duplicate_commit() -> void:
 func _test_19_negative_cancelled_reservation_late_callback() -> void:
 	print("\n--- TEST 19 (NEGATIVE): Late Callback After Cancellation ---")
 	var c := CarJamController.new()
-	var lvl: CarJamLevelData = _get_accounting_test_level()
+	var lvl: CarJamLevelData = load("res://levels/level_001.tres")
 	c.load_level(lvl)
 
 	var v3 = c.vehicles[3]
@@ -836,7 +804,7 @@ func _test_19_negative_cancelled_reservation_late_callback() -> void:
 func _test_20_negative_procedural_plan_more_waves_than_authored_groups() -> void:
 	print("\n--- TEST 20 (NEGATIVE): Procedural Plan With More Waves Than Authored Groups ---")
 	var c := CarJamController.new()
-	var lvl: CarJamLevelData = _get_accounting_test_level()
+	var lvl: CarJamLevelData = load("res://levels/level_001.tres")
 	c.load_level(lvl)
 
 	var WavePlanClass = load("res://scripts/universal/wave_plan.gd")
@@ -894,7 +862,7 @@ func _test_20_negative_procedural_plan_more_waves_than_authored_groups() -> void
 func _test_21_negative_attempted_invalid_commit_leaves_all_counters_unchanged() -> void:
 	print("\n--- TEST 21 (NEGATIVE): Invalid Commits Leave Every Counter Untouched ---")
 	var c := CarJamController.new()
-	var lvl: CarJamLevelData = _get_accounting_test_level()
+	var lvl: CarJamLevelData = load("res://levels/level_001.tres")
 	c.load_level(lvl)
 
 	var v3 = c.vehicles[3]
@@ -929,7 +897,7 @@ func _test_21_negative_attempted_invalid_commit_leaves_all_counters_unchanged() 
 func _test_22_negative_interrupted_boarding_leaves_no_phantom_seats_or_stranded_passengers() -> void:
 	print("\n--- TEST 22 (NEGATIVE): Interrupted Boarding Cleanup & Rollback ---")
 	var c := CarJamController.new()
-	var lvl: CarJamLevelData = _get_accounting_test_level()
+	var lvl: CarJamLevelData = load("res://levels/level_001.tres")
 	c.load_level(lvl)
 
 	var v3 = c.vehicles[3]

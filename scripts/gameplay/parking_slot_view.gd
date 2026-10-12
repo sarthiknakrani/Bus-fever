@@ -9,11 +9,9 @@ const SLOT_HEIGHT: float = 94.0
 
 var _vip_label: Label
 var _draw_node: Node2D
-var is_unlocked: bool = false
 
-func setup(id: int, p_is_unlocked: bool = false) -> void:
+func setup(id: int) -> void:
 	slot_id = id
-	is_unlocked = p_is_unlocked
 	name = "Slot_%d" % id
 	
 	_build_visuals()
@@ -49,7 +47,7 @@ func _update_visual_state() -> void:
 
 func _on_draw_lines() -> void:
 	var is_vip = (slot_id == 0)
-	var is_locked = not is_unlocked and not is_vip
+	var is_locked = (slot_id >= 4)
 	var is_reserved = (slot_state == CarJamParkingManager.SlotState.RESERVED)
 	var is_occupied = (slot_state == CarJamParkingManager.SlotState.OCCUPIED)
 	var is_departing = (slot_state == CarJamParkingManager.SlotState.DEPARTING)
