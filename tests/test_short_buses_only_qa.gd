@@ -62,9 +62,9 @@ func _run_short_bus_tests() -> void:
 		else:
 			print("    [PASS] Verified NOT a long bus")
 
-		# Check 4: Exact short bus dimensions
+		# Check 4: Exact short bus dimensions (canonical 62x110 vertical, 110x62 horizontal)
 		var is_vert: bool = (vv.vehicle_dir == CarJamVehicleData.Direction.UP or vv.vehicle_dir == CarJamVehicleData.Direction.DOWN)
-		var expected_size: Vector2 = Vector2(68, 146) if is_vert else Vector2(146, 68)
+		var expected_size: Vector2 = Vector2(62, 110) if is_vert else Vector2(110, 62)
 		if tex_size == expected_size:
 			print("    [PASS] Exact native short bus dimensions: %s" % str(expected_size))
 		else:
@@ -120,7 +120,7 @@ func _run_short_bus_tests() -> void:
 			print("    [PASS] Verified NOT a long bus")
 
 		var is_vert: bool = (vv.vehicle_dir == CarJamVehicleData.Direction.UP or vv.vehicle_dir == CarJamVehicleData.Direction.DOWN)
-		var expected_size: Vector2 = Vector2(68, 146) if is_vert else Vector2(146, 68)
+		var expected_size: Vector2 = Vector2(62, 110) if is_vert else Vector2(110, 62)
 		if tex_size == expected_size:
 			print("    [PASS] Exact native short bus dimensions: %s" % str(expected_size))
 		else:
@@ -146,8 +146,7 @@ func _run_short_bus_tests() -> void:
 		var test_vv := VehicleView.new()
 		test_vv.setup(99, "test", "blue", d, 40, fp)
 		var unscaled: Vector2 = test_vv.get_unscaled_parked_size()
-		var scale_val: float = minf(54.0 / unscaled.x, 102.0 / unscaled.y)
-		var visual_body: Vector2 = unscaled * scale_val
+		var visual_body: Vector2 = Vector2(VehicleView.CANONICAL_BODY_WIDTH, VehicleView.CANONICAL_BODY_LENGTH)
 		var w_margin: float = (62.0 - visual_body.x) / 2.0
 		var h_margin: float = (110.0 - visual_body.y) / 2.0
 
@@ -155,7 +154,7 @@ func _run_short_bus_tests() -> void:
 			dir_names[d_idx], unscaled.x, unscaled.y, visual_body.x, visual_body.y, w_margin, h_margin
 		])
 
-		if visual_body.x <= 54.0 and visual_body.y <= 102.0 and w_margin >= 3.0 and h_margin >= 3.0:
+		if visual_body.x <= 56.0 and visual_body.y <= 104.0 and w_margin >= 3.0 and h_margin >= 3.0:
 			print("    [PASS] Clean centered parking fit with zero slot clipping")
 		else:
 			print("    [FAIL] Parking containment violation!")

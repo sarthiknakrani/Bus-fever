@@ -14,6 +14,13 @@ var passenger_occupancy: int = 0
 var is_in_parking: bool = false
 
 const CELL_SIZE: float = 78.0
+
+# Canonical short bus dimensions (uniform across all variants)
+const CANONICAL_BODY_WIDTH: float = 54.0
+const CANONICAL_BODY_LENGTH: float = 102.0
+const CANONICAL_CANVAS_WIDTH: float = 62.0
+const CANONICAL_CANVAS_HEIGHT: float = 110.0
+
 var _badge_node: Node2D
 var _badge_label: Label
 var _touch_area: Area2D
@@ -244,6 +251,6 @@ func get_unscaled_parked_size() -> Vector2:
 		else:
 			return Vector2(tex_sz.x, tex_sz.y)
 	
-	# Authoritative standard short bus parked dimensions
-	return Vector2(68.0, 146.0)
+	# Authoritative canonical short bus parked dimensions matching parking slot (62x110)
+	return Vector2(CANONICAL_CANVAS_WIDTH, CANONICAL_CANVAS_HEIGHT)
 

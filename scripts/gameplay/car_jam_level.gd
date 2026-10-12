@@ -565,6 +565,10 @@ func _setup_visuals(lvl: CarJamLevelData) -> void:
 		vv.setup(vd.id, vd.code, vd.color_id, vd.direction, vd.capacity, vd.footprint)
 		var center_offset = _calc_footprint_center_offset(vd.footprint)
 		vv.position = _cell_to_board_local(vd.anchor, lvl.board_size) + center_offset
+		# Compensate board_root's 0.72 Y-scaling so buses render at uniform 1.0 global scale
+		# across all orientations (eliminates the 28% size difference between vertical and horizontal buses)
+		var board_scale_y = board_root.scale.y if board_root != null and board_root.scale.y != 0.0 else 0.72
+		vv.scale = Vector2(1.0, 1.0 / board_scale_y)
 		vv.tapped.connect(_on_vehicle_tapped)
 		vehicle_layer.add_child(vv)
 		vehicle_views[vd.id] = vv
@@ -922,16 +926,15 @@ func _on_vehicle_dispatch_started(vehicle_id: int, slot_id: int, corridor: Array
 	# parking slots.
 	var corridor_pos := Vector2(target_slot_pos.x, target_slot_pos.y + 110.0)
 
-	# Authoritative parking slot dimensions from ParkingSlotView
-	# SLOT_WIDTH = 62.0, SLOT_HEIGHT = 110.0
-	# Target visual bus body in parking: width <= 54.0, height <= 102.0 with preserved aspect ratio
+	# Authoritative parking slot dimensions from ParkingSlotView (SLOT_WIDTH = 62.0, SLOT_HEIGHT = 110.0)
+	# All normalized short buses have canonical canvas 62x110 and body 54x102.
+	# Scale is uniform 1.0 everywhere (board, transit, parking) with zero size popping or distortion.
 	var parked_size: Vector2 = vv.get_unscaled_parked_size()
-	var target_max_w: float = 54.0
-	var target_max_h: float = 102.0
-
-	var scale_w: float = target_max_w / parked_size.x
-	var scale_h: float = target_max_h / parked_size.y
-	var final_scale: float = minf(scale_w, scale_h)
+	var final_scale: float = 1.0
+	if parked_size.x > 0.0 and parked_size.y > 0.0 and (absf(parked_size.x - 62.0) > 1.0 or absf(parked_size.y - 110.0) > 1.0):
+		var scale_w: float = 62.0 / parked_size.x
+		var scale_h: float = 110.0 / parked_size.y
+		final_scale = minf(scale_w, scale_h)
 	var final_scale_vec := Vector2(final_scale, final_scale)
 
 	VehicleMovement.animate_dispatch(
@@ -1863,8 +1866,8 @@ func _calc_highest_bus_visual_y() -> float:
 		if vv.is_in_parking:
 			continue
 		
-		var tw := 146.0
-		var th := 68.0
+		var tw := 62.0
+		var th := 110.0
 		for c in vv.get_children():
 			if c is Sprite2D and c.texture != null:
 				tw = c.texture.get_size().x
@@ -1878,7 +1881,7 @@ func _calc_highest_bus_visual_y() -> float:
 			Vector2(hw, hh), Vector2(-hw, hh)
 		]
 		for corner in corners:
-			var world_pt: Vector2 = board_root.transform * (vv.position + corner)
+			var world_pt: Vector2 = board_root.transform * (vv.transform * corner)
 			highest_y = minf(highest_y, world_pt.y)
 			
 	return highest_y
