@@ -13,9 +13,9 @@ func _init() -> void:
 	
 	var all_passed := true
 	
-	# TEST 1: Level 1 & Level 2 Bus Clearance from Separator Line
+	# TEST 1: Level 1 & Level 2 Exact Screen Center and Clearance
 	for lvl_num in [1, 2]:
-		print("\n--- TEST: Level %d Bus vs Separator Line Clearance ---" % lvl_num)
+		print("\n--- TEST: Level %d Bus vs Separator Line Clearance & Centering ---" % lvl_num)
 		var lvl: CarJamLevel = CarJamLevelScene.instantiate()
 		root.add_child(lvl)
 		if not lvl.is_node_ready():
@@ -36,16 +36,30 @@ func _init() -> void:
 			
 		var sep_y: float = plat.p_separator_y
 		var parking_y: float = lvl.parking_root.position.y
+		var parking_bottom = parking_y + ParkingSlotView.SLOT_HEIGHT / 2.0
 		var board_y: float = lvl.board_root.position.y
+		var vp_h = 1280.0
+		var scale_y = lvl.world_root.scale.y
+		var sep_screen_y = (vp_h / 2.0) + (sep_y * scale_y)
+		var expected_center_y = vp_h / 2.0
 		
-		print("  [LAYOUT] Parking Y = %.1f | Separator Y = %.1f | Board Y = %.1f" % [parking_y, sep_y, board_y])
+		print("  [LAYOUT] Parking Bottom = %.1f | Separator Y = %.1f (Screen=%.1f, Mid=%.1f) | Board Y = %.1f" % [
+			parking_bottom, sep_y, sep_screen_y, expected_center_y, board_y
+		])
 		
-		# Check separator is between parking and board
-		if not (parking_y < sep_y and sep_y < board_y):
-			print("  [FAIL] Separator line is not positioned between parking and board! (parking=%.1f, sep=%.1f, board=%.1f)" % [parking_y, sep_y, board_y])
+		# Check separator is mathematically centered at H/2
+		if absf(sep_screen_y - expected_center_y) > 0.001:
+			print("  [FAIL] Separator line is not at screen center! Screen Y = %.2f, Expected = %.2f" % [sep_screen_y, expected_center_y])
 			all_passed = false
 		else:
-			print("  [PASS] Separator line is strictly between parking slots and puzzle board")
+			print("  [PASS] Separator line is mathematically at EXACT screen center (H/2 = %.1f)" % expected_center_y)
+		
+		# Check separator is strictly between parking and board
+		if not (parking_bottom < sep_y and sep_y < board_y):
+			print("  [FAIL] Separator line is not positioned between parking bottom and board! (parking_btm=%.1f, sep=%.1f, board=%.1f)" % [parking_bottom, sep_y, board_y])
+			all_passed = false
+		else:
+			print("  [PASS] Separator line is strictly between parking slots (above) and puzzle board (below)")
 			
 		# Check all vehicles on board
 		var min_gap_found: float = 999999.0
@@ -53,10 +67,7 @@ func _init() -> void:
 		
 		for vid in lvl.vehicle_views:
 			var vv: VehicleView = lvl.vehicle_views[vid]
-			# Board root has position Vector2(0, board_y), rotation 45 deg, scale (1.0, 0.72)
 			var world_pos: Vector2 = lvl.board_root.transform * vv.position
-			# Native bus size: unscaled height is up to 146 px, scaled by 0.72 on board_root = 105.1 px.
-			# Half height is ~52.6 px.
 			var top_visual_y: float = world_pos.y - (146.0 * 0.72 / 2.0)
 			var gap_to_sep: float = top_visual_y - sep_y
 			
@@ -80,56 +91,65 @@ func _init() -> void:
 			
 		lvl.queue_free()
 
-	# TEST 2: Multi-Resolution Responsiveness & No Overlap
-	print("\n--- TEST: Multi-Resolution Responsive Clearance (Level 1) ---")
+	# TEST 2: Multi-Resolution Responsiveness & Exact Centering Verification
+	print("\n--- TEST: Multi-Resolution Responsive Exact Centering & Clearance ---")
 	var test_resolutions: Array[Vector2] = [
+		Vector2(810, 1753),   # iPhone reference portrait
 		Vector2(720, 1280),   # Standard portrait 16:9
 		Vector2(1080, 1920),  # FHD portrait 16:9
-		Vector2(1080, 2400),  # Tall Android
-		Vector2(390, 844),    # iPhone 12/13/14
-		Vector2(414, 896),    # iPhone XR / 11
-		Vector2(768, 1024)    # iPad portrait
+		Vector2(390, 844),    # iPhone 12/13/14 portrait
+		Vector2(1080, 2400),  # Tall modern mobile portrait
+		Vector2(768, 1024),   # Tablet portrait
+		Vector2(414, 896)     # iPhone XR / 11 portrait
 	]
 	
-	for res in test_resolutions:
-		var lvl: CarJamLevel = CarJamLevelScene.instantiate()
-		root.add_child(lvl)
-		if not lvl.is_node_ready():
-			lvl._ready()
+	for lvl_num in [1, 2]:
+		print("\n-- Level %d Across All Resolutions --" % lvl_num)
+		for res in test_resolutions:
+			var lvl: CarJamLevel = CarJamLevelScene.instantiate()
+			root.add_child(lvl)
+			if not lvl.is_node_ready():
+				lvl._ready()
+				
+			var level_data: CarJamLevelData = ResourceLoader.load("res://levels/level_%03d.tres" % lvl_num) as CarJamLevelData
+			lvl.controller.load_level(level_data)
+			lvl._setup_visuals(level_data)
+			lvl._update_layout(res)
 			
-		var level_data: CarJamLevelData = ResourceLoader.load("res://levels/level_001.tres") as CarJamLevelData
-		lvl.controller.load_level(level_data)
-		lvl._setup_visuals(level_data)
-		
-		# Override viewport size simulation
-		var track_h = 392.0
-		var parking_h = ParkingSlotView.SLOT_HEIGHT
-		var board_pixel_h = max(level_data.board_size.x, level_data.board_size.y) * 78.0 * sqrt(2.0) * 0.72
-		var bus_corridor_gap = 135.0
-		var base_content_h = track_h + 65.0 + parking_h + bus_corridor_gap + board_pixel_h
-		var screen_safe_h = res.y - 250.0
-		var scale_factor = clampf(min(res.x * 0.94 / 702.0, screen_safe_h / (base_content_h + 30.0)), 0.42, 2.20)
-		
-		lvl.world_root.scale = Vector2(scale_factor, scale_factor)
-		lvl._update_layout()
-		
-		var plat: PlatformView = lvl.platform_bg as PlatformView
-		var sep_y = plat.p_separator_y
-		
-		var min_gap: float = 999999.0
-		for vid in lvl.vehicle_views:
-			var vv = lvl.vehicle_views[vid]
-			var world_pos = lvl.board_root.transform * vv.position
-			var top_visual_y = world_pos.y - (146.0 * 0.72 / 2.0)
-			min_gap = minf(min_gap, top_visual_y - sep_y)
+			var plat: PlatformView = lvl.platform_bg as PlatformView
+			var sep_y = plat.p_separator_y
+			var scale_factor = lvl.world_root.scale.y
+			var sep_screen_y = (res.y / 2.0) + (sep_y * scale_factor)
+			var expected_center = res.y / 2.0
 			
-		if min_gap > 0.0:
-			print("  [PASS] Resolution %dx%d: scale=%.3f, Clearance Gap = +%.1f px (No overlap!)" % [int(res.x), int(res.y), scale_factor, min_gap])
-		else:
-			print("  [FAIL] Resolution %dx%d: Overlap detected! gap = %.1f px" % [int(res.x), int(res.y), min_gap])
-			all_passed = false
-			
-		lvl.queue_free()
+			# 1. Exact Center Check
+			if absf(sep_screen_y - expected_center) > 0.001:
+				print("  [FAIL] Resolution %dx%d: Separator screen Y = %.2f != Expected Center = %.2f" % [
+					int(res.x), int(res.y), sep_screen_y, expected_center
+				])
+				all_passed = false
+				
+			# 2. Upper Area (Parking) Above Line Check
+			var parking_bottom = lvl.parking_root.position.y + ParkingSlotView.SLOT_HEIGHT / 2.0
+			var park_gap = sep_y - parking_bottom
+			if park_gap <= 0.0:
+				print("  [FAIL] Resolution %dx%d: Parking encroaches separator! park_gap = %.1f" % [int(res.x), int(res.y), park_gap])
+				all_passed = false
+				
+			# 3. Lower Area (Buses) Below Line Check
+			var highest_bus_y = lvl._calc_highest_bus_visual_y()
+			var bus_gap = highest_bus_y - sep_y
+			if bus_gap < 20.0:
+				print("  [FAIL] Resolution %dx%d: Bus clearance too small! gap = %.1f px (< 20px)" % [int(res.x), int(res.y), bus_gap])
+				all_passed = false
+			else:
+				print("  [PASS] Res %4dx%4d (L%d): scale=%.3f | SepScreen=%.1f (mid=%.1f) | ParkGap=+%.1fpx | BusGap=+%.1fpx" % [
+					int(res.x), int(res.y), lvl_num, scale_factor,
+					sep_screen_y, expected_center,
+					park_gap, bus_gap
+				])
+				
+			lvl.queue_free()
 
 	# TEST 3: PlatformView Coherent Grey & Full Width Properties
 	print("\n--- TEST: PlatformView Coherent Styling Properties ---")

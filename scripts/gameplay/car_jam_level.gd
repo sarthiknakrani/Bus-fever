@@ -1887,11 +1887,11 @@ func _calc_highest_bus_visual_y() -> float:
 	return highest_y
 
 
-func _update_layout() -> void:
+func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 	if world_root == null:
 		return
 	var vp := get_viewport()
-	var vp_size: Vector2 = vp.get_visible_rect().size if vp != null else Vector2.ZERO
+	var vp_size: Vector2 = override_vp_size if override_vp_size != Vector2.ZERO else (vp.get_visible_rect().size if vp != null else Vector2.ZERO)
 	if vp_size.x <= 0.0 or vp_size.y <= 0.0:
 		vp_size = Vector2(720, 1280)
 
@@ -1907,8 +1907,9 @@ func _update_layout() -> void:
 	
 	# 2. Determine required margins and total logical dimensions
 	# Top safe area (~110px: TopBar), bottom safe area (~140px: booster bar + padding)
-	var screen_safe_h = vp_size.y - 250.0
 	var screen_safe_w = vp_size.x * 0.94
+	var safe_upper_screen_h = (vp_size.y / 2.0) - 110.0
+	var safe_lower_screen_h = (vp_size.y / 2.0) - 140.0
 
 	# Ensure we fit parking strip, board clearance, and track system with feeder
 	var slot_spacing = 65.0 # MATCHES what we set earlier
@@ -1918,39 +1919,49 @@ func _update_layout() -> void:
 	var track_system_w = 702.0 # Full track system span (R=115, apex=270, border 162px)
 	var required_w = maxf(maxf(parking_w, board_padded_w), track_system_w)
 	
-	# Baseline content height with clean corridor below parking for turning buses
-	var min_gap_tp = 65.0
-	var bus_corridor_gap = 135.0 # Clean visual corridor ensuring buses never overlap the separator line
-	var base_content_h = track_h + min_gap_tp + parking_h + bus_corridor_gap + board_pixel_h
+	# Minimum essential dimensions for upper and lower screen halves
+	var min_gap_tp = 60.0
+	var min_corridor = 40.0
+	var essential_upper_h = track_h + min_gap_tp + parking_h + min_corridor
+	
+	var min_sep_to_board = 60.0
+	var min_btm_pad = 20.0
+	var essential_lower_h = min_sep_to_board + board_pixel_h + min_btm_pad
 
 	var scale_w = screen_safe_w / required_w
-	var scale_h = screen_safe_h / (base_content_h + 30.0)
-	var scale_factor = clampf(min(scale_w, scale_h), 0.42, 2.20)
-	
-	# Compute logical space available at this scale
-	var available_local_h = screen_safe_h / scale_factor
-	var extra_h = maxf(0.0, available_local_h - base_content_h)
-
-	# Distribute extra height gracefully: comfortable spacing between track/parking and bus corridor
-	var gap_tp = clampf(min_gap_tp + extra_h * 0.15, 65.0, 100.0)
-	var gap_pb = clampf(bus_corridor_gap + extra_h * 0.20, 135.0, 175.0)
-	var total_content_h = track_h + gap_tp + parking_h + gap_pb + board_pixel_h
-	var remaining_h = maxf(0.0, available_local_h - total_content_h)
+	var scale_h_upper = safe_upper_screen_h / (essential_upper_h + 10.0)
+	var scale_h_lower = safe_lower_screen_h / (essential_lower_h + 10.0)
+	var scale_factor = clampf(minf(scale_w, minf(scale_h_upper, scale_h_lower)), 0.42, 2.20)
 
 	# Apply scale to world root
 	world_root.scale = Vector2(scale_factor, scale_factor)
 	world_root.position = Vector2.ZERO
 	
-	# Center the stacked layout vertically inside available safe area
+	# In world_root coordinates, local Y = 0.0 corresponds to exact vertical screen center:
+	# separator_line_global_y = (vp_size.y / 2.0) + (0.0 * scale_factor) = H / 2.0
+	var separator_y: float = 0.0
+	
 	var half_h = (vp_size.y / 2.0) / scale_factor
 	var top_safe_y = -half_h + (110.0 / scale_factor)
-	var top_y = top_safe_y + clampf(remaining_h * 0.22, 0.0, 50.0)
-	var start_y = top_y + (track_h / 2.0)
-	
-	var track_y = start_y
-	var parking_y = track_y + (track_h / 2.0) + gap_tp + (parking_h / 2.0)
-	var board_y = parking_y + (parking_h / 2.0) + gap_pb + (board_pixel_h / 2.0)
-	
+	var btm_safe_y = half_h - (140.0 / scale_factor)
+
+	# Distribute extra upper space gracefully above separator line
+	var avail_upper_h = -top_safe_y
+	var extra_upper_h = maxf(0.0, avail_upper_h - essential_upper_h)
+	var gap_tp = clampf(min_gap_tp + extra_upper_h * 0.40, 60.0, 95.0)
+	var corridor_to_sep = clampf(min_corridor + extra_upper_h * 0.35, 40.0, 75.0)
+
+	# Position upper elements strictly above separator line (y < 0.0)
+	var parking_bottom = -corridor_to_sep
+	var parking_y = parking_bottom - (parking_h / 2.0)
+	var track_y = parking_y - (parking_h / 2.0) - gap_tp - (track_h / 2.0)
+
+	# Distribute extra lower space gracefully below separator line
+	var avail_lower_h = btm_safe_y
+	var extra_lower_h = maxf(0.0, avail_lower_h - essential_lower_h)
+	var sep_to_board = clampf(min_sep_to_board + extra_lower_h * 0.45, 60.0, 110.0)
+	var board_y = sep_to_board + (board_pixel_h / 2.0)
+
 	# Passenger track prominent in upper section
 	if passenger_track_root != null:
 		passenger_track_root.position = Vector2(0, track_y)
@@ -1973,17 +1984,7 @@ func _update_layout() -> void:
 		var plat_top = parking_y - (parking_h / 2.0) - 20.0
 		
 		# Partition gap (where parking bays end and road corridor begins)
-		var parking_bottom = parking_y + (parking_h / 2.0)
 		var partition_y = parking_bottom + 10.0
-		
-		# Determine safe separator Y dynamically relative to highest bus visual top
-		var highest_bus_y = _calc_highest_bus_visual_y()
-		var visual_margin = 25.0
-		var max_safe_divider_y = highest_bus_y - visual_margin
-		var nominal_divider_y = parking_bottom + 65.0
-		var separator_y = minf(nominal_divider_y, max_safe_divider_y)
-		if separator_y <= partition_y + 15.0:
-			separator_y = -9999.0 # omit cleanly if corridor space is too restricted
 		
 		# Deck plateau width (comfortably frames parking slots with padding)
 		var deck_w = maxf(500.0, parking_w + 45.0)

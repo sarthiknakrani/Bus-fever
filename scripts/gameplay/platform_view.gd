@@ -44,8 +44,9 @@ func _draw() -> void:
 	draw_colored_polygon(points, base_grey)
 
 	# 3. Subtle road corridor shading between parking platform and separator line
-	if sep_y > gy:
-		draw_rect(Rect2(-hw, gy, p_width, sep_y - gy), Color(0.79, 0.81, 0.88, 0.22))
+	var line_top: float = sep_y - 3.25
+	if sep_y > -9000.0 and line_top > gy:
+		draw_rect(Rect2(-hw, gy, p_width, line_top - gy), Color(0.79, 0.81, 0.88, 0.22))
 
 	# 4. Clean 3D curb outlining the platform perimeter and connecting seamlessly with the horizon floor
 	var top_edge = PackedVector2Array([
@@ -62,8 +63,8 @@ func _draw() -> void:
 	draw_polyline(top_edge, curb_deep, 2.5, true)
 	draw_polyline(top_edge, curb_highlight, 1.5, true)
 
-	# 5. Authoritative Road Divider / Separator line (placed safely above puzzle buses)
+	# 5. Authoritative Road Divider / Separator line (exact vertical center on sep_y)
 	if sep_y > -9000.0:
-		draw_rect(Rect2(-hw, sep_y, p_width, 2.5), curb_shadow)
-		draw_rect(Rect2(-hw, sep_y + 2.5, p_width, 2.0), curb_deep)
-		draw_rect(Rect2(-hw, sep_y + 4.5, p_width, 2.0), curb_highlight)
+		draw_rect(Rect2(-hw, sep_y - 3.25, p_width, 2.5), curb_shadow)
+		draw_rect(Rect2(-hw, sep_y - 0.75, p_width, 2.0), curb_deep)
+		draw_rect(Rect2(-hw, sep_y + 1.25, p_width, 2.0), curb_highlight)
