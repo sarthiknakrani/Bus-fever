@@ -1974,14 +1974,13 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 	if board_root != null:
 		board_root.position = Vector2(0, board_y)
 		
+	var plat_top = parking_y - (parking_h / 2.0) - 20.0
+
 	if platform_bg != null:
 		platform_bg.position = Vector2.ZERO # drawn relative to world_root
 		
 		# Full screen bounds in local space
 		var local_bottom = (vp_size.y / scale_factor) + 1000.0 # extend way down
-		
-		# Start platform slightly above the parking slots
-		var plat_top = parking_y - (parking_h / 2.0) - 20.0
 		
 		# Partition gap (where parking bays end and road corridor begins)
 		var partition_y = parking_bottom + 10.0
@@ -1993,6 +1992,12 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 		var full_w = (vp_size.x / scale_factor) + 200.0
 		
 		platform_bg.setup_full(plat_top, local_bottom, full_w, partition_y, separator_y, deck_w)
+
+	if passenger_track_bg != null:
+		var tr = passenger_track_bg.get_node_or_null("TrackRenderer") as CarJamTrackRenderer
+		if tr != null:
+			tr.plat_top_local = plat_top - track_y
+			tr.queue_redraw()
 
 
 
