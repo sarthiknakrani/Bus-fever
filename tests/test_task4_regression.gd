@@ -24,7 +24,7 @@ func _init() -> void:
 	curve.add_point(Vector2(155, -115), Vector2.ZERO, Vector2(h, 0))
 	curve.add_point(Vector2(270, 0), Vector2(0, -h), Vector2(0, h))
 	
-	var slot_spacing := 76.0
+	var slot_spacing := 65.0
 	var total_span: float = float(slot_count - 1) * slot_spacing
 	var min_trig: float = 999999.0
 	var max_trig: float = -999999.0

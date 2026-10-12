@@ -524,7 +524,7 @@ func _setup_visuals(lvl: CarJamLevelData) -> void:
 	board_bg.setup(lvl.board_size)
 
 	# 2. Parking Slots
-	var slot_spacing := 76.0
+	var slot_spacing := 65.0
 	var total_span: float = float(lvl.parking_slots_count - 1) * slot_spacing
 	
 	# Draw a thick rounded asphalt background for parking
@@ -533,20 +533,20 @@ func _setup_visuals(lvl: CarJamLevelData) -> void:
 	parking_bg.z_index = -1
 	
 
-	var bg_w = total_span + 62.0 + 36.0 # total_span + SLOT_WIDTH + padding
-	var bg_h = 110.0 + 24.0 # SLOT_HEIGHT + padding
+	var bg_w = total_span + ParkingSlotView.SLOT_WIDTH + 32.0 # total_span + SLOT_WIDTH + padding
+	var bg_h = ParkingSlotView.SLOT_HEIGHT + 20.0 # SLOT_HEIGHT + padding
 	
 	parking_bg.draw.connect(func():
 		var style = StyleBoxFlat.new()
 		style.bg_color = Color("c5c9db") # Seamlessly cohesive grey apron matching platform and road
-		style.set_corner_radius_all(14)
+		style.set_corner_radius_all(12)
 		style.border_width_left = 2
 		style.border_width_top = 2
 		style.border_width_right = 2
 		style.border_width_bottom = 2
 		style.border_color = Color("a5abc2") # Clean subtle apron border matching platform curb shadow
 		style.shadow_color = Color(0, 0, 0, 0.08) # Soft integrated depth, no harsh floating-card look
-		style.shadow_size = 4
+		style.shadow_size = 3
 		style.shadow_offset = Vector2(0, 2)
 		style.draw(parking_bg.get_canvas_item(), Rect2(-bg_w/2.0, -bg_h/2.0, bg_w, bg_h))
 	)
@@ -565,10 +565,10 @@ func _setup_visuals(lvl: CarJamLevelData) -> void:
 		vv.setup(vd.id, vd.code, vd.color_id, vd.direction, vd.capacity, vd.footprint)
 		var center_offset = _calc_footprint_center_offset(vd.footprint)
 		vv.position = _cell_to_board_local(vd.anchor, lvl.board_size) + center_offset
-		# Compensate board_root's 0.72 Y-scaling so buses render at uniform 1.0 global scale
+		# Compensate board_root's 0.72 Y-scaling so buses render at uniform BUS_VISUAL_SCALE (0.85) global scale
 		# across all orientations (eliminates the 28% size difference between vertical and horizontal buses)
 		var board_scale_y = board_root.scale.y if board_root != null and board_root.scale.y != 0.0 else 0.72
-		vv.scale = Vector2(1.0, 1.0 / board_scale_y)
+		vv.scale = Vector2(VehicleView.BUS_VISUAL_SCALE, VehicleView.BUS_VISUAL_SCALE / board_scale_y)
 		vv.tapped.connect(_on_vehicle_tapped)
 		vehicle_layer.add_child(vv)
 		vehicle_views[vd.id] = vv
@@ -743,7 +743,7 @@ func _init_passenger_track() -> void:
 	
 	# Precalculate boarding crossing points for ALL parking slots
 	slot_boarding_points.clear()
-	var slot_spacing := 76.0
+	var slot_spacing := 65.0
 	var total_span: float = float(controller.level_data.parking_slots_count - 1) * slot_spacing
 	var min_trig: float = 999999.0
 	var max_trig: float = -999999.0
@@ -924,16 +924,16 @@ func _on_vehicle_dispatch_started(vehicle_id: int, slot_id: int, corridor: Array
 	# full turn inside the corridor before entering the bay vertically.
 	# This guarantees the bus never sweeps sideways across VIP or other
 	# parking slots.
-	var corridor_pos := Vector2(target_slot_pos.x, target_slot_pos.y + 110.0)
+	var corridor_pos := Vector2(target_slot_pos.x, target_slot_pos.y + ParkingSlotView.SLOT_HEIGHT)
 
-	# Authoritative parking slot dimensions from ParkingSlotView (SLOT_WIDTH = 62.0, SLOT_HEIGHT = 110.0)
-	# All normalized short buses have canonical canvas 62x110 and body 54x102.
-	# Scale is uniform 1.0 everywhere (board, transit, parking) with zero size popping or distortion.
+	# Authoritative parking slot dimensions from ParkingSlotView (SLOT_WIDTH = 53.0, SLOT_HEIGHT = 94.0)
+	# All normalized short buses have canonical canvas 62x110 and body 48x102 (V) / 46x102 (H).
+	# Visual scale is uniform 0.85 everywhere (board, transit, parking) with zero size popping or distortion.
 	var parked_size: Vector2 = vv.get_unscaled_parked_size()
-	var final_scale: float = 1.0
-	if parked_size.x > 0.0 and parked_size.y > 0.0 and (absf(parked_size.x - 62.0) > 1.0 or absf(parked_size.y - 110.0) > 1.0):
-		var scale_w: float = 62.0 / parked_size.x
-		var scale_h: float = 110.0 / parked_size.y
+	var final_scale: float = VehicleView.BUS_VISUAL_SCALE
+	if parked_size.x > 0.0 and parked_size.y > 0.0 and (absf(parked_size.x - VehicleView.CANONICAL_CANVAS_WIDTH) > 1.0 or absf(parked_size.y - VehicleView.CANONICAL_CANVAS_HEIGHT) > 1.0):
+		var scale_w: float = ParkingSlotView.SLOT_WIDTH / parked_size.x
+		var scale_h: float = ParkingSlotView.SLOT_HEIGHT / parked_size.y
 		final_scale = minf(scale_w, scale_h)
 	var final_scale_vec := Vector2(final_scale, final_scale)
 
@@ -1897,7 +1897,7 @@ func _update_layout() -> void:
 
 	# 1. Determine local bounding sizes
 	var track_h = 392.0 # Authoritative track envelope (R=115, border 162px: -196 to +196)
-	var parking_h = 110.0 # Authoritative ParkingSlotView height (SLOT_HEIGHT = 110)
+	var parking_h = ParkingSlotView.SLOT_HEIGHT # 94.0 Authoritative ParkingSlotView height
 	var board_cells_w = float(controller.level_data.board_size.x) if controller != null and controller.level_data != null else 7.0
 	var board_cells_h = float(controller.level_data.board_size.y) if controller != null and controller.level_data != null else 7.0
 	var board_local_size = max(board_cells_w, board_cells_h) * CELL_SIZE
@@ -1911,9 +1911,9 @@ func _update_layout() -> void:
 	var screen_safe_w = vp_size.x * 0.94
 
 	# Ensure we fit parking strip, board clearance, and track system with feeder
-	var slot_spacing = 76.0 # MATCHES what we set earlier
+	var slot_spacing = 65.0 # MATCHES what we set earlier
 	var slots_count: int = controller.level_data.parking_slots_count if controller != null and controller.level_data != null else 4
-	var parking_w = float(max(1, slots_count - 1)) * slot_spacing + 40.0
+	var parking_w = float(max(1, slots_count - 1)) * slot_spacing + 35.0
 	var board_padded_w = board_pixel_w + 100.0
 	var track_system_w = 702.0 # Full track system span (R=115, apex=270, border 162px)
 	var required_w = maxf(maxf(parking_w, board_padded_w), track_system_w)
@@ -1986,7 +1986,7 @@ func _update_layout() -> void:
 			separator_y = -9999.0 # omit cleanly if corridor space is too restricted
 		
 		# Deck plateau width (comfortably frames parking slots with padding)
-		var deck_w = maxf(580.0, parking_w + 50.0)
+		var deck_w = maxf(500.0, parking_w + 45.0)
 		
 		# Width needs to cover entire screen width
 		var full_w = (vp_size.x / scale_factor) + 200.0

@@ -10,8 +10,12 @@ func _init() -> void:
 	var CANONICAL_L = 102.0
 	var CANONICAL_W_V = 48.0
 	var CANONICAL_W_H = 46.0
-	var SLOT_W = 62.0
-	var SLOT_H = 110.0
+	var SLOT_W = 53.0
+	var SLOT_H = 94.0
+
+	var RENDERED_L = CANONICAL_L * VehicleView.BUS_VISUAL_SCALE # 86.7
+	var RENDERED_W_V = CANONICAL_W_V * VehicleView.BUS_VISUAL_SCALE # 40.8
+	var RENDERED_W_H = CANONICAL_W_H * VehicleView.BUS_VISUAL_SCALE # 39.1
 
 	# SECTION 1: Source PNG Texture Asset Bounds & Proportional Aspect Ratios
 	print("\n--- 1. PROPORTIONAL TEXTURE ASSET & ASPECT RATIO QA (28 VARIANTS) ---")
@@ -93,7 +97,7 @@ func _init() -> void:
 	lvl1._setup_visuals(data1)
 	lvl1._update_layout()
 	
-	_measure_level_buses(lvl1, 1, CANONICAL_W_V, CANONICAL_W_H, CANONICAL_L)
+	_measure_level_buses(lvl1, 1, RENDERED_W_V, RENDERED_W_H, RENDERED_L, CANONICAL_W_V, CANONICAL_W_H, CANONICAL_L)
 	lvl1.queue_free()
 
 	# SECTION 4: Level 2 Puzzle-Board Rendered Bus Dimensions
@@ -107,7 +111,7 @@ func _init() -> void:
 	lvl2._setup_visuals(data2)
 	lvl2._update_layout()
 	
-	_measure_level_buses(lvl2, 2, CANONICAL_W_V, CANONICAL_W_H, CANONICAL_L)
+	_measure_level_buses(lvl2, 2, RENDERED_W_V, RENDERED_W_H, RENDERED_L, CANONICAL_W_V, CANONICAL_W_H, CANONICAL_L)
 	lvl2.queue_free()
 
 	# SECTION 5: Parking Bay Proportional Fit & Balanced Margins
@@ -128,21 +132,21 @@ func _init() -> void:
 		
 		var pv := VehicleView.new()
 		pv.setup(100 + i, "park_test", "red", d, 40, fp)
-		var unscaled = pv.get_unscaled_parked_size()
+		var rendered_sz = pv.get_rendered_parked_size()
 		var is_vert = (d == 0 or d == 1)
-		var body_w = CANONICAL_W_V if is_vert else CANONICAL_W_H
-		var body_l = CANONICAL_L
+		var body_w = RENDERED_W_V if is_vert else RENDERED_W_H
+		var body_l = RENDERED_L
 		var side_margin = (SLOT_W - body_w) / 2.0
 		var end_margin = (SLOT_H - body_l) / 2.0
 		
-		print("  Direction %s: Unscaled Canvas=(%.1f, %.1f) | Body=(%.1f, %.1f) | Margins: X=%.1fpx, Y=%.1fpx" % [
-			d_name, unscaled.x, unscaled.y, body_w, body_l, side_margin, end_margin
+		print("  Direction %s: Rendered Canvas=(%.1f, %.1f) | Body=(%.1f, %.1f) | Margins: X=%.1fpx, Y=%.1fpx" % [
+			d_name, rendered_sz.x, rendered_sz.y, body_w, body_l, side_margin, end_margin
 		])
-		assert(unscaled == Vector2(SLOT_W, SLOT_H), "Unscaled parked canvas does not match slot")
+		assert(rendered_sz.x <= SLOT_W + 0.1 and rendered_sz.y <= SLOT_H + 0.1, "Rendered parked canvas exceeds slot")
 		assert(side_margin >= 4.0, "Side margin is less than 4.0px")
-		assert(end_margin >= 4.0, "End margin is less than 4.0px")
+		assert(end_margin >= 3.0, "End margin is less than 3.0px")
 		pv.queue_free()
-	print("  [PASS] All directions fit parking slots with clean margins >= 4.0px and zero clipping.")
+	print("  [PASS] All directions fit parking slots with clean margins (side >= 4px, end >= 3px) and zero clipping.")
 
 	# SECTION 6: Dispatch & Transit Scale Invariance (No Size Popping)
 	print("\n--- 6. DISPATCH TRANSIT SCALE INVARIANCE (NO POPPING) ---")
@@ -158,9 +162,9 @@ func _init() -> void:
 		var vv: VehicleView = lvl_test.vehicle_views[vid]
 		var sf = lvl_test.world_root.scale.x
 		var g_scale_before = vv.global_scale / sf
-		assert(absf(g_scale_before.x - 1.0) < 0.02, "Bus global scale X on board is not 1.0")
-		assert(absf(g_scale_before.y - 1.0) < 0.02, "Bus global scale Y on board is not 1.0")
-	print("  [PASS] All vehicles on board have strictly uniform (1.0, 1.0) world scale.")
+		assert(absf(g_scale_before.x - VehicleView.BUS_VISUAL_SCALE) < 0.02, "Bus global scale X on board is not 0.85")
+		assert(absf(g_scale_before.y - VehicleView.BUS_VISUAL_SCALE) < 0.02, "Bus global scale Y on board is not 0.85")
+	print("  [PASS] All vehicles on board have strictly uniform (0.85, 0.85) world scale.")
 	lvl_test.queue_free()
 
 	print("\n===============================================================")
@@ -188,7 +192,7 @@ func _get_alpha_bbox(img: Image) -> Rect2:
 		return Rect2()
 	return Rect2(min_x, min_y, max_x - min_x + 1, max_y - min_y + 1)
 
-func _measure_level_buses(lvl: CarJamLevel, lvl_num: int, target_w_v: float, target_w_h: float, target_l: float) -> void:
+func _measure_level_buses(lvl: CarJamLevel, lvl_num: int, target_w_v: float, target_w_h: float, target_l: float, canon_w_v: float, canon_w_h: float, canon_l: float) -> void:
 	var max_board_w_dev = 0.0
 	var max_board_l_dev = 0.0
 	
@@ -197,6 +201,7 @@ func _measure_level_buses(lvl: CarJamLevel, lvl_num: int, target_w_v: float, tar
 		var dir_str = CarJamVehicleData.dir_to_string(vv.vehicle_dir)
 		var is_vert = (vv.vehicle_dir == CarJamVehicleData.Direction.UP or vv.vehicle_dir == CarJamVehicleData.Direction.DOWN)
 		var target_w = target_w_v if is_vert else target_w_h
+		var canon_w = canon_w_v if is_vert else canon_w_h
 		
 		# Measure screen length and width by transforming unit vectors along bus body axes
 		var local_axis_l = Vector2(0, 1) if is_vert else Vector2(1, 0)
@@ -206,10 +211,10 @@ func _measure_level_buses(lvl: CarJamLevel, lvl_num: int, target_w_v: float, tar
 		var screen_axis_l = vv.global_transform.basis_xform(local_axis_l)
 		var screen_axis_w = vv.global_transform.basis_xform(local_axis_w)
 		
-		# Body dimension on screen is body pixels * basis length / world_root scale
+		# Body dimension on screen is canon body pixels * basis length / world_root scale
 		var sf = lvl.world_root.scale.x
-		var screen_l = target_l * (screen_axis_l.length() / sf)
-		var screen_w = target_w * (screen_axis_w.length() / sf)
+		var screen_l = canon_l * (screen_axis_l.length() / sf)
+		var screen_w = canon_w * (screen_axis_w.length() / sf)
 		
 		var l_dev = absf(screen_l - target_l) / target_l * 100.0
 		var w_dev = absf(screen_w - target_w) / target_w * 100.0

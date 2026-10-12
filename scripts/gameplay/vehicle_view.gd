@@ -22,6 +22,16 @@ const CANONICAL_BODY_WIDTH_H: float = 46.0
 const CANONICAL_CANVAS_WIDTH: float = 62.0
 const CANONICAL_CANVAS_HEIGHT: float = 110.0
 
+# Authoritative visual scale factor (~15% reduction across all short buses)
+const BUS_VISUAL_SCALE: float = 0.85
+
+# Rendered target dimensions across board, transit and parking
+const RENDERED_BODY_LENGTH: float = CANONICAL_BODY_LENGTH * BUS_VISUAL_SCALE # 86.7
+const RENDERED_BODY_WIDTH_V: float = CANONICAL_BODY_WIDTH_V * BUS_VISUAL_SCALE # 40.8
+const RENDERED_BODY_WIDTH_H: float = CANONICAL_BODY_WIDTH_H * BUS_VISUAL_SCALE # 39.1
+const RENDERED_CANVAS_WIDTH: float = CANONICAL_CANVAS_WIDTH * BUS_VISUAL_SCALE # 52.7
+const RENDERED_CANVAS_HEIGHT: float = CANONICAL_CANVAS_HEIGHT * BUS_VISUAL_SCALE # 93.5
+
 var _badge_node: Node2D
 var _badge_label: Label
 var _touch_area: Area2D
@@ -254,4 +264,8 @@ func get_unscaled_parked_size() -> Vector2:
 	
 	# Authoritative canonical short bus parked dimensions matching parking slot (62x110)
 	return Vector2(CANONICAL_CANVAS_WIDTH, CANONICAL_CANVAS_HEIGHT)
+
+## Returns the rendered pixel dimensions of the bus when rotated into parking (facing UP) at BUS_VISUAL_SCALE
+func get_rendered_parked_size() -> Vector2:
+	return get_unscaled_parked_size() * BUS_VISUAL_SCALE
 

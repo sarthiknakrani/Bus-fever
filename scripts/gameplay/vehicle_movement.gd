@@ -83,7 +83,7 @@ static func animate_dispatch(
 	if P2.distance_to(start_pos) < 80.0:
 		# Caller did not supply a corridor we trust — synthesize one
 		# directly under the slot, well clear of the parking rect.
-		P2 = Vector2(slot_pos.x, slot_pos.y + 100.0)
+		P2 = Vector2(slot_pos.x, slot_pos.y + 85.0)
 
 	# Ensure upward-moving buses do not overshoot above the corridor waypoint
 	# into the parking bays prior to docking through P2.
@@ -195,7 +195,7 @@ static func animate_departure(
 	var total_duration: float = BUS_DEPARTURE_DURATION * duration_mult
 	print("[QA] Bus %d DEPARTURE START at %.3f (Target: %.2fs)" % [vehicle_id, t_dep_start, total_duration])
 
-	var reverse_pos: Vector2 = slot_pos + Vector2(0.0, 185.0)
+	var reverse_pos: Vector2 = slot_pos + Vector2(0.0, 160.0)
 
 	var curve := Curve2D.new()
 	var vp_rect := vehicle_node.get_viewport_rect()

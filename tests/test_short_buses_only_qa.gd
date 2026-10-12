@@ -145,18 +145,18 @@ func _run_short_bus_tests() -> void:
 			fp.append_array([Vector2i(0, 0), Vector2i(1, 0)])
 		var test_vv := VehicleView.new()
 		test_vv.setup(99, "test", "blue", d, 40, fp)
-		var unscaled: Vector2 = test_vv.get_unscaled_parked_size()
+		var rendered: Vector2 = test_vv.get_rendered_parked_size()
 		var is_vert: bool = (d == 0 or d == 1)
-		var body_w = VehicleView.CANONICAL_BODY_WIDTH_V if is_vert else VehicleView.CANONICAL_BODY_WIDTH_H
-		var visual_body: Vector2 = Vector2(body_w, VehicleView.CANONICAL_BODY_LENGTH)
-		var w_margin: float = (62.0 - visual_body.x) / 2.0
-		var h_margin: float = (110.0 - visual_body.y) / 2.0
+		var body_w = VehicleView.RENDERED_BODY_WIDTH_V if is_vert else VehicleView.RENDERED_BODY_WIDTH_H
+		var visual_body: Vector2 = Vector2(body_w, VehicleView.RENDERED_BODY_LENGTH)
+		var w_margin: float = (ParkingSlotView.SLOT_WIDTH - visual_body.x) / 2.0
+		var h_margin: float = (ParkingSlotView.SLOT_HEIGHT - visual_body.y) / 2.0
 
-		print("  Direction %s: Unscaled=(%.1f, %.1f) -> Parked Body=(%.1f, %.1f) | Margins: W=%.1fpx, H=%.1fpx" % [
-			dir_names[d_idx], unscaled.x, unscaled.y, visual_body.x, visual_body.y, w_margin, h_margin
+		print("  Direction %s: Rendered=(%.1f, %.1f) -> Parked Body=(%.1f, %.1f) | Margins: W=%.1fpx, H=%.1fpx" % [
+			dir_names[d_idx], rendered.x, rendered.y, visual_body.x, visual_body.y, w_margin, h_margin
 		])
 
-		if visual_body.x <= 56.0 and visual_body.y <= 104.0 and w_margin >= 3.0 and h_margin >= 3.0:
+		if visual_body.x <= ParkingSlotView.SLOT_WIDTH and visual_body.y <= ParkingSlotView.SLOT_HEIGHT and w_margin >= 3.0 and h_margin >= 3.0:
 			print("    [PASS] Clean centered parking fit with zero slot clipping")
 		else:
 			print("    [FAIL] Parking containment violation!")

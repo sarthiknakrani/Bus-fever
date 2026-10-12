@@ -103,7 +103,7 @@ func _init() -> void:
 		
 		# Override viewport size simulation
 		var track_h = 392.0
-		var parking_h = 110.0
+		var parking_h = ParkingSlotView.SLOT_HEIGHT
 		var board_pixel_h = max(level_data.board_size.x, level_data.board_size.y) * 78.0 * sqrt(2.0) * 0.72
 		var bus_corridor_gap = 135.0
 		var base_content_h = track_h + 65.0 + parking_h + bus_corridor_gap + board_pixel_h

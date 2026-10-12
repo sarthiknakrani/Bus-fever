@@ -17,10 +17,10 @@ const VehicleMovement := preload("res://scripts/gameplay/vehicle_movement.gd")
 const CELL_SIZE := 78.0
 const BOARD_Y := 720.0
 const PARKING_Y := 405.0
-const PARKING_SLOT_SPACING := 76.0
-const PARKING_SLOT_WIDTH := 62.0
-const PARKING_SLOT_HEIGHT := 104.0
-const CORRIDOR_Y := PARKING_Y + 100.0
+const PARKING_SLOT_SPACING := 65.0
+const PARKING_SLOT_WIDTH := 53.0
+const PARKING_SLOT_HEIGHT := 94.0
+const CORRIDOR_Y := PARKING_Y + 85.0
 
 var failures: int = 0
 

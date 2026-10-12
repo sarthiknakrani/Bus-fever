@@ -123,11 +123,9 @@ func _run_qa() -> void:
 	for vid in level.vehicle_views:
 		var vv: VehicleView = level.vehicle_views[vid]
 		var parked_size: Vector2 = vv.get_unscaled_parked_size()
-		var target_max_w: float = 54.0
-		var target_max_h: float = 102.0
-		var scale_w: float = target_max_w / parked_size.x
-		var scale_h: float = target_max_h / parked_size.y
-		var final_scale: float = minf(scale_w, scale_h)
+		var target_max_w: float = 46.0
+		var target_max_h: float = 87.0
+		var final_scale: float = VehicleView.BUS_VISUAL_SCALE
 		
 		var visual_w = parked_size.x * final_scale
 		var visual_h = parked_size.y * final_scale
@@ -136,8 +134,8 @@ func _run_qa() -> void:
 			vv.vehicle_id, vv.vehicle_code, vv.vehicle_color_id, visual_w, visual_h, final_scale
 		])
 		
-		var fits_w = visual_w <= SLOT_W and visual_w >= 44.0
-		var fits_h = visual_h <= SLOT_H and visual_h >= 98.0
+		var fits_w = visual_w <= SLOT_W and visual_w >= 36.0
+		var fits_h = visual_h <= SLOT_H and visual_h >= 80.0
 		if fits_w and fits_h:
 			var margin_w = (SLOT_W - visual_w) / 2.0
 			var margin_h = (SLOT_H - visual_h) / 2.0
