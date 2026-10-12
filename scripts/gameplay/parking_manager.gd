@@ -68,6 +68,25 @@ func get_slot(slot_id: int) -> ParkingSlot:
 func is_full() -> bool:
 	return find_available_slot() == -1
 
+func get_unlocked_slot_count() -> int:
+	var count := 0
+	for s in _slots:
+		if s.is_unlocked:
+			count += 1
+	return count
+
+func get_unlocked_slot_ids() -> Array[int]:
+	var ids: Array[int] = []
+	for s in _slots:
+		if s.is_unlocked:
+			ids.append(s.slot_id)
+	return ids
+
+func is_slot_unlocked(slot_id: int) -> bool:
+	if slot_id >= 0 and slot_id < _slots.size():
+		return _slots[slot_id].is_unlocked
+	return false
+
 func get_available_slot_count() -> int:
 	var count := 0
 	for s in _slots:

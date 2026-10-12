@@ -40,8 +40,8 @@ func _init() -> void:
 	v_red.capacity = 4
 	v_red.state = VehicleModel.VehicleState.PARKED
 
-	parking.reserve_slot(v_red.id)
-	parking.confirm_arrival(0, v_red.id)
+	var s_red = parking.reserve_slot(v_red.id)
+	parking.confirm_arrival(s_red, v_red.id)
 
 	var vehicles: Dictionary = { v_red.id: v_red }
 
@@ -56,7 +56,7 @@ func _init() -> void:
 		print("  [PASS] Non-matching queue head: red vehicle did not board, blue head was NOT skipped")
 
 	# 2. Matching vehicle arrives:
-	# Park a BLUE vehicle in slot 1
+	# Park a BLUE vehicle in slot 2
 	var v_blue := VehicleModel.new()
 	v_blue.id = 2
 	v_blue.code = "BLUE_1"
@@ -64,15 +64,15 @@ func _init() -> void:
 	v_blue.capacity = 4
 	v_blue.state = VehicleModel.VehicleState.PARKED
 
-	parking.reserve_slot(v_blue.id)
-	parking.confirm_arrival(1, v_blue.id)
+	var s_blue = parking.reserve_slot(v_blue.id)
+	parking.confirm_arrival(s_blue, v_blue.id)
 	vehicles[v_blue.id] = v_blue
 
 	evts = boarding.evaluate_boarding(queue, parking, vehicles)
-	if evts.size() != 2: # Blue boards group 0 (fills), then Red in slot 0 boards group 1 (fills)!
+	if evts.size() != 2: # Blue boards group 0 (fills), then Red in slot s_red boards group 1 (fills)!
 		failures.append("Expected 2 boarding events (blue then red), got %d" % evts.size())
 	else:
-		print("  [PASS] Blue boarded, filled, and queue advanced to Red which boarded slot 0!")
+		print("  [PASS] Blue boarded, filled, and queue advanced to Red which boarded slot %d!" % s_red)
 
 	if not v_blue.is_full() or v_blue.state != VehicleModel.VehicleState.FULL:
 		failures.append("Blue vehicle should be FULL")
@@ -80,8 +80,8 @@ func _init() -> void:
 		failures.append("Red vehicle should be FULL")
 
 	# Depart them
-	parking.release_slot(0)
-	parking.release_slot(1)
+	parking.release_slot(s_red)
+	parking.release_slot(s_blue)
 	v_blue.state = VehicleModel.VehicleState.COMPLETED
 	v_red.state = VehicleModel.VehicleState.COMPLETED
 
@@ -100,8 +100,8 @@ func _init() -> void:
 	v_yellow.capacity = 4
 	v_yellow.state = VehicleModel.VehicleState.PARKED
 
-	parking.reserve_slot(v_yellow.id)
-	parking.confirm_arrival(0, v_yellow.id)
+	var s_yellow = parking.reserve_slot(v_yellow.id)
+	parking.confirm_arrival(s_yellow, v_yellow.id)
 	vehicles[v_yellow.id] = v_yellow
 
 	evts = boarding.evaluate_boarding(queue, parking, vehicles)

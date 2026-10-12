@@ -77,7 +77,7 @@ static func plan_from_flat_colors(lvl, flat_colors: Array):
 ##   validation: SolvabilityValidator.Result
 ## }
 ## Caller chooses how to feed sequence into the runtime.
-static func build_runtime(lvl, initial_circulating_count: int = 40, slot_count: int = 4) -> Dictionary:
+static func build_runtime(lvl, initial_circulating_count: int = 152, slot_count: int = 3) -> Dictionary:
 	var demand_script: GDScript = load("res://scripts/universal/passenger_demand.gd")
 	var demand = demand_script.from_carjam_level(lvl)
 	var groups = lvl.passenger_groups if "passenger_groups" in lvl else []

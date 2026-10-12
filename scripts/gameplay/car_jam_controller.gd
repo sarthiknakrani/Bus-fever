@@ -553,30 +553,61 @@ func _check_terminal_states() -> void:
 		level_completed.emit()
 		return
 
-	# Failure / Softlock check:
-	# If parking is full (no free slots) AND no parked vehicle matches the head of queue:
+	# Failure / Deadlock check:
+	# If parking is full (no free slots):
 	if parking.is_full():
-		var has_match := false
-		var has_departing_or_arriving := false
-		var all_groups = queue.get_all_groups()
+		var has_progress_in_flight := false
+		var has_circulating_match := false
+		var has_feeder_match := false
+
+		# 1. Check in-flight operations (reservations, arriving, departing, full buses)
+		if not boarding_reservations.is_empty():
+			for r in boarding_reservations.values():
+				if r.reservation_status == "ACTIVE":
+					has_progress_in_flight = true
+					break
+
+		var parked_color_needs: Dictionary = {} # color_id -> bool
 		for i in parking.get_slot_count():
 			var slot = parking.get_slot(i)
-			if slot:
+			if slot and slot.is_unlocked:
 				if slot.state == CarJamParkingManager.SlotState.RESERVED or slot.state == CarJamParkingManager.SlotState.RELEASING:
-					has_departing_or_arriving = true
+					has_progress_in_flight = true
+					break
 				elif slot.state == CarJamParkingManager.SlotState.OCCUPIED:
 					var v = vehicles.get(slot.vehicle_id, null)
 					if v != null:
 						if v.state == VehicleModel.VehicleState.FULL or v.state == VehicleModel.VehicleState.COMPLETED:
-							has_departing_or_arriving = true
+							has_progress_in_flight = true
+							break
 						elif v.remaining_capacity() > 0:
-							for g in all_groups:
-								if g.remaining_count > 0 and g.color_id == v.color_id:
-									has_match = true
-									break
-			if has_match or has_departing_or_arriving: break
-		
-		if not has_match and not has_departing_or_arriving:
+							parked_color_needs[v.color_id] = true
+
+		if not has_progress_in_flight:
+			# 2. Check if any circulating passenger matches any parked bus needing passengers
+			for p in authoritative_passengers.values():
+				var st: String = String(p.get("state", ""))
+				var col: String = String(p.get("color_id", ""))
+				if st == "CIRCULATING" and parked_color_needs.has(col):
+					has_circulating_match = true
+					break
+
+			# 3. If no circulating passenger matches, check if oval has space or feeder can feed a matching passenger
+			if not has_circulating_match:
+				var circulating_count := 0
+				for p in authoritative_passengers.values():
+					if p.get("state", "") == "CIRCULATING":
+						circulating_count += 1
+
+				if circulating_count < 152:
+					for p in authoritative_passengers.values():
+						var st: String = String(p.get("state", ""))
+						var col: String = String(p.get("color_id", ""))
+						if (st == "FEEDER" or st == "PENDING") and parked_color_needs.has(col):
+							has_feeder_match = true
+							break
+
+		if not has_progress_in_flight and not has_circulating_match and not has_feeder_match:
 			state = GameState.FAIL
 			puzzle_failed.emit()
 			return

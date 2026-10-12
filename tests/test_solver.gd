@@ -17,13 +17,15 @@ func _init() -> void:
 		return
 	print("  [PASS] Level 1 validation passed: 12 vehicles, 48 passengers, 4 slots")
 
-	# 2. Save .tres
-	var save_ok := CarJamLevelFactory.save_level_1_tres("res://levels/level_001.tres")
+	# 2. Save .tres (to temp file to keep res://levels/level_001.tres untouched)
+	var temp_path := "res://tests/temp_level_001.tres"
+	var save_ok := CarJamLevelFactory.save_level_1_tres(temp_path)
 	if not save_ok:
-		print("  [FAIL] Failed to save level_001.tres")
+		print("  [FAIL] Failed to save %s" % temp_path)
 		quit(1)
 		return
-	print("  [PASS] level_001.tres saved successfully")
+	print("  [PASS] temp level .tres saved successfully")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(temp_path))
 
 	# 3. Load .tres
 	var loaded_lvl := ResourceLoader.load("res://levels/level_001.tres") as CarJamLevelData

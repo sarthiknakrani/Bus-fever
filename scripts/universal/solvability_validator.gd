@@ -5,30 +5,25 @@ class_name SolvabilityValidator
 ## least one sequence of legal player taps.
 ##
 ## "Solvable" here means: a valid action sequence exists in which the
-## player dispatches every bus, the head-of-queue color matches the bus
-## color at the moment of dispatch, and no deadlock (parking full, no
-## matching color) occurs before all buses have departed.
+## player dispatches every bus, buses board passengers from the active
+## oval loop (capacity 152), freed oval capacity admits waiting feeder
+## passengers, and no deadlock (parking full, no matching color on oval)
+## occurs before all buses have departed.
 ##
 ## Simulation rule (faithful to the runtime):
-##   Each step:
-##     1. Board up to head_len matching passengers onto any parked bus
-##        whose color matches head_color (FIFO into the head run).
-##     2. Any parked bus whose remaining seats == 0 immediately
-##        "departs" — its slot is freed in the next substep.
-##     3. If a bus of head_color is available AND there is a free slot,
-##        dispatch it (park it in the slot).
+##   1. Active circular oval holds up to 152 passengers.
+##   2. Feeder holds remaining passengers until boarding frees space on oval.
+##   3. Parked buses board matching circulating passengers from the oval.
+##   4. Any parked bus whose remaining seats == 0 departs and frees its slot.
+##   5. If a slot is free, an undispatched matching bus is dispatched.
 ##   Termination:
-##     - All buses completed (dispatched, full, departed) AND feeder
-##       served all passengers -> SOLVABLE.
-##     - Parked buses > 0 all mismatched with head_color AND no bus of
-##       head_color can be dispatched AND queue still has head_color ->
-##       DEADLOCK.
-##
-## The validator operates ONLY on the data abstractions (PassengerDemand
-## and WavePlan). It does not consult the visual runtime, the feeder
-## animation, or the bus movement animation.
+##     - All buses completed (dispatched, full, departed) AND all passengers
+##       served -> SOLVABLE.
+##     - Parked buses full, none can board from oval, feeder blocked -> DEADLOCK.
 
 const MAX_SIM_DEPTH := 8192 # safety bound to keep searches finite
+const DEFAULT_SLOT_COUNT := 3
+const OVAL_CAPACITY := 152
 
 class Result:
 	var solvable: bool = false
@@ -39,7 +34,7 @@ class Result:
 
 ## Returns true if the level is solvable. Convenience wrapper around
 ## validate; discards detail.
-static func is_solvable(demand, plan, slot_count: int = 4) -> bool:
+static func is_solvable(demand, plan, slot_count: int = DEFAULT_SLOT_COUNT) -> bool:
 	var r = validate(demand, plan, slot_count)
 	return r.solvable
 
@@ -52,12 +47,10 @@ static func is_solvable_fast(demand, plan) -> bool:
 	var errs = plan.validate_against(demand)
 	if not errs.is_empty():
 		return false
-	# Demand totals must be achievable. Demand per color must equal sum of
-	# capacities per color (already covered by plan.validate_against).
 	return true
 
 ## Full deterministic validation. Calls the iterative bounded simulator.
-static func validate(demand, plan, slot_count: int = 4):
+static func validate(demand, plan, slot_count: int = DEFAULT_SLOT_COUNT):
 	var res = Result.new()
 	if demand == null or plan == null or plan.waves.is_empty():
 		res.reason = "Empty plan"
@@ -104,33 +97,33 @@ static func _run_simulator(buses: Array, flat: Array, slot_count: int) -> SimRes
 	var slots: Array = []
 	for i in slot_count:
 		slots.append(-1) # -1 = free, else bus index
-	var queue_head: int = 0
+
+	# Initial circular oval population & feeder state
+	var init_oval_count: int = mini(flat.size(), OVAL_CAPACITY)
+	var feeder_index: int = init_oval_count
+	var oval_counts: Dictionary = {}
+	for i in init_oval_count:
+		var c = String(flat[i]["color"])
+		oval_counts[c] = oval_counts.get(c, 0) + 1
+
 	var steps := 0
 	while steps < MAX_SIM_DEPTH:
 		steps += 1
-		# Compute head color of feeder (only considering what's released).
-		var head_color := ""
-		var head_len := 0
-		if queue_head < flat.size():
-			head_color = String(flat[queue_head]["color"])
-			var i = queue_head
-			while i < flat.size() and String(flat[i]["color"]) == head_color:
-				head_len += 1
-				i += 1
+
 		# Check success: every bus dispatched & no passenger demand left.
-		var all_dispatched := true
 		var all_bus_filled_dispatched := true
 		for b in buses:
-			if not b["dispatched"]:
-				all_dispatched = false
 			if not b["dispatched"] or int(b["remaining"]) > 0:
 				all_bus_filled_dispatched = false
-		if all_bus_filled_dispatched and queue_head >= flat.size():
+				break
+		var oval_empty := _sum_oval(oval_counts) == 0
+		if all_bus_filled_dispatched and feeder_index >= flat.size() and oval_empty:
 			out.success = true
 			out.dispatched = _bus_ids_in_dispatch_order(buses)
 			out.filled = _fill_amounts(buses)
 			out.steps = steps
 			return out
+
 		# Auto-finalize any FULL parked bus: free its slot.
 		for slot_i in slots.size():
 			var bus_idx = slots[slot_i]
@@ -138,94 +131,113 @@ static func _run_simulator(buses: Array, flat: Array, slot_count: int) -> SimRes
 				continue
 			var bbus: Dictionary = buses[bus_idx]
 			if int(bbus["remaining"]) <= 0:
-				# Bus departs; it stays in 'dispatched' for accounting.
 				slots[slot_i] = -1
-		# Auto-finalize FULL buses that are NOT yet in slots (legal only if
-		# they were dispatched directly into "departing" state).
-		# (Not applicable in this rule set.)
-		# BOARD: fill any parked bus of head_color with the head run.
+
+		# BOARD: fill any parked bus with matching passengers circulating on the oval.
 		var boarded_some := false
-		if head_color != "":
-			for slot_i in slots.size():
-				var bus_idx2 = slots[slot_i]
-				if bus_idx2 < 0:
-					continue
-				var bb: Dictionary = buses[bus_idx2]
-				if String(bb["color"]) != head_color:
-					continue
-				if int(bb["remaining"]) <= 0:
-					continue
-				# Take min(bus_remaining, head_len).
-				var want = mini(int(bb["remaining"]), head_len)
-				if want <= 0:
-					continue
-				bb["remaining"] = int(bb["remaining"]) - want
-				head_len -= want
-				boarded_some = true
-				queue_head += want # advance feeder
-		# Re-free any slot whose bus just became full.
 		for slot_i in slots.size():
-			var bus_idx3 = slots[slot_i]
-			if bus_idx3 < 0:
+			var bus_idx2 = slots[slot_i]
+			if bus_idx2 < 0:
 				continue
-			var bbb: Dictionary = buses[bus_idx3]
-			if int(bbb["remaining"]) <= 0:
+			var bb: Dictionary = buses[bus_idx2]
+			var b_color: String = String(bb["color"])
+			if int(bb["remaining"]) <= 0:
+				continue
+			var available: int = oval_counts.get(b_color, 0)
+			if available <= 0:
+				continue
+
+			var want: int = mini(int(bb["remaining"]), available)
+			bb["remaining"] = int(bb["remaining"]) - want
+			oval_counts[b_color] -= want
+			boarded_some = true
+
+			# Each boarded passenger creates capacity on the oval, admitting from feeder
+			for k in want:
+				if feeder_index < flat.size():
+					var incoming: String = String(flat[feeder_index]["color"])
+					feeder_index += 1
+					oval_counts[incoming] = oval_counts.get(incoming, 0) + 1
+
+			# Re-free slot if bus became full
+			if int(bb["remaining"]) <= 0:
 				slots[slot_i] = -1
-		# DISPATCH: pick a free slot; park a bus of head_color.
+
+		# DISPATCH: if a slot is free, park an undispatched bus.
 		var dispatched_one := false
-		if head_color != "":
-			var free_slot = -1
-			for slot_i in slots.size():
-				if slots[slot_i] == -1:
-					free_slot = slot_i
+		var free_slot := -1
+		for slot_i in slots.size():
+			if slots[slot_i] == -1:
+				free_slot = slot_i
+				break
+
+		if free_slot != -1:
+			# Priority 1: Dispatch a bus whose color is currently circulating on the oval
+			var chosen_bus_idx := -1
+			for bus_i in buses.size():
+				var b: Dictionary = buses[bus_i]
+				if b["dispatched"]:
+					continue
+				if int(b["remaining"]) <= 0:
+					continue
+				if oval_counts.get(String(b["color"]), 0) > 0:
+					chosen_bus_idx = bus_i
 					break
-			if free_slot != -1:
+
+			# Priority 2: If none matches current oval, dispatch a bus whose color appears earliest in feeder
+			if chosen_bus_idx == -1:
+				var earliest_feeder_pos := 999999
 				for bus_i in buses.size():
 					var b: Dictionary = buses[bus_i]
-					if b["dispatched"]:
+					if b["dispatched"] or int(b["remaining"]) <= 0:
 						continue
-					if int(b["remaining"]) <= 0:
-						continue
-					if String(b["color"]) != head_color:
-						continue
-					b["dispatched"] = true
-					b["slot"] = free_slot
-					slots[free_slot] = bus_i
-					out.dispatched.append(b["id"])
-					dispatched_one = true
-					break
+					var c: String = String(b["color"])
+					# Find earliest position in remaining feeder
+					for f_i in range(feeder_index, flat.size()):
+						if String(flat[f_i]["color"]) == c:
+							if f_i < earliest_feeder_pos:
+								earliest_feeder_pos = f_i
+								chosen_bus_idx = bus_i
+							break
+
+			if chosen_bus_idx != -1:
+				var chosen_bus: Dictionary = buses[chosen_bus_idx]
+				chosen_bus["dispatched"] = true
+				chosen_bus["slot"] = free_slot
+				slots[free_slot] = chosen_bus_idx
+				out.dispatched.append(chosen_bus["id"])
+				dispatched_one = true
+
 		# Check termination: did nothing this step and we're stuck.
 		if not boarded_some and not dispatched_one:
-			# Determine why we're stuck.
-			var pending := flat.size() - queue_head
-			if pending <= 0 and all_dispatched:
+			var pending := (flat.size() - feeder_index) + _sum_oval(oval_counts)
+			var all_done := true
+			for b in buses:
+				if not b["dispatched"] or int(b["remaining"]) > 0:
+					all_done = false
+					break
+			if pending <= 0 and all_done:
 				out.success = true
 				out.filled = _fill_amounts(buses)
 				out.steps = steps
 				return out
-			# No boarding happened -> head_color has no parked bus OR no match.
-			# No dispatch happened -> no slot free OR no bus of head_color.
-			var any_matching_bus := false
-			for b in buses:
-				if not b["dispatched"] and String(b["color"]) == head_color:
-					any_matching_bus = true
-					break
-			var any_free_slot := false
-			for s in slots:
-				if s == -1:
-					any_free_slot = true
-					break
-			if any_matching_bus and any_free_slot:
-				# Should have dispatched — treat as a soft pass through to retry.
-				# Try harder: scan dispatchable buses again on next iteration.
-				if steps >= MAX_SIM_DEPTH - 1:
-					out.reason = "Stuck without progress but possible match"
-					break
-				continue
-			out.reason = "Deadlock: head=%s, parked=%d, free_slots=%d, queued_remaining=%d" % [head_color, _occupied_slot_count(slots), slots.size() - _occupied_slot_count(slots), pending]
+
+			out.reason = "Deadlock: parked=%d, free_slots=%d, remaining_passengers=%d, oval_counts=%s" % [
+				_occupied_slot_count(slots),
+				slots.size() - _occupied_slot_count(slots),
+				pending,
+				str(oval_counts)
+			]
 			break
+
 	out.steps = steps
 	return out
+
+static func _sum_oval(counts: Dictionary) -> int:
+	var total := 0
+	for c in counts:
+		total += int(counts[c])
+	return total
 
 static func _bus_ids_in_dispatch_order(buses: Array) -> Array:
 	var out := []

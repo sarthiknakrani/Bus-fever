@@ -613,7 +613,7 @@ func _build_universal_passenger_queue() -> Array[Dictionary]:
 	if UniversalIntegration == null or UniversalSequence == null:
 		return []
 	var lvl = controller.level_data
-	var slot_count = controller.parking.get_slot_count() if controller.parking != null else 4
+	var slot_count = controller.parking.get_unlocked_slot_count() if controller.parking != null else 3
 	var runtime = UniversalIntegration.build_runtime(lvl, MAX_INITIAL_LOOP_PASSENGERS, slot_count)
 	var validation = runtime.get("validation", null)
 	if validation == null or not validation.solvable:
