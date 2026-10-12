@@ -82,6 +82,49 @@ func _process(_delta: float) -> void:
 	if _badge_node != null and _badge_node.visible:
 		_badge_node.global_rotation = 0.0
 
+var is_highlighted: bool = false
+var _highlight_node: Node2D
+var _highlight_tween: Tween
+
+func set_highlight(active: bool) -> void:
+	is_highlighted = active
+	if _highlight_node == null:
+		_highlight_node = Node2D.new()
+		_highlight_node.z_index = 2
+		_highlight_node.draw.connect(_on_draw_highlight)
+		add_child(_highlight_node)
+	_highlight_node.visible = active
+	if active:
+		if _highlight_tween != null and _highlight_tween.is_valid():
+			_highlight_tween.kill()
+		_highlight_node.modulate.a = 1.0
+		_highlight_tween = create_tween().set_loops()
+		_highlight_tween.tween_property(_highlight_node, "modulate:a", 0.35, 0.45).set_trans(Tween.TRANS_SINE)
+		_highlight_tween.tween_property(_highlight_node, "modulate:a", 1.0, 0.45).set_trans(Tween.TRANS_SINE)
+		_highlight_node.queue_redraw()
+	else:
+		if _highlight_tween != null and _highlight_tween.is_valid():
+			_highlight_tween.kill()
+
+func _on_draw_highlight() -> void:
+	var w: float = CANONICAL_CANVAS_WIDTH
+	var h: float = CANONICAL_CANVAS_HEIGHT
+	if vehicle_dir == CarJamVehicleData.Direction.LEFT or vehicle_dir == CarJamVehicleData.Direction.RIGHT:
+		w = CANONICAL_CANVAS_HEIGHT
+		h = CANONICAL_CANVAS_WIDTH
+	var rect := Rect2(-w / 2.0 - 2, -h / 2.0 - 2, w + 4, h + 4)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(1.0, 0.9, 0.2, 0.15)
+	sb.border_color = Color("facc15")
+	sb.border_width_left = 3
+	sb.border_width_top = 3
+	sb.border_width_right = 3
+	sb.border_width_bottom = 3
+	sb.set_corner_radius_all(14)
+	sb.shadow_color = Color(1.0, 0.8, 0.0, 0.4)
+	sb.shadow_size = 6
+	sb.draw(_highlight_node.get_canvas_item(), rect)
+
 func _build_visuals() -> void:
 	# Clear existing interim visuals
 	for c in get_children():

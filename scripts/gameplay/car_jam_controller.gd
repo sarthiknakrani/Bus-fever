@@ -73,7 +73,7 @@ func load_level(lvl: CarJamLevelData) -> void:
 	board.setup(lvl.board_size)
 
 	parking = CarJamParkingManager.new()
-	parking.setup(lvl.parking_slots_count)
+	parking.setup(lvl.parking_slots_count, lvl.unlocked_slot_ids)
 
 	queue = CarJamPassengerQueue.new()
 	queue.setup(lvl.passenger_groups)

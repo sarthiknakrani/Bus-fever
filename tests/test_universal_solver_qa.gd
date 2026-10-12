@@ -72,12 +72,12 @@ func _init() -> void:
 # 1. Level 1 Full Solve
 # -----------------------------------------------------------------
 func _test_1_level_1_full_solve() -> void:
-	_section("1. Level 1 Full Solve (3 Unlocked Slots)")
+	_section("1. Level 1 Full Solve (6 Unlocked Slots)")
 	var lvl1 = CarJamLevelFactory.create_level_1()
 	var res = CarJamPuzzleSolver.solve(lvl1)
 	_expect(res["solvable"], "Level 1 is solvable in CarJamPuzzleSolver")
 	_expect(res["moves"].size() == 6, "Level 1 solved in exactly 6 moves (got %d)" % res["moves"].size())
-	_expect(res["unlocked_slots"] == [1, 2, 3], "Level 1 used authoritative unlocked slots [1, 2, 3]")
+	_expect(res["unlocked_slots"] == [1, 2, 3, 4, 5, 6], "Level 1 used authoritative unlocked slots [1, 2, 3, 4, 5, 6]")
 	print("    Winning Move Order: %s | Iterations: %d" % [str(res["moves"]), res["iterations"]])
 
 # -----------------------------------------------------------------
@@ -126,23 +126,16 @@ func _test_4_full_parking_with_one_bus_boarding() -> void:
 	var lvl := CarJamLevelFactory.create_level_1()
 	ctrl.load_level(lvl)
 
-	# Mark first passenger as CIRCULATING (Red, matches bus 3)
+	# Mark first passenger as CIRCULATING (Blue, matches bus 1)
 	ctrl.authoritative_passengers[0]["state"] = "CIRCULATING"
 
-	# Fill all 3 normal slots
-	var s1 = ctrl.parking.reserve_slot(3) # v3_red
-	ctrl.parking.confirm_arrival(s1, 3)
-	ctrl.vehicles[3].state = VehicleModel.VehicleState.PARKED
+	# Fill all 6 unlocked slots (buses 1 to 6)
+	for vid in [1, 2, 3, 4, 5, 6]:
+		var s = ctrl.parking.reserve_slot(vid)
+		ctrl.parking.confirm_arrival(s, vid)
+		ctrl.vehicles[vid].state = VehicleModel.VehicleState.PARKED
 
-	var s2 = ctrl.parking.reserve_slot(5) # v5_blue
-	ctrl.parking.confirm_arrival(s2, 5)
-	ctrl.vehicles[5].state = VehicleModel.VehicleState.PARKED
-
-	var s3 = ctrl.parking.reserve_slot(1) # v1_yellow
-	ctrl.parking.confirm_arrival(s3, 1)
-	ctrl.vehicles[1].state = VehicleModel.VehicleState.PARKED
-
-	_expect(ctrl.parking.is_full(), "Parking is full with 3 parked buses")
+	_expect(ctrl.parking.is_full(), "Parking is full with 6 parked buses")
 
 	ctrl._check_terminal_states()
 	_expect(ctrl.state == CarJamController.GameState.PLAYING, "Game is still PLAYING because parked buses match circulating passengers")
@@ -380,11 +373,11 @@ func _test_11_illegal_escape_paths() -> void:
 	var ctrl := CarJamController.new()
 	ctrl.load_level(lvl)
 
-	# Vehicle 1 (v1_yellow) starts at (1, 0), dir DOWN (towards Vehicle 6 & 3)
-	# It is blocked by v6_red or v3_red
-	var tap_res = ctrl.tap_vehicle(1)
+	# Vehicle 2 (v2_yellow) starts at (3, 2), dir UP (towards Vehicle 1 at 3, 1)
+	# It is blocked by v1_blue
+	var tap_res = ctrl.tap_vehicle(2)
 	_expect(not tap_res, "Blocked vehicle tap rejected by controller")
-	_expect(ctrl.vehicles[1].state == VehicleModel.VehicleState.ON_BOARD, "Blocked vehicle remains ON_BOARD")
+	_expect(ctrl.vehicles[2].state == VehicleModel.VehicleState.ON_BOARD, "Blocked vehicle remains ON_BOARD")
 
 # -----------------------------------------------------------------
 # 12. Repeated Rapid Bus Selections
@@ -395,11 +388,11 @@ func _test_12_repeated_rapid_taps() -> void:
 	var ctrl := CarJamController.new()
 	ctrl.load_level(lvl)
 
-	# Vehicle 3 can escape
-	var tap1 = ctrl.tap_vehicle(3)
-	_expect(tap1, "First tap on Vehicle 3 accepted")
-	var tap2 = ctrl.tap_vehicle(3)
-	_expect(not tap2, "Immediate second tap on Vehicle 3 rejected (already EXITING)")
+	# Vehicle 1 can escape
+	var tap1 = ctrl.tap_vehicle(1)
+	_expect(tap1, "First tap on Vehicle 1 accepted")
+	var tap2 = ctrl.tap_vehicle(1)
+	_expect(not tap2, "Immediate second tap on Vehicle 1 rejected (already EXITING)")
 
 # -----------------------------------------------------------------
 # 13. Restart During Boarding
@@ -411,9 +404,9 @@ func _test_13_restart_during_boarding() -> void:
 	ctrl.load_level(lvl)
 
 	var old_token = ctrl.session_token
-	# Dispatch vehicle 3
-	ctrl.tap_vehicle(3)
-	_expect(ctrl.parking.get_slot(1).vehicle_id == 3, "Slot 1 reserved for bus 3")
+	# Dispatch vehicle 1
+	ctrl.tap_vehicle(1)
+	_expect(ctrl.parking.get_slot(1).vehicle_id == 1, "Slot 1 reserved for bus 1")
 
 	# Restart
 	ctrl.restart_level()
@@ -422,7 +415,7 @@ func _test_13_restart_during_boarding() -> void:
 	_expect(ctrl.boarding_reservations.is_empty(), "Boarding reservations wiped")
 
 	# Stale callback with old token rejected
-	ctrl.on_vehicle_departed_from_slot(3, 1, old_token)
+	ctrl.on_vehicle_departed_from_slot(1, 1, old_token)
 	_expect(ctrl.state == CarJamController.GameState.PLAYING, "Stale callback ignored")
 
 # -----------------------------------------------------------------

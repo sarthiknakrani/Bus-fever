@@ -51,6 +51,14 @@ var result_btn_label: Label
 var result_retry_btn: TextureButton
 var result_subtitle_label: Label
 var _result_outcome: String = ""  # "victory" or "failure" — guards which buttons are shown
+var _result_reward_vbox: VBoxContainer
+
+var _tutorial_active: bool = false
+var _tutorial_step: int = 1
+var _tutorial_banner: PanelContainer
+var _tutorial_hand: TextureRect
+var _tutorial_hand_tween: Tween
+var _tutorial_target_bus_id: int = -1
 
 var _toast_container: CenterContainer
 var _toast_panel: PanelContainer
@@ -554,7 +562,8 @@ func _setup_visuals(lvl: CarJamLevelData) -> void:
 
 	for i in lvl.parking_slots_count:
 		var slot_view := ParkingSlotView.new()
-		slot_view.setup(i)
+		var slot_unlocked := controller.parking.is_slot_unlocked(i) if controller and controller.parking != null else (i >= 1 and i <= 3)
+		slot_view.setup(i, slot_unlocked)
 		slot_view.position = Vector2(-total_span / 2.0 + float(i) * slot_spacing, 0)
 		parking_slots_node.add_child(slot_view)
 		slot_views.append(slot_view)
@@ -575,6 +584,9 @@ func _setup_visuals(lvl: CarJamLevelData) -> void:
 
 	# 4. Passenger Queue
 	_init_passenger_track()
+
+	# 5. Level 1 Interactive Tutorial
+	_setup_level_1_tutorial()
 
 func _calc_footprint_center_offset(footprint: Array[Vector2i]) -> Vector2:
 	if footprint.size() <= 1: return Vector2.ZERO
@@ -885,6 +897,9 @@ func _on_vehicle_tapped(vehicle_id: int) -> void:
 		var vv: VehicleView = vehicle_views.get(vehicle_id, null)
 		if vv != null:
 			vv.play_blocked_shake()
+	else:
+		if _tutorial_active:
+			_on_tutorial_vehicle_dispatched(vehicle_id)
 
 func _on_vehicle_dispatch_started(vehicle_id: int, slot_id: int, corridor: Array[Vector2i]) -> void:
 	_play_sfx("move")
@@ -1084,21 +1099,34 @@ func _on_level_completed() -> void:
 		if gc != null and gc.has_level(next_num):
 			save_mgr.unlock_level(next_num)
 
-	result_title_label.text = "LEVEL %d CLEAR!" % current_num
-	result_title_label.add_theme_color_override("font_color", Color("facc15"))
-
-	# Configure the next-level button based on actual authored levels.
-	var next_num: int = current_num + 1
-	if gc != null and gc.has_level(next_num):
-		result_btn_label.text = "Level %d" % next_num
+	if current_num == 1:
+		result_title_label.text = "GREAT JOB!"
+		result_title_label.add_theme_color_override("font_color", Color("facc15"))
+		result_btn_label.text = "Next"
 		result_btn.visible = true
 		result_subtitle_label.visible = false
 		result_subtitle_label.text = ""
+		if _result_reward_vbox != null:
+			_result_reward_vbox.visible = true
+		_spawn_celebration_particles()
 	else:
-		# No further level — don't pretend the player can advance.
-		result_btn.visible = false
-		result_subtitle_label.text = "More Levels Coming Soon"
-		result_subtitle_label.visible = true
+		result_title_label.text = "LEVEL %d CLEAR!" % current_num
+		result_title_label.add_theme_color_override("font_color", Color("facc15"))
+		if _result_reward_vbox != null:
+			_result_reward_vbox.visible = false
+
+		# Configure the next-level button based on actual authored levels.
+		var next_num: int = current_num + 1
+		if gc != null and gc.has_level(next_num):
+			result_btn_label.text = "Level %d" % next_num
+			result_btn.visible = true
+			result_subtitle_label.visible = false
+			result_subtitle_label.text = ""
+		else:
+			# No further level — don't pretend the player can advance.
+			result_btn.visible = false
+			result_subtitle_label.text = "More Levels Coming Soon"
+			result_subtitle_label.visible = true
 
 	# Failure-only button is never shown on victory.
 	result_retry_btn.visible = false
@@ -1111,6 +1139,9 @@ func _on_puzzle_failed() -> void:
 		return
 	_result_outcome = "failure"
 	_play_sfx("failure")
+
+	if _result_reward_vbox != null:
+		_result_reward_vbox.visible = false
 
 	# CRITICAL: failure must NEVER enable level progression or unlock the next level.
 	# Only the retry/home actions are exposed — no victory-style next-level button.
@@ -1149,6 +1180,199 @@ func _on_result_retry_pressed() -> void:
 	var gc = get_tree().root.get_node_or_null("GameController")
 	if gc != null:
 		gc.start_level(gc.current_level_number)
+
+# -----------------------------------------------------------------
+# LEVEL 1 INTERACTIVE TUTORIAL & VICTORY CELEBRATION
+# -----------------------------------------------------------------
+
+func _setup_level_1_tutorial() -> void:
+	if controller == null or controller.level_data == null or controller.level_data.level_id != 1:
+		if booster_bar != null:
+			booster_bar.visible = true
+		return
+	if not is_inside_tree() or hud == null:
+		return
+
+	var tree = get_tree()
+	var save_mgr = tree.root.get_node_or_null("SaveManager") if (tree != null and tree.root != null) else null
+	if save_mgr != null and save_mgr.tutorial_done():
+		if booster_bar != null:
+			booster_bar.visible = true
+		return
+
+	_tutorial_active = true
+	_tutorial_step = 1
+
+	if booster_bar != null:
+		booster_bar.visible = false
+
+	# 1. Create bottom tutorial banner
+	_tutorial_banner = PanelContainer.new()
+	_tutorial_banner.name = "TutorialBanner"
+	_tutorial_banner.anchor_left = 0.5
+	_tutorial_banner.anchor_right = 0.5
+	_tutorial_banner.anchor_top = 1.0
+	_tutorial_banner.anchor_bottom = 1.0
+	_tutorial_banner.offset_left = -170.0
+	_tutorial_banner.offset_right = 170.0
+	_tutorial_banner.offset_top = -108.0
+	_tutorial_banner.offset_bottom = -44.0
+	_tutorial_banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var b_style = StyleBoxFlat.new()
+	b_style.bg_color = Color("fffbeb") # warm cream
+	b_style.border_color = Color("fde68a") # soft gold
+	b_style.border_width_left = 3
+	b_style.border_width_top = 3
+	b_style.border_width_right = 3
+	b_style.border_width_bottom = 5
+	b_style.set_corner_radius_all(16)
+	b_style.shadow_color = Color(0, 0, 0, 0.15)
+	b_style.shadow_size = 10
+	b_style.shadow_offset = Vector2(0, 4)
+	_tutorial_banner.add_theme_stylebox_override("panel", b_style)
+
+	var b_lbl = Label.new()
+	b_lbl.text = "Tap the vehicle to match the passengers"
+	b_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	b_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	b_lbl.add_theme_font_size_override("font_size", 15)
+	b_lbl.add_theme_color_override("font_color", Color("57361a")) # dark brown
+	b_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_tutorial_banner.add_child(b_lbl)
+	hud.add_child(_tutorial_banner)
+
+	# 2. Create tutorial hand
+	_tutorial_hand = TextureRect.new()
+	_tutorial_hand.name = "TutorialHand"
+	_tutorial_hand.texture = load("res://assets/ui/tutorial_hand.svg")
+	_tutorial_hand.ignore_texture_size = true
+	_tutorial_hand.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_tutorial_hand.custom_minimum_size = Vector2(72, 72)
+	_tutorial_hand.size = Vector2(72, 72)
+	_tutorial_hand.pivot_offset = Vector2(24, 24)
+	_tutorial_hand.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tutorial_hand.z_index = 10
+	hud.add_child(_tutorial_hand)
+
+	# Point to initial target: Vehicle 1 (v1_blue)
+	_point_tutorial_to_bus(1)
+
+const TUTORIAL_SEQUENCE: Array[int] = [1, 3, 2, 4, 5, 6]
+
+func _point_tutorial_to_bus(vid: int) -> void:
+	if not vehicle_views.has(vid):
+		return
+	_tutorial_target_bus_id = vid
+	for v_id in vehicle_views:
+		if is_instance_valid(vehicle_views[v_id]):
+			vehicle_views[v_id].set_highlight(v_id == vid)
+
+	var vv: VehicleView = vehicle_views[vid]
+	var target_screen_pos: Vector2 = vv.get_global_transform_with_canvas().origin
+	_start_hand_animation(target_screen_pos)
+
+func _start_hand_animation(target_pos: Vector2) -> void:
+	if _tutorial_hand == null:
+		return
+	if _tutorial_hand_tween != null and _tutorial_hand_tween.is_valid():
+		_tutorial_hand_tween.kill()
+
+	# Hand SVG has pointing index fingertip near top-left of its 72x72 box (approx (14, 14)).
+	# To point directly into the vehicle body from the bottom-right:
+	var finger_tip_offset := Vector2(14.0, 14.0)
+	var base_pos := target_pos - finger_tip_offset + Vector2(24, 24)
+	var tap_pos := target_pos - finger_tip_offset + Vector2(8, 8)
+
+	_tutorial_hand.position = base_pos
+	_tutorial_hand_tween = create_tween().set_loops()
+	_tutorial_hand_tween.tween_property(_tutorial_hand, "position", tap_pos, 0.38).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_tutorial_hand_tween.parallel().tween_property(_tutorial_hand, "scale", Vector2(0.90, 0.90), 0.38)
+	_tutorial_hand_tween.tween_property(_tutorial_hand, "position", base_pos, 0.38).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	_tutorial_hand_tween.parallel().tween_property(_tutorial_hand, "scale", Vector2(1.0, 1.0), 0.38)
+
+func _on_tutorial_vehicle_dispatched(vehicle_id: int) -> void:
+	if not _tutorial_active:
+		return
+
+	# Fade out the bottom instructional banner on the first player action
+	if _tutorial_banner != null and is_instance_valid(_tutorial_banner):
+		var tw = _tutorial_banner.create_tween()
+		tw.tween_property(_tutorial_banner, "modulate:a", 0.0, 0.25)
+		tw.tween_callback(_tutorial_banner.queue_free)
+		_tutorial_banner = null
+
+	# Unhighlight the dispatched vehicle
+	if vehicle_views.has(vehicle_id) and is_instance_valid(vehicle_views[vehicle_id]):
+		vehicle_views[vehicle_id].set_highlight(false)
+
+	# Find next undispatched vehicle in the reference tutorial sequence
+	var next_id := -1
+	for id in TUTORIAL_SEQUENCE:
+		if id == vehicle_id:
+			continue
+		if controller != null and controller.vehicles.has(id):
+			var v = controller.vehicles[id]
+			if v.state == VehicleModel.VehicleState.ON_BOARD:
+				next_id = id
+				break
+
+	if next_id != -1 and vehicle_views.has(next_id):
+		_step_tutorial_to(next_id)
+	else:
+		_complete_tutorial()
+
+func _step_tutorial_to(target_bus_id: int) -> void:
+	_point_tutorial_to_bus(target_bus_id)
+
+func _complete_tutorial() -> void:
+	_tutorial_active = false
+	_tutorial_target_bus_id = -1
+	if _tutorial_hand_tween != null and _tutorial_hand_tween.is_valid():
+		_tutorial_hand_tween.kill()
+
+	for vid in vehicle_views:
+		if is_instance_valid(vehicle_views[vid]):
+			vehicle_views[vid].set_highlight(false)
+
+	if _tutorial_hand != null and is_instance_valid(_tutorial_hand):
+		var tw = _tutorial_hand.create_tween()
+		tw.tween_property(_tutorial_hand, "modulate:a", 0.0, 0.3)
+		tw.tween_callback(_tutorial_hand.queue_free)
+		_tutorial_hand = null
+
+	if _tutorial_banner != null and is_instance_valid(_tutorial_banner):
+		var tw = _tutorial_banner.create_tween()
+		tw.tween_property(_tutorial_banner, "modulate:a", 0.0, 0.3)
+		tw.tween_callback(_tutorial_banner.queue_free)
+		_tutorial_banner = null
+
+	var tree = get_tree()
+	var save_mgr = tree.root.get_node_or_null("SaveManager") if (tree != null and tree.root != null) else null
+	if save_mgr != null:
+		save_mgr.set_tutorial_done(true)
+
+
+func _spawn_celebration_particles() -> void:
+	if result_overlay == null:
+		return
+	var particles := CPUParticles2D.new()
+	particles.name = "CelebrationParticles"
+	particles.position = Vector2(result_overlay.size.x / 2.0, result_overlay.size.y / 2.0 - 50.0)
+	particles.emitting = true
+	particles.one_shot = true
+	particles.explosiveness = 0.85
+	particles.amount = 60
+	particles.lifetime = 2.5
+	particles.spread = 180.0
+	particles.gravity = Vector2(0, 180)
+	particles.initial_velocity_min = 160.0
+	particles.initial_velocity_max = 340.0
+	particles.scale_amount_min = 4.0
+	particles.scale_amount_max = 8.0
+	var colors := [Color("38bdf8"), Color("facc15"), Color("ef4444"), Color("4ade80"), Color("fb923c"), Color("c084fc")]
+	particles.color = colors.pick_random()
+	result_overlay.add_child(particles)
 
 # -----------------------------------------------------------------
 # RESPONSIVE HUD & SAFE AREA
@@ -1612,6 +1836,32 @@ func _build_hud() -> void:
 	result_title_label.add_theme_color_override("font_color", Color("4a2810"))
 	result_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	header_vbox.add_child(result_title_label)
+
+	# Reward section (Level 1 victory: gold coin stack + "+20")
+	var reward_vbox = VBoxContainer.new()
+	reward_vbox.name = "RewardVBox"
+	reward_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	reward_vbox.add_theme_constant_override("separation", 2)
+	reward_vbox.visible = false
+	res_vbox.add_child(reward_vbox)
+
+	var reward_icon = TextureRect.new()
+	reward_icon.texture = load("res://assets/ui/coin_stack_reward.svg")
+	reward_icon.ignore_texture_size = true
+	reward_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	reward_icon.custom_minimum_size = Vector2(88, 72)
+	reward_icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	reward_vbox.add_child(reward_icon)
+
+	var reward_label = Label.new()
+	reward_label.text = "+20"
+	reward_label.add_theme_font_size_override("font_size", 22)
+	reward_label.add_theme_color_override("font_color", Color("f59e0b"))
+	reward_label.add_theme_color_override("font_outline_color", Color("78350f"))
+	reward_label.add_theme_constant_override("outline_size", 4)
+	reward_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	reward_vbox.add_child(reward_label)
+	_result_reward_vbox = reward_vbox
 	
 	var btn_vbox = VBoxContainer.new()
 	btn_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -1993,6 +2243,9 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 		var full_w = (vp_size.x / scale_factor) + 200.0
 		
 		platform_bg.setup_full(plat_top, local_bottom, full_w, partition_y, separator_y, deck_w)
+
+	if _tutorial_active and _tutorial_target_bus_id != -1 and vehicle_views.has(_tutorial_target_bus_id):
+		_point_tutorial_to_bus(_tutorial_target_bus_id)
 
 
 

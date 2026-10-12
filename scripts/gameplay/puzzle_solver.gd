@@ -209,7 +209,7 @@ static func solve(lvl: CarJamLevelData, max_iterations: int = 50000, override_un
 		init_state.unlocked_slots = override_unlocked_slots.duplicate()
 	else:
 		var pm := CarJamParkingManager.new()
-		pm.setup(total_slot_count)
+		pm.setup(total_slot_count, lvl.unlocked_slot_ids if "unlocked_slot_ids" in lvl else [])
 		for i in total_slot_count:
 			var slot = pm.get_slot(i)
 			if slot != null and slot.is_unlocked:
