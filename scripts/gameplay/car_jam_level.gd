@@ -1991,7 +1991,10 @@ func _update_layout() -> void:
 		# Width needs to cover entire screen width
 		var full_w = (vp_size.x / scale_factor) + 200.0
 		
-		platform_bg.setup_full(plat_top, local_bottom, full_w, partition_y, separator_y, deck_w)
+		if platform_bg.has_method("setup_unified"):
+			platform_bg.setup_unified(track_y, parking_y, parking_h, local_bottom, full_w, partition_y, separator_y, 65.0, slots_count)
+		else:
+			platform_bg.setup_full(plat_top, local_bottom, full_w, partition_y, separator_y, deck_w)
 
 
 
