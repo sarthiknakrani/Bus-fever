@@ -69,11 +69,11 @@ class PassengerRow extends RefCounted:
 	var is_feeder: bool = false
 	var passengers: Array[Dictionary] = [] # {"id": int, "color_id": String, "lane": int, "view": PassengerView, "state": String}
 
-const LANE_SPACING := 22.2
-const ROW_SPACING := 26.85
+const LANE_SPACING := 24.2
+const ROW_SPACING := 35.33
 const NUM_LANES := 4
-const PASSENGER_SPACING := 26.85
-const MAX_INITIAL_LOOP_PASSENGERS := 200
+const PASSENGER_SPACING := 35.33
+const MAX_INITIAL_LOOP_PASSENGERS := 152
 
 var passenger_track: Path2D
 var feeder_track: Path2D
@@ -93,8 +93,8 @@ var track_time: float = 0.0
 var _last_board_landing_time: float = 0.0
 var _oval_freed_capacity: int = 0
 
-@export var passenger_normal_speed: float = 130.0
-@export var passenger_sprint_speed: float = 160.0
+@export var passenger_normal_speed: float = 335.0
+@export var passenger_sprint_speed: float = 380.0
 @export var bus_movement_duration_multiplier: float = 1.0
 const TRACK_SPEED := 40.0
 
@@ -169,10 +169,10 @@ func _process(delta: float) -> void:
 				max_prog = _feeder_rows[j - 1].progress - ROW_SPACING
 			var dist_ahead: float = max_prog - f_row.progress
 			var speed: float = passenger_normal_speed
-			if dist_ahead > ROW_SPACING * 1.3:
+			if dist_ahead > ROW_SPACING * 1.25:
 				speed = passenger_sprint_speed
-			elif dist_ahead < ROW_SPACING * 0.9:
-				speed = passenger_normal_speed * 0.8
+			elif dist_ahead < ROW_SPACING * 0.95:
+				speed = passenger_normal_speed * 0.85
 			var dist_moved: float = speed * delta
 			dist_moved = minf(dist_moved, maxf(dist_ahead, 0.0))
 			f_row.progress += dist_moved
@@ -186,7 +186,7 @@ func _process(delta: float) -> void:
 			var needed_cap: int = lead_row.passengers.size()
 			if _oval_freed_capacity >= needed_cap and lead_row.progress >= f_len - 2.0:
 				var merge_clear := true
-				var clearance_buffer := ROW_SPACING * 1.35
+				var clearance_buffer := ROW_SPACING * 0.95
 				for cr in _circulating_rows:
 					if cr.progress < clearance_buffer or cr.progress > (track_len - clearance_buffer):
 						merge_clear = false
@@ -239,19 +239,19 @@ func _process(delta: float) -> void:
 				ahead_row = _circulating_rows[i - 1]
 				dist_ahead = ahead_row.progress - row.progress
 
-			if dist_ahead > ROW_SPACING * 1.3:
+			if dist_ahead > ROW_SPACING * 1.25:
 				speed = passenger_sprint_speed
-			elif dist_ahead < ROW_SPACING * 0.9:
-				speed = passenger_normal_speed * 0.8
+			elif dist_ahead < ROW_SPACING * 0.95:
+				speed = passenger_normal_speed * 0.85
 
 		var old_prog = row.progress
 		var dist_moved = speed * delta
-		const MIN_ROW_GAP: float = 24.0
+		var min_gap: float = ROW_SPACING
 		if _circulating_rows.size() > 1:
-			if dist_ahead <= MIN_ROW_GAP:
+			if dist_ahead <= min_gap:
 				dist_moved = 0.0
 			else:
-				dist_moved = minf(dist_moved, dist_ahead - MIN_ROW_GAP)
+				dist_moved = minf(dist_moved, dist_ahead - min_gap)
 
 		# Boarding checks across parking slots
 		var to_board_from_row: Array[Dictionary] = []
@@ -579,7 +579,7 @@ func _cell_to_board_local(c: Vector2i, b_size: Vector2i) -> Vector2:
 func _get_slot_world_pos(slot_id: int) -> Vector2:
 	if slot_id >= 0 and slot_id < slot_views.size():
 		return parking_root.position + slot_views[slot_id].position
-	return Vector2(0, PARKING_Y)
+	return parking_root.position if parking_root != null else Vector2(0, PARKING_Y)
 
 ## Build the flat per-passenger color sequence from the universal
 ## PassengerSequence. Returns [] if the universal layer cannot produce a
@@ -769,10 +769,10 @@ func _init_passenger_track() -> void:
 				row.passengers.append(p_obj)
 		all_rows.append(row)
 
-	# Main oval starts densely packed (up to 40 rows = 160 passengers)
+	# Main oval starts densely packed (38 rows = 152 passengers)
 	var track_len = passenger_track.curve.get_baked_length()
 	var initial_rows_count = mini(all_rows.size(), int(MAX_INITIAL_LOOP_PASSENGERS / NUM_LANES))
-	var loop_pitch: float = (track_len / 40.0) if initial_rows_count >= 40 else ROW_SPACING
+	var loop_pitch: float = (track_len / float(initial_rows_count)) if initial_rows_count > 0 else ROW_SPACING
 	for r in initial_rows_count:
 		var row = all_rows[r]
 		row.is_feeder = false
@@ -828,7 +828,6 @@ func _board_circulating_passenger(p: Dictionary, vehicle_id: int, slot_idx: int,
 	p["state"] = "BOARDING"
 	_animate_individual_boarding(p, vehicle_id, slot_idx, trigger_prog)
 	circulating_ids.erase(p["id"])
-	_oval_freed_capacity += 1
 
 func _try_board_passenger(p: Dictionary, slot_idx: int) -> bool:
 	if p.get("state", "") != "CIRCULATING":
@@ -1928,8 +1927,8 @@ func _update_layout() -> void:
 		vp_size = Vector2(720, 1280)
 
 	# 1. Determine local bounding sizes
-	var track_h = 240.0
-	var parking_h = 150.0
+	var track_h = 392.0 # Authoritative track envelope (R=115, border 162px: -196 to +196)
+	var parking_h = 110.0 # Authoritative ParkingSlotView height (SLOT_HEIGHT = 110)
 	var board_cells_w = float(controller.level_data.board_size.x)
 	var board_cells_h = float(controller.level_data.board_size.y)
 	var board_local_size = max(board_cells_w, board_cells_h) * CELL_SIZE
@@ -1950,8 +1949,8 @@ func _update_layout() -> void:
 	var required_w = maxf(maxf(parking_w, board_padded_w), track_system_w)
 	
 	# Baseline content height with clean corridor below parking for turning buses
-	var min_gap_tp = 22.0
-	var bus_corridor_gap = 95.0
+	var min_gap_tp = 65.0
+	var bus_corridor_gap = 100.0
 	var base_content_h = track_h + min_gap_tp + parking_h + bus_corridor_gap + board_pixel_h
 
 	var scale_w = screen_safe_w / required_w
@@ -1963,8 +1962,8 @@ func _update_layout() -> void:
 	var extra_h = maxf(0.0, available_local_h - base_content_h)
 
 	# Distribute extra height gracefully: comfortable spacing between track/parking and bus corridor
-	var gap_tp = clampf(min_gap_tp + extra_h * 0.12, 22.0, 52.0)
-	var gap_pb = clampf(bus_corridor_gap + extra_h * 0.24, 95.0, 150.0)
+	var gap_tp = clampf(min_gap_tp + extra_h * 0.15, 65.0, 100.0)
+	var gap_pb = clampf(bus_corridor_gap + extra_h * 0.20, 100.0, 150.0)
 	var total_content_h = track_h + gap_tp + parking_h + gap_pb + board_pixel_h
 	var remaining_h = maxf(0.0, available_local_h - total_content_h)
 
@@ -1986,7 +1985,7 @@ func _update_layout() -> void:
 	if passenger_track_root != null:
 		passenger_track_root.position = Vector2(0, track_y)
 
-	# Parking strip right below the track
+	# Parking strip positioned lower with clear visual separation
 	if parking_root != null:
 		parking_root.position = Vector2(0, parking_y)
 
@@ -2001,10 +2000,10 @@ func _update_layout() -> void:
 		var local_bottom = (vp_size.y / scale_factor) + 1000.0 # extend way down
 		
 		# Start platform slightly above the parking slots
-		var plat_top = parking_y - (parking_h / 2.0) - 40.0
+		var plat_top = parking_y - (parking_h / 2.0) - 20.0
 		
 		# Partition gap
-		var partition_y = parking_y + (parking_h / 2.0) + 10.0
+		var partition_y = parking_y + (parking_h / 2.0) + 15.0
 		
 		# Width needs to cover entire screen width
 		var full_w = (vp_size.x / scale_factor) + 200.0
@@ -2398,6 +2397,7 @@ func _on_individual_boarded(pid: int, vehicle_id: int, color_id: String, token: 
 		if is_instance_valid(p["view"]):
 			p["view"].queue_free()
 		p["state"] = "BOARDED"
+	_oval_freed_capacity += 1
 	controller.commit_boarding(vehicle_id, color_id, token)
 
 func _create_custom_toggle(text: String, icon_text: String, is_on: bool, on_toggle: Callable) -> Control:

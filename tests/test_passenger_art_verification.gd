@@ -81,10 +81,12 @@ func _run_all_tests() -> void:
 
 	await create_timer(0.1).timeout
 
-	if level.circulating_ids.size() == 200:
-		print("  [PASS] Main oval densely packed at start: 200 passengers (50 rows x 4 lanes)")
+	if level.circulating_ids.size() == level.MAX_INITIAL_LOOP_PASSENGERS:
+		print("  [PASS] Main oval densely packed at start: %d passengers (%d rows x 4 lanes)" % [
+			level.MAX_INITIAL_LOOP_PASSENGERS, int(level.MAX_INITIAL_LOOP_PASSENGERS / level.NUM_LANES)
+		])
 	else:
-		print("  [FAIL] Expected 200 initial loop passengers, got %d" % level.circulating_ids.size())
+		print("  [FAIL] Expected %d initial loop passengers, got %d" % [level.MAX_INITIAL_LOOP_PASSENGERS, level.circulating_ids.size()])
 		failures += 1
 
 	# Check active passenger instances

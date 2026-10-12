@@ -71,10 +71,8 @@ func _build_visuals() -> void:
 			c.queue_free()
 	_wheels.clear()
 	
-	# Determine Asset properties
+	# Determine Asset properties: Only approved short bus artwork is used throughout the game
 	var length_str = "short"
-	if vehicle_footprint.size() > 2:
-		length_str = "long"
 		
 	var dir_str = "down"
 	if vehicle_dir == CarJamVehicleData.Direction.UP: dir_str = "up"
@@ -93,8 +91,8 @@ func _build_visuals() -> void:
 				break
 	
 	var tex_paths := [
-		"res://assets/sprites/premium_buses/bus_%s_%s_%s.png" % [length_str, col_str, dir_str],
-		"res://assets/buses/%s_%s_%s.png" % [length_str, col_str, dir_str],
+		"res://assets/sprites/premium_buses/bus_short_%s_%s.png" % [col_str, dir_str],
+		"res://assets/buses/short_%s_%s.png" % [col_str, dir_str],
 		"res://assets/buses/%s_%s.png" % [col_str, dir_str]
 	]
 	
@@ -246,8 +244,6 @@ func get_unscaled_parked_size() -> Vector2:
 		else:
 			return Vector2(tex_sz.x, tex_sz.y)
 	
-	# Authoritative fallback based on footprint length
-	var is_long := vehicle_footprint.size() > 2
-	var h: float = 224.0 if is_long else 146.0
-	return Vector2(68.0, h)
+	# Authoritative standard short bus parked dimensions
+	return Vector2(68.0, 146.0)
 

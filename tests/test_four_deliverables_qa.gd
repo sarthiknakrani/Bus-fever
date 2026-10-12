@@ -29,22 +29,22 @@ func _run_qa() -> void:
 	print("  [MEASURED] ROW_SPACING: %.2f px" % level.ROW_SPACING)
 	print("  [MEASURED] MAX_INITIAL_LOOP_PASSENGERS: %d" % level.MAX_INITIAL_LOOP_PASSENGERS)
 
-	if abs(level.LANE_SPACING - 22.2) < 0.1:
-		print("  [PASS] LANE_SPACING calibrated to 22.2 px (0-2px perceptible clearance for 22px characters)")
+	if abs(level.LANE_SPACING - 24.2) < 0.1:
+		print("  [PASS] LANE_SPACING calibrated to 24.2 px (0-2px perceptible clearance for 23.76px characters)")
 	else:
-		print("  [FAIL] Expected LANE_SPACING 22.2, got %.2f" % level.LANE_SPACING)
+		print("  [FAIL] Expected LANE_SPACING 24.2, got %.2f" % level.LANE_SPACING)
 		failures += 1
 
-	if abs(level.ROW_SPACING - 26.85) < 0.1:
-		print("  [PASS] ROW_SPACING calibrated to 26.85 px (zero visible gaps, 50 rows along 1342.64px loop)")
+	if abs(level.ROW_SPACING - 35.33) < 0.1:
+		print("  [PASS] ROW_SPACING calibrated to 35.33 px (zero visible gaps, 38 rows along 1342.64px loop)")
 	else:
-		print("  [FAIL] Expected ROW_SPACING 26.85, got %.2f" % level.ROW_SPACING)
+		print("  [FAIL] Expected ROW_SPACING 35.33, got %.2f" % level.ROW_SPACING)
 		failures += 1
 
-	if level.circulating_ids.size() == 200:
-		print("  [PASS] Main oval starts densely populated with exactly 200 passengers (50 rows x 4 lanes)")
+	if level.circulating_ids.size() == 152:
+		print("  [PASS] Main oval starts densely populated with exactly 152 passengers (38 rows x 4 lanes)")
 	else:
-		print("  [FAIL] Expected 200 circulating passengers, got %d" % level.circulating_ids.size())
+		print("  [FAIL] Expected 152 circulating passengers, got %d" % level.circulating_ids.size())
 		failures += 1
 
 	# Verify horizontal clearance between adjacent lanes
@@ -53,7 +53,7 @@ func _run_qa() -> void:
 	var lane1 = level._calc_lane_pos(pt_sample["pos"], pt_sample["normal"], 1)
 	var lane_dist = lane0.distance_to(lane1)
 	print("  [MEASURED] Inter-lane center distance: %.2f px" % lane_dist)
-	if abs(lane_dist - 22.2) < 0.1:
+	if abs(lane_dist - 24.2) < 0.1:
 		print("  [PASS] Inter-lane clearance strictly verified")
 	else:
 		print("  [FAIL] Inter-lane distance mismatch: %.2f" % lane_dist)

@@ -119,8 +119,8 @@ func _process(delta: float) -> void:
 				_shadow.modulate.a = 0.45
 		else:
 			# Real Running Cycle synchronized directly with movement distance
-			# Frame changes smoothly with actual travel speed (stride ~ 28px)
-			_anim_time += moved_dist / 28.0
+			# Frame changes smoothly with actual travel speed (stride ~ 75px for brisk pace)
+			_anim_time += moved_dist / 75.0
 			if _is_animated:
 				var run_frame: int = int(floor(fmod(_anim_time + _phase_offset, 1.0) * 6.0)) % 6
 				_char_sprite.frame = run_frame
