@@ -538,13 +538,13 @@ func _setup_visuals(lvl: CarJamLevelData) -> void:
 	
 	parking_bg.draw.connect(func():
 		var style = StyleBoxFlat.new()
-		style.bg_color = Color("b0bccd") # Slate 400 cohesive grey apron matching platform and road
+		style.bg_color = Color("c5c9db") # Seamlessly cohesive grey apron matching platform and road
 		style.set_corner_radius_all(12)
 		style.border_width_left = 2
 		style.border_width_top = 2
 		style.border_width_right = 2
 		style.border_width_bottom = 2
-		style.border_color = Color("8c93a8") # Clean subtle apron border matching platform curb shadow
+		style.border_color = Color("a5abc2") # Clean subtle apron border matching platform curb shadow
 		style.shadow_color = Color(0, 0, 0, 0.08) # Soft integrated depth, no harsh floating-card look
 		style.shadow_size = 3
 		style.shadow_offset = Vector2(0, 2)
@@ -1991,11 +1991,7 @@ func _update_layout() -> void:
 		# Width needs to cover entire screen width
 		var full_w = (vp_size.x / scale_factor) + 200.0
 		
-		var local_top = -half_h - 150.0
-		if platform_bg.has_method("setup_unified"):
-			platform_bg.setup_unified(track_y, parking_y, parking_h, local_bottom, full_w, partition_y, separator_y, 65.0, slots_count, local_top)
-		else:
-			platform_bg.setup_full(plat_top, local_bottom, full_w, partition_y, separator_y, deck_w)
+		platform_bg.setup_full(plat_top, local_bottom, full_w, partition_y, separator_y, deck_w)
 
 
 

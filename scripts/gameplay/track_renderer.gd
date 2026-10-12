@@ -5,8 +5,8 @@ var curve: Curve2D
 var feeder_curve: Curve2D
 
 func _draw() -> void:
-	# 1. Background Shadows (Platform drop shadow on unified grey deck)
-	var bg_shadow = Color(0.20, 0.24, 0.35, 0.28)
+	# 1. Background Shadows (Solid dark tone for clean shadow without excessive alpha buildup)
+	var bg_shadow = Color("0284c7").darkened(0.55)
 	
 	if feeder_curve != null:
 		var f_pts = feeder_curve.get_baked_points()
