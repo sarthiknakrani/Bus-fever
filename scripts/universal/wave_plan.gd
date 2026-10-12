@@ -46,14 +46,77 @@ func total() -> int:
 func wave_count() -> int:
 	return waves.size()
 
-## Flat sequence (one entry per passenger). Each entry is {"color": String, "wave_index": int}.
-func flatten() -> Array:
+## Flat sequence (one entry per passenger). Each entry is {"color": String, "wave_index": int, "group_id": int}.
+func flatten(authored_groups = null) -> Array:
 	var out: Array = []
+	if authored_groups != null and not authored_groups.is_empty():
+		var group_rem: Array[int] = []
+		for g in authored_groups:
+			group_rem.append(int(g.initial_count))
+		for i in waves.size():
+			var w: Dictionary = waves[i]
+			var c: String = String(w.get("color", ""))
+			var count: int = int(w.get("count", 0))
+			for j in count:
+				var chosen_gid := -1
+				if w.has("source_group_id"):
+					var explicit_gid: int = int(w["source_group_id"])
+					if explicit_gid >= 0 and explicit_gid < authored_groups.size():
+						if authored_groups[explicit_gid].color_id == c and group_rem[explicit_gid] > 0:
+							chosen_gid = explicit_gid
+							group_rem[explicit_gid] -= 1
+				if chosen_gid == -1:
+					for g_i in authored_groups.size():
+						if authored_groups[g_i].color_id == c and group_rem[g_i] > 0:
+							chosen_gid = g_i
+							group_rem[g_i] -= 1
+							break
+				if chosen_gid == -1:
+					chosen_gid = int(w.get("source_group_id", w.get("group_id", i)))
+				out.append({
+					"id": out.size(),
+					"color": c,
+					"color_id": c,
+					"wave_index": i,
+					"group_id": chosen_gid
+				})
+	else:
+		for i in waves.size():
+			var w: Dictionary = waves[i]
+			var gid: int = int(w.get("source_group_id", w.get("group_id", i)))
+			var col: String = String(w.get("color", ""))
+			for j in int(w.get("count", 0)):
+				out.append({
+					"id": out.size(),
+					"color": col,
+					"color_id": col,
+					"wave_index": i,
+					"group_id": gid
+				})
+	return out
+
+## Map waves to authored accounting groups so procedural or split plans
+## strictly preserve authoritative group identities and capacities.
+func assign_source_groups(authored_groups: Array) -> void:
+	if authored_groups.is_empty():
+		return
+	var group_rem: Array[int] = []
+	for g in authored_groups:
+		group_rem.append(int(g.initial_count))
+
 	for i in waves.size():
 		var w: Dictionary = waves[i]
-		for j in int(w.get("count", 0)):
-			out.append({"color": String(w.get("color", "")), "wave_index": i})
-	return out
+		var c = String(w.get("color", ""))
+		var count = int(w.get("count", 0))
+		var assigned_gid := -1
+		for g_i in authored_groups.size():
+			if authored_groups[g_i].color_id == c and group_rem[g_i] >= count:
+				assigned_gid = g_i
+				group_rem[g_i] -= count
+				break
+		if assigned_gid != -1:
+			w["source_group_id"] = assigned_gid
+			w["group_id"] = assigned_gid
 
 ## Per-color totals across all waves.
 func totals_by_color() -> Dictionary:

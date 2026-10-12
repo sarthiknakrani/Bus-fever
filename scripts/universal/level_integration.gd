@@ -38,8 +38,9 @@ static func plan_from_authored_groups(lvl):
 	var groups = lvl.passenger_groups if "passenger_groups" in lvl else []
 	if groups.is_empty():
 		return null
-	for g in groups:
-		p.waves.append({"color": String(g.color_id), "count": int(g.initial_count)})
+	for i in groups.size():
+		var g = groups[i]
+		p.waves.append({"color": String(g.color_id), "count": int(g.initial_count), "source_group_id": i, "group_id": i})
 	var errs = p.validate_against(demand)
 	if not errs.is_empty():
 		push_error("[Universal] Authored groups do not satisfy demand: " + str(errs))
@@ -79,12 +80,15 @@ static func plan_from_flat_colors(lvl, flat_colors: Array):
 static func build_runtime(lvl, initial_circulating_count: int = 40, slot_count: int = 4) -> Dictionary:
 	var demand_script: GDScript = load("res://scripts/universal/passenger_demand.gd")
 	var demand = demand_script.from_carjam_level(lvl)
+	var groups = lvl.passenger_groups if "passenger_groups" in lvl else []
 	var plan = plan_from_authored_groups(lvl)
 	if plan == null:
 		var gen_script: GDScript = load("res://scripts/universal/wave_generator.gd")
 		plan = gen_script.generate(demand)
+		if plan != null and not groups.is_empty():
+			plan.assign_source_groups(groups)
 	var seq_script: GDScript = load("res://scripts/universal/passenger_sequence.gd")
-	var sequence = seq_script.new(plan, initial_circulating_count)
+	var sequence = seq_script.new(plan, initial_circulating_count, groups)
 	var val_script: GDScript = load("res://scripts/universal/solvability_validator.gd")
 	var validation = val_script.validate(demand, plan, slot_count)
 	return {

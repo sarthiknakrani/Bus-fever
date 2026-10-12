@@ -29,19 +29,19 @@ class Passenger:
 	var state: int = PState.PENDING
 	var release_index: int = -1 # position in feeder; -1 if not yet released
 
-func _init(plan, initial_circulating_count: int = 40) -> void:
+func _init(plan, initial_circulating_count: int = 40, authored_groups = null) -> void:
 	plan_ref = plan
 	initial_count = maxi(0, initial_circulating_count)
 	_passengers.clear()
 	if plan == null:
 		return
-	var flat = plan.flatten()
+	var flat = plan.flatten(authored_groups)
 	for i in flat.size():
 		var p = Passenger.new()
 		p.id = i
 		p.color = String(flat[i]["color"])
 		p.lane = i % 4 # 4-wide formation
-		p.group_id = int(flat[i].get("wave_index", 0))
+		p.group_id = int(flat[i].get("group_id", flat[i].get("wave_index", 0)))
 		p.state = PState.PENDING
 		# The first `initial_count` passengers are placed on the loop at start.
 		if i < initial_count:

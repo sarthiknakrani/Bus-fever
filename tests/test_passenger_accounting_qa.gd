@@ -25,9 +25,22 @@ func _run_suite() -> void:
 	await _test_11_passenger_cancellation_rollback()
 	await _test_12_final_passenger_and_vehicle_completion()
 
+	# Negative test scenarios
+	await _test_13_negative_invalid_group_id()
+	await _test_14_negative_wrong_group_color()
+	await _test_15_negative_group_exhausted_zero_remaining()
+	await _test_16_negative_later_same_color_group_has_demand_while_requested_group_exhausted()
+	await _test_17_negative_illegal_state_modifications()
+	await _test_18_negative_duplicate_commit()
+	await _test_19_negative_cancelled_reservation_late_callback()
+	await _test_20_negative_procedural_plan_more_waves_than_authored_groups()
+	await _test_21_negative_attempted_invalid_commit_leaves_all_counters_unchanged()
+	await _test_22_negative_interrupted_boarding_leaves_no_phantom_seats_or_stranded_passengers()
+	await _test_23_level_2_full_playthrough_and_conservation()
+
 	print("\n=======================================================")
 	if total_failures == 0:
-		print("=== ALL 12 MANDATORY REGRESSION TESTS PASSED (0 FAILURES) ===")
+		print("=== ALL 23 REGRESSION & NEGATIVE TESTS PASSED (0 FAILURES) ===")
 	else:
 		print("=== %d TESTS FAILED ===" % total_failures)
 	print("=======================================================\n")
@@ -513,4 +526,463 @@ func _test_12_final_passenger_and_vehicle_completion() -> void:
 		print("  [PASS] Final Conservation Invariant: Exactly 240 passengers BOARDED (0 leaks)")
 	else:
 		print("  [FAIL] Final conservation failed: %s" % str(final_cons))
+		total_failures += 1
+
+# -----------------------------------------------------------------
+# 13. Negative Test: Valid Passenger Has Invalid Group ID
+# -----------------------------------------------------------------
+func _test_13_negative_invalid_group_id() -> void:
+	print("\n--- TEST 13 (NEGATIVE): Valid Passenger Has Invalid Group ID ---")
+	var c := CarJamController.new()
+	var lvl: CarJamLevelData = load("res://levels/level_001.tres")
+	c.load_level(lvl)
+
+	var v3 = c.vehicles[3]
+	v3.state = VehicleModel.VehicleState.PARKED
+	c.authoritative_passengers[10]["state"] = "CIRCULATING"
+	c.authoritative_passengers[10]["group_id"] = 999 # Invalid group index
+
+	var res = c.try_reserve_boarding(10, 3, "red", 999)
+	if not res:
+		print("  [PASS] Reservation with invalid group_id strictly rejected")
+	else:
+		print("  [FAIL] Reservation allowed with invalid group_id!")
+		total_failures += 1
+
+	var com = c.commit_boarding(10, 3, "red", c.session_token)
+	if not com:
+		print("  [PASS] Commit with invalid group_id strictly rejected")
+	else:
+		print("  [FAIL] Commit allowed with invalid group_id!")
+		total_failures += 1
+
+	if v3.passenger_occupancy == 0:
+		print("  [PASS] Bus occupancy unchanged (0/40)")
+	else:
+		print("  [FAIL] Bus occupancy mutated!")
+		total_failures += 1
+
+# -----------------------------------------------------------------
+# 14. Negative Test: Passenger Assigned to Wrong Color Group
+# -----------------------------------------------------------------
+func _test_14_negative_wrong_group_color() -> void:
+	print("\n--- TEST 14 (NEGATIVE): Passenger Assigned to Wrong Color Group ---")
+	var c := CarJamController.new()
+	var lvl: CarJamLevelData = load("res://levels/level_001.tres")
+	c.load_level(lvl)
+
+	var v3 = c.vehicles[3]
+	v3.state = VehicleModel.VehicleState.PARKED
+	c.authoritative_passengers[11]["state"] = "CIRCULATING"
+	# Passenger 11 is red, but assigned to Group 1 (which is blue)
+	c.authoritative_passengers[11]["group_id"] = 1
+
+	var res = c.try_reserve_boarding(11, 3, "red", 1)
+	if not res:
+		print("  [PASS] Reservation with mismatched group color strictly rejected")
+	else:
+		print("  [FAIL] Reservation allowed for mismatched group color!")
+		total_failures += 1
+
+	var com = c.commit_boarding(11, 3, "red", c.session_token)
+	if not com:
+		print("  [PASS] Commit with mismatched group color strictly rejected")
+	else:
+		print("  [FAIL] Commit allowed for mismatched group color!")
+		total_failures += 1
+
+	if v3.passenger_occupancy == 0 and c.queue.get_all_groups()[1].remaining_count == 40:
+		print("  [PASS] Bus occupancy and group counters completely untouched")
+	else:
+		print("  [FAIL] State or counters corrupted by invalid commit!")
+		total_failures += 1
+
+# -----------------------------------------------------------------
+# 15. Negative Test: Exact Group Has Zero Remaining Demand
+# -----------------------------------------------------------------
+func _test_15_negative_group_exhausted_zero_remaining() -> void:
+	print("\n--- TEST 15 (NEGATIVE): Exact Group Has Zero Remaining Demand ---")
+	var c := CarJamController.new()
+	var lvl: CarJamLevelData = load("res://levels/level_001.tres")
+	c.load_level(lvl)
+
+	var v3 = c.vehicles[3]
+	v3.state = VehicleModel.VehicleState.PARKED
+	c.authoritative_passengers[12]["state"] = "CIRCULATING"
+	c.authoritative_passengers[12]["group_id"] = 0
+
+	# Force Group 0 to have 0 remaining
+	c.queue.get_all_groups()[0].remaining_count = 0
+
+	var res = c.try_reserve_boarding(12, 3, "red", 0)
+	if not res:
+		print("  [PASS] Reservation rejected when exact group has 0 remaining demand")
+	else:
+		print("  [FAIL] Reservation accepted on exhausted group!")
+		total_failures += 1
+
+	var com = c.commit_boarding(12, 3, "red", c.session_token)
+	if not com:
+		print("  [PASS] Commit rejected when exact group has 0 remaining demand")
+	else:
+		print("  [FAIL] Commit accepted on exhausted group!")
+		total_failures += 1
+
+# -----------------------------------------------------------------
+# 16. Negative Test: Later Same-Color Group Demand Not Stolen
+# -----------------------------------------------------------------
+func _test_16_negative_later_same_color_group_has_demand_while_requested_group_exhausted() -> void:
+	print("\n--- TEST 16 (NEGATIVE): No Wrong-Group Fallback When Requested Group Exhausted ---")
+	var c := CarJamController.new()
+	var lvl: CarJamLevelData = load("res://levels/level_001.tres")
+	c.load_level(lvl)
+
+	var v3 = c.vehicles[3]
+	v3.state = VehicleModel.VehicleState.PARKED
+	c.authoritative_passengers[13]["state"] = "CIRCULATING"
+	c.authoritative_passengers[13]["group_id"] = 0
+
+	# Group 0 (Red) exhausted, Group 3 (Red) has 40 remaining
+	c.queue.get_all_groups()[0].remaining_count = 0
+	var g3_initial_rem: int = c.queue.get_all_groups()[3].remaining_count
+	assert(g3_initial_rem == 40, "Group 3 must start with 40 remaining")
+
+	var res = c.try_reserve_boarding(13, 3, "red", 0)
+	var com = c.commit_boarding(13, 3, "red", c.session_token)
+
+	if not res and not com:
+		print("  [PASS] Both reservation and commit strictly rejected for exhausted Group 0")
+	else:
+		print("  [FAIL] Reservation or commit accepted on exhausted group!")
+		total_failures += 1
+
+	# Critical assertion: Group 3 must NOT have been decremented
+	var g3_post_rem: int = c.queue.get_all_groups()[3].remaining_count
+	if g3_post_rem == 40:
+		print("  [PASS] Strict authoritative isolation: Group 3 remaining demand was NOT stolen (remains 40)")
+	else:
+		print("  [FAIL] Wrong-group fallback occurred! Group 3 demand decremented from 40 to %d" % g3_post_rem)
+		total_failures += 1
+
+# -----------------------------------------------------------------
+# 17. Negative Test: Illegal State Modifications
+# -----------------------------------------------------------------
+func _test_17_negative_illegal_state_modifications() -> void:
+	print("\n--- TEST 17 (NEGATIVE): Illegal State Transition Enforcement ---")
+	var c := CarJamController.new()
+	var lvl: CarJamLevelData = load("res://levels/level_001.tres")
+	c.load_level(lvl)
+
+	# 1. Unknown passenger
+	var unknown_res = c.set_passenger_state(9999, "CIRCULATING")
+	if not unknown_res:
+		print("  [PASS] set_passenger_state rejects unknown passenger ID")
+	else:
+		print("  [FAIL] set_passenger_state accepted unknown passenger!")
+		total_failures += 1
+
+	# 2. Direct assignment of BOARDED (forbidden outside commit_boarding)
+	var direct_boarded = c.set_passenger_state(14, "BOARDED")
+	if not direct_boarded:
+		print("  [PASS] Direct mutation to BOARDED strictly forbidden")
+	else:
+		print("  [FAIL] Direct mutation to BOARDED permitted!")
+		total_failures += 1
+
+	# 3. Direct assignment of BOARDING_RESERVED (forbidden outside try_reserve_boarding)
+	var direct_reserved = c.set_passenger_state(14, "BOARDING_RESERVED")
+	if not direct_reserved:
+		print("  [PASS] Direct mutation to BOARDING_RESERVED strictly forbidden")
+	else:
+		print("  [FAIL] Direct mutation to BOARDING_RESERVED permitted!")
+		total_failures += 1
+
+	# 4. Valid initial placement PENDING -> CIRCULATING
+	var valid_circ = c.set_passenger_state(14, "CIRCULATING")
+	if valid_circ:
+		print("  [PASS] Legitimate transition PENDING -> CIRCULATING allowed")
+	else:
+		print("  [FAIL] Legitimate initial transition PENDING -> CIRCULATING rejected!")
+		total_failures += 1
+
+	# 5. Invalid transition CIRCULATING -> FEEDER
+	var circ_to_feeder = c.set_passenger_state(14, "FEEDER")
+	if not circ_to_feeder:
+		print("  [PASS] Backward transition CIRCULATING -> FEEDER strictly rejected")
+	else:
+		print("  [FAIL] Backward transition CIRCULATING -> FEEDER accepted!")
+		total_failures += 1
+
+	# 6. Commit passenger 14 so it becomes BOARDED
+	c.vehicles[3].state = VehicleModel.VehicleState.PARKED
+	c.try_reserve_boarding(14, 3, "red", 0)
+	c.commit_boarding(14, 3, "red", c.session_token)
+	assert(c.authoritative_passengers[14]["state"] == "BOARDED", "Passenger 14 must be BOARDED")
+
+	# 7. Terminal state protection: BOARDED cannot transition away
+	var boarded_to_circ = c.set_passenger_state(14, "CIRCULATING")
+	var boarded_to_feeder = c.set_passenger_state(14, "FEEDER")
+	var boarded_to_pending = c.set_passenger_state(14, "PENDING")
+	if not boarded_to_circ and not boarded_to_feeder and not boarded_to_pending:
+		print("  [PASS] Terminal state protection: BOARDED passenger cannot be reactivated")
+	else:
+		print("  [FAIL] BOARDED passenger was illegally reactivated!")
+		total_failures += 1
+
+# -----------------------------------------------------------------
+# 18. Negative Test: Duplicate Commit Calls
+# -----------------------------------------------------------------
+func _test_18_negative_duplicate_commit() -> void:
+	print("\n--- TEST 18 (NEGATIVE): Duplicate Commit Idempotence & Counter Invariance ---")
+	var c := CarJamController.new()
+	var lvl: CarJamLevelData = load("res://levels/level_001.tres")
+	c.load_level(lvl)
+
+	var v3 = c.vehicles[3]
+	v3.state = VehicleModel.VehicleState.PARKED
+	c.authoritative_passengers[15]["state"] = "CIRCULATING"
+
+	c.try_reserve_boarding(15, 3, "red", 0)
+	var com1 = c.commit_boarding(15, 3, "red", c.session_token)
+	if com1:
+		print("  [PASS] First commit succeeded")
+	else:
+		print("  [FAIL] First commit failed!")
+		total_failures += 1
+
+	var occ_after_com1: int = v3.passenger_occupancy
+	var g0_rem_after_com1: int = c.queue.get_all_groups()[0].remaining_count
+
+	# Duplicate calls
+	var com2 = c.commit_boarding(15, 3, "red", c.session_token)
+	var com3 = c.commit_boarding(15, 3, "red", c.session_token)
+
+	if not com2 and not com3:
+		print("  [PASS] Subsequent duplicate commits cleanly rejected (returned false)")
+	else:
+		print("  [FAIL] Duplicate commit accepted!")
+		total_failures += 1
+
+	if v3.passenger_occupancy == occ_after_com1 and c.queue.get_all_groups()[0].remaining_count == g0_rem_after_com1:
+		print("  [PASS] Vehicle occupancy (%d) and group remaining (%d) strictly invariant across duplicate commits" % [occ_after_com1, g0_rem_after_com1])
+	else:
+		print("  [FAIL] Counters corrupted by duplicate commits!")
+		total_failures += 1
+
+# -----------------------------------------------------------------
+# 19. Negative Test: Cancelled Reservation Late Callback
+# -----------------------------------------------------------------
+func _test_19_negative_cancelled_reservation_late_callback() -> void:
+	print("\n--- TEST 19 (NEGATIVE): Late Callback After Cancellation ---")
+	var c := CarJamController.new()
+	var lvl: CarJamLevelData = load("res://levels/level_001.tres")
+	c.load_level(lvl)
+
+	var v3 = c.vehicles[3]
+	v3.state = VehicleModel.VehicleState.PARKED
+	c.authoritative_passengers[16]["state"] = "CIRCULATING"
+
+	c.try_reserve_boarding(16, 3, "red", 0)
+	c.cancel_boarding_reservation(16)
+
+	var late_com = c.commit_boarding(16, 3, "red", c.session_token)
+	if not late_com:
+		print("  [PASS] Stale callback for cancelled reservation strictly rejected")
+	else:
+		print("  [FAIL] Stale callback accepted after cancellation!")
+		total_failures += 1
+
+	if v3.passenger_occupancy == 0 and c.queue.get_all_groups()[0].remaining_count == 40:
+		print("  [PASS] Seat and group counters untouched (0 boarded, 40 remaining)")
+	else:
+		print("  [FAIL] Seat or group counter mutated by stale callback!")
+		total_failures += 1
+
+# -----------------------------------------------------------------
+# 20. Negative Test: Procedural Plan Has More Waves Than Authored Groups
+# -----------------------------------------------------------------
+func _test_20_negative_procedural_plan_more_waves_than_authored_groups() -> void:
+	print("\n--- TEST 20 (NEGATIVE): Procedural Plan With More Waves Than Authored Groups ---")
+	var c := CarJamController.new()
+	var lvl: CarJamLevelData = load("res://levels/level_001.tres")
+	c.load_level(lvl)
+
+	var WavePlanClass = load("res://scripts/universal/wave_plan.gd")
+	var plan: WavePlan = WavePlanClass.new()
+	# Split 240 passengers across 12 waves of 20 (authored level has only 6 groups of 40)
+	var wave_colors = ["red", "red", "blue", "blue", "yellow", "yellow", "red", "red", "blue", "blue", "yellow", "yellow"]
+	for col in wave_colors:
+		plan.waves.append({"color": col, "count": 20})
+
+	# Map waves to authored groups
+	plan.assign_source_groups(lvl.passenger_groups)
+	var flat = plan.flatten(lvl.passenger_groups)
+
+	# Verify every single passenger has a valid group_id within 0..5
+	var all_valid_groups := true
+	var group_counts := {}
+	for p_info in flat:
+		var gid: int = int(p_info["group_id"])
+		if gid < 0 or gid >= lvl.passenger_groups.size():
+			all_valid_groups = false
+			break
+		group_counts[gid] = group_counts.get(gid, 0) + 1
+
+	if all_valid_groups:
+		print("  [PASS] All 240 passengers mapped to valid authored groups (0..5) despite 12 waves")
+	else:
+		print("  [FAIL] Mapped passenger had out-of-bounds group ID!")
+		total_failures += 1
+
+	# Verify per-group counts: exactly 40 per authored group
+	var group_counts_exact := true
+	for g_i in lvl.passenger_groups.size():
+		if group_counts.get(g_i, 0) != 40:
+			group_counts_exact = false
+			break
+
+	if group_counts_exact:
+		print("  [PASS] Each authored group receives exactly 40 passengers across split waves")
+	else:
+		print("  [FAIL] Split wave demand did not sum to authored group capacity: %s" % str(group_counts))
+		total_failures += 1
+
+	# Register into controller and run conservation validation
+	c.register_passengers(flat)
+	var cons = c.verify_passenger_conservation()
+	if cons["ok"] and cons["group_errors"].is_empty():
+		print("  [PASS] Conservation verification passed 100% for split procedural wave plan")
+	else:
+		print("  [FAIL] Conservation check failed for split wave plan: %s" % str(cons))
+		total_failures += 1
+
+# -----------------------------------------------------------------
+# 21. Negative Test: Attempted Invalid Commits Leave All Counters Unchanged
+# -----------------------------------------------------------------
+func _test_21_negative_attempted_invalid_commit_leaves_all_counters_unchanged() -> void:
+	print("\n--- TEST 21 (NEGATIVE): Invalid Commits Leave Every Counter Untouched ---")
+	var c := CarJamController.new()
+	var lvl: CarJamLevelData = load("res://levels/level_001.tres")
+	c.load_level(lvl)
+
+	var v3 = c.vehicles[3]
+	v3.state = VehicleModel.VehicleState.PARKED
+
+	var pre_occupancy: int = v3.passenger_occupancy
+	var pre_g0_rem: int = c.queue.get_all_groups()[0].remaining_count
+	var pre_g1_rem: int = c.queue.get_all_groups()[1].remaining_count
+	var pre_active_res: int = c.get_active_reservations_for_vehicle(3)
+
+	# Execute invalid commit operations
+	c.commit_boarding(9999, 3, "red", c.session_token) # Nonexistent passenger
+	c.commit_boarding(1, 3, "red", 8888) # Wrong session token
+	c.commit_boarding(1, 3, "red", c.session_token) # Unreserved passenger
+	c.commit_boarding(1, 6, "red", c.session_token) # Wrong bus
+	c.commit_boarding(1, 3, "blue", c.session_token) # Wrong color
+
+	var post_occupancy: int = v3.passenger_occupancy
+	var post_g0_rem: int = c.queue.get_all_groups()[0].remaining_count
+	var post_g1_rem: int = c.queue.get_all_groups()[1].remaining_count
+	var post_active_res: int = c.get_active_reservations_for_vehicle(3)
+
+	if pre_occupancy == post_occupancy and pre_g0_rem == post_g0_rem and pre_g1_rem == post_g1_rem and pre_active_res == post_active_res:
+		print("  [PASS] Absolute invariance: Occupancy, group counts, and reservations 100% unchanged")
+	else:
+		print("  [FAIL] Counters were modified by rejected commits!")
+		total_failures += 1
+
+# -----------------------------------------------------------------
+# 22. Negative Test: Interrupted Boarding Leaves No Phantom Seats Or Stranded Passengers
+# -----------------------------------------------------------------
+func _test_22_negative_interrupted_boarding_leaves_no_phantom_seats_or_stranded_passengers() -> void:
+	print("\n--- TEST 22 (NEGATIVE): Interrupted Boarding Cleanup & Rollback ---")
+	var c := CarJamController.new()
+	var lvl: CarJamLevelData = load("res://levels/level_001.tres")
+	c.load_level(lvl)
+
+	var v3 = c.vehicles[3]
+	v3.state = VehicleModel.VehicleState.PARKED
+	c.authoritative_passengers[17]["state"] = "CIRCULATING"
+
+	# Reserve
+	c.try_reserve_boarding(17, 3, "red", 0)
+	assert(c.get_active_reservations_for_vehicle(3) == 1, "Reservation must be registered")
+
+	# Simulate interruption / animation failure
+	var cancel_ok = c.cancel_boarding_reservation(17)
+	if cancel_ok:
+		print("  [PASS] Reservation cancellation succeeded")
+	else:
+		print("  [FAIL] Reservation cancellation failed!")
+		total_failures += 1
+
+	var active_res: int = c.get_active_reservations_for_vehicle(3)
+	var sync_pending: int = int(c.pending_boarders.get(3, 0))
+	var p_state: String = c.authoritative_passengers[17]["state"]
+
+	if active_res == 0 and sync_pending == 0 and p_state == "CIRCULATING" and v3.passenger_occupancy == 0:
+		print("  [PASS] No phantom seat reservation (active=0, pending=0, occ=0) and passenger restored to CIRCULATING")
+	else:
+		print("  [FAIL] Residual phantom reservation or passenger state corrupted!")
+		total_failures += 1
+
+	# Re-reserve succeeds cleanly
+	var re_res = c.try_reserve_boarding(17, 3, "red", 0)
+	if re_res:
+		print("  [PASS] Interrupted passenger successfully re-reserved without state friction")
+	else:
+		print("  [FAIL] Failed to re-reserve passenger after interruption!")
+		total_failures += 1
+
+# -----------------------------------------------------------------
+# 23. Level 2 Full Playthrough and Conservation Invariant Verification
+# -----------------------------------------------------------------
+func _test_23_level_2_full_playthrough_and_conservation() -> void:
+	print("\n--- TEST 23: Level 2 Full Playthrough & Strict Conservation ---")
+	var c := CarJamController.new()
+	var lvl: CarJamLevelData = load("res://levels/level_002.tres")
+	c.load_level(lvl)
+
+	# Verify Level 2 initial setup
+	assert(c.vehicles.size() == 12, "Level 2 must have 12 vehicles")
+	assert(c.authoritative_passengers.size() == 480, "Level 2 must have 480 passengers")
+
+	var level_completed_fired := [false]
+	c.level_completed.connect(func(): level_completed_fired[0] = true)
+
+	for vid in c.vehicles:
+		var v = c.vehicles[vid]
+		v.state = VehicleModel.VehicleState.PARKED
+
+	for pid in c.authoritative_passengers.keys():
+		var p = c.authoritative_passengers[pid]
+		p["state"] = "CIRCULATING"
+		var target_vid := -1
+		for vid in c.vehicles:
+			var v = c.vehicles[vid]
+			if v.color_id == p["color_id"] and v.remaining_capacity() > 0:
+				target_vid = vid
+				break
+		assert(target_vid != -1, "No available bus for Level 2 passenger %d!" % pid)
+		c.try_reserve_boarding(pid, target_vid, p["color_id"], p["group_id"])
+		c.commit_boarding(pid, target_vid, p["color_id"], c.session_token)
+
+	for vid in c.vehicles:
+		var v = c.vehicles[vid]
+		v.state = VehicleModel.VehicleState.COMPLETED
+
+	c._check_terminal_states()
+
+	print("  Level 2 Controller Game State: %d (Expected WIN=2) | Level Completed: %s" % [c.state, str(level_completed_fired[0])])
+	if c.state == CarJamController.GameState.WIN and level_completed_fired[0]:
+		print("  [PASS] Level 2 cleanly reached WIN state with all 480 passengers and 12 buses")
+	else:
+		print("  [FAIL] Level 2 win state not reached!")
+		total_failures += 1
+
+	var final_cons = c.verify_passenger_conservation()
+	if final_cons["ok"] and final_cons["state_counts"]["BOARDED"] == 480:
+		print("  [PASS] Level 2 Final Conservation Invariant: Exactly 480 passengers BOARDED (0 leaks, 0 group errors)")
+	else:
+		print("  [FAIL] Level 2 final conservation failed: %s" % str(final_cons))
 		total_failures += 1
