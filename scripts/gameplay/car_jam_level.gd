@@ -1239,8 +1239,8 @@ func _build_hud() -> void:
 	booster_bar.anchor_bottom = 1.0
 	booster_bar.offset_left = 20.0
 	booster_bar.offset_right = -20.0
-	booster_bar.offset_top = -90.0
-	booster_bar.offset_bottom = -10.0
+	booster_bar.offset_top = -102.0
+	booster_bar.offset_bottom = -18.0
 	safe_area_root.add_child(booster_bar)
 
 	var b_hbox := HBoxContainer.new()
@@ -1299,11 +1299,11 @@ func _build_hud() -> void:
 
 		# Add a premium 3D green '+' circle badge
 		var plus := Label.new()
-		plus.text = "✚"
-		plus.add_theme_font_size_override("font_size", 11)
+		plus.text = "+"
+		plus.add_theme_font_size_override("font_size", 14)
 		plus.add_theme_color_override("font_color", Color("ffffff"))
 		plus.add_theme_color_override("font_outline_color", Color("064e3b"))
-		plus.add_theme_constant_override("outline_size", 3)
+		plus.add_theme_constant_override("outline_size", 2)
 		
 		var p_style = StyleBoxFlat.new()
 		p_style.bg_color = Color("22c55e")
@@ -1347,16 +1347,20 @@ func _build_hud() -> void:
 	hud.add_child(pause_overlay)
 
 	var p_bg := ColorRect.new()
+	p_bg.name = "PauseBg"
 	p_bg.color = Color(0, 0, 0, 0.7)
 	p_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	p_bg.mouse_filter = Control.MOUSE_FILTER_STOP
 	pause_overlay.add_child(p_bg)
 
 	var p_center := CenterContainer.new()
 	p_center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	p_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	pause_overlay.add_child(p_center)
 
 	var p_wrapper := Control.new()
-	p_wrapper.custom_minimum_size = Vector2(255, 315)
+	p_wrapper.custom_minimum_size = Vector2(280, 315)
+	p_wrapper.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	p_center.add_child(p_wrapper)
 
 	var p_panel := PanelContainer.new()
@@ -1381,40 +1385,40 @@ func _build_hud() -> void:
 	pop_gloss.anchor_bottom = 0.5
 	pop_gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var pg_style = StyleBoxFlat.new()
-	pg_style.bg_color = Color(1, 1, 1, 0.4)
+	pg_style.bg_color = Color(1, 1, 1, 0.18) # Clean subtle gloss, does not wash out title
 	pg_style.corner_radius_top_left = 24
 	pg_style.corner_radius_top_right = 24
 	pop_gloss.add_theme_stylebox_override("panel", pg_style)
 	p_wrapper.add_child(pop_gloss)
 
 	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 21)
-	margin.add_theme_constant_override("margin_right", 21)
-	margin.add_theme_constant_override("margin_top", 21)
-	margin.add_theme_constant_override("margin_bottom", 21)
+	margin.add_theme_constant_override("margin_left", 22)
+	margin.add_theme_constant_override("margin_right", 22)
+	margin.add_theme_constant_override("margin_top", 20)
+	margin.add_theme_constant_override("margin_bottom", 20)
 	p_panel.add_child(margin)
 
 	var pb_vbox := VBoxContainer.new()
 	pb_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	pb_vbox.add_theme_constant_override("separation", 13)
+	pb_vbox.add_theme_constant_override("separation", 12)
 	margin.add_child(pb_vbox)
 
 	# A. Top area with Title
 	var title := Label.new()
 	title.text = "Settings"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 18)
-	title.add_theme_color_override("font_color", Color("9e7655"))
+	title.add_theme_font_size_override("font_size", 22)
+	title.add_theme_color_override("font_color", Color("4a2810")) # High contrast warm brown (WCAG AAA)
 	pb_vbox.add_child(title)
 
 	var line := ColorRect.new()
 	line.custom_minimum_size = Vector2(0, 2)
-	line.color = Color("c4b29c")
+	line.color = Color("d4c3ad")
 	pb_vbox.add_child(line)
 
 	# C. Separate inner container (Toggles)
 	var toggles := VBoxContainer.new()
-	toggles.add_theme_constant_override("separation", 9)
+	toggles.add_theme_constant_override("separation", 10)
 	pb_vbox.add_child(toggles)
 	
 	var sm_sfx = true
@@ -1426,11 +1430,11 @@ func _build_hud() -> void:
 		sm_music = sm.music_enabled()
 		sm_haptics = sm.haptics_enabled()
 
-	toggles.add_child(_create_custom_toggle("Sound", "🔊", sm_sfx, func(on):
+	toggles.add_child(_create_custom_toggle("Sound", "res://assets/ui/icons/sound.svg", sm_sfx, func(on):
 		if is_inside_tree() and get_tree().root.has_node("SettingsManager"):
 			get_tree().root.get_node("SettingsManager").set_sfx(on)
 	))
-	toggles.add_child(_create_custom_toggle("Music", "🎵", sm_music, func(on): 
+	toggles.add_child(_create_custom_toggle("Music", "res://assets/ui/icons/music.svg", sm_music, func(on): 
 		if is_inside_tree() and get_tree().root.has_node("SettingsManager"):
 			get_tree().root.get_node("SettingsManager").set_music(on)
 		if is_inside_tree() and get_tree().root.has_node("AudioManager"):
@@ -1438,7 +1442,7 @@ func _build_hud() -> void:
 			if on: am.play_music()
 			else: am.stop_music()
 	))
-	toggles.add_child(_create_custom_toggle("Vibration", "📳", sm_haptics, func(on):
+	toggles.add_child(_create_custom_toggle("Vibration", "res://assets/ui/icons/vibration.svg", sm_haptics, func(on):
 		if is_inside_tree() and get_tree().root.has_node("SettingsManager"):
 			get_tree().root.get_node("SettingsManager").set_haptics(on)
 	))
@@ -1526,49 +1530,15 @@ func _build_hud() -> void:
 	btm_hbox.add_child(p_btn_home)
 
 	# B. Close button (top-right)
-	var close_btn := Button.new()
-	close_btn.text = "✖"
-	close_btn.add_theme_font_size_override("font_size", 18)
-	close_btn.add_theme_color_override("font_color", Color.WHITE)
-	close_btn.custom_minimum_size = Vector2(40, 40)
+	var close_btn := _create_close_button(_on_resume_pressed)
 	close_btn.anchor_left = 1.0
 	close_btn.anchor_right = 1.0
 	close_btn.anchor_top = 0.0
 	close_btn.anchor_bottom = 0.0
-	close_btn.offset_left = -24.0
-	close_btn.offset_top = -16.0
-	close_btn.offset_right = 24.0
-	close_btn.offset_bottom = 32.0
-	var c_style = StyleBoxFlat.new()
-	c_style.bg_color = Color("ef4444")
-	c_style.set_corner_radius_all(18)
-	c_style.shadow_color = Color(0, 0, 0, 0.3)
-	c_style.shadow_size = 4
-	c_style.shadow_offset = Vector2(0, 3)
-	close_btn.add_theme_stylebox_override("normal", c_style)
-	
-	var c_hover = c_style.duplicate()
-	c_hover.bg_color = Color("f87171")
-	close_btn.add_theme_stylebox_override("hover", c_hover)
-	
-	var c_pressed = c_style.duplicate()
-	c_pressed.bg_color = Color("dc2626")
-	c_pressed.shadow_size = 0
-	c_pressed.shadow_offset = Vector2(0,0)
-	close_btn.add_theme_stylebox_override("pressed", c_pressed)
-	
-	var cg = Panel.new()
-	cg.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	cg.anchor_bottom = 0.5
-	cg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var cgs = StyleBoxFlat.new()
-	cgs.bg_color = Color(1, 1, 1, 0.3)
-	cgs.corner_radius_top_left = 18
-	cgs.corner_radius_top_right = 18
-	cg.add_theme_stylebox_override("panel", cgs)
-	close_btn.add_child(cg)
-	
-	close_btn.pressed.connect(_on_resume_pressed)
+	close_btn.offset_left = -22.0
+	close_btn.offset_top = -14.0
+	close_btn.offset_right = 22.0
+	close_btn.offset_bottom = 30.0
 	p_wrapper.add_child(close_btn)
 
 	# ResultOverlay
@@ -1582,6 +1552,7 @@ func _build_hud() -> void:
 	var res_bg := ColorRect.new()
 	res_bg.color = Color(0, 0, 0, 0.8)
 	res_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	res_bg.mouse_filter = Control.MOUSE_FILTER_STOP
 	result_overlay.add_child(res_bg)
 	
 	var res_center := CenterContainer.new()
@@ -1624,16 +1595,18 @@ func _build_hud() -> void:
 	header_vbox.add_theme_constant_override("separation", 8)
 	res_vbox.add_child(header_vbox)
 	
-	var trophy_lbl = Label.new()
-	trophy_lbl.text = "✨ 🏆 ✨"
-	trophy_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	trophy_lbl.add_theme_font_size_override("font_size", 48)
-	header_vbox.add_child(trophy_lbl)
+	var trophy_icon = TextureRect.new()
+	trophy_icon.texture = load("res://assets/ui/icons/trophy.svg")
+	trophy_icon.ignore_texture_size = true
+	trophy_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	trophy_icon.custom_minimum_size = Vector2(64, 64)
+	trophy_icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	header_vbox.add_child(trophy_icon)
 	
 	result_title_label = Label.new()
 	result_title_label.text = "LEVEL CLEAR!"
 	result_title_label.add_theme_font_size_override("font_size", 28)
-	result_title_label.add_theme_color_override("font_color", Color("9e7655"))
+	result_title_label.add_theme_color_override("font_color", Color("4a2810"))
 	result_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	header_vbox.add_child(result_title_label)
 	
@@ -1793,7 +1766,7 @@ func _build_hud() -> void:
 	restart_confirm_overlay.add_child(rc_center)
 
 	var rc_wrapper := Control.new()
-	rc_wrapper.custom_minimum_size = Vector2(255, 270)
+	rc_wrapper.custom_minimum_size = Vector2(280, 210)
 	rc_center.add_child(rc_wrapper)
 
 	var rc_panel := PanelContainer.new()
@@ -1804,8 +1777,8 @@ func _build_hud() -> void:
 	rc_style.corner_radius_top_right = 32
 	rc_style.corner_radius_bottom_left = 32
 	rc_style.corner_radius_bottom_right = 32
-	rc_style.shadow_color = Color(0,0,0,0.3)
-	rc_style.shadow_size = 12
+	rc_style.shadow_color = Color(0, 0, 0, 0.3)
+	rc_style.shadow_size = 14
 	rc_style.shadow_offset = Vector2(0, 8)
 	rc_style.border_width_bottom = 6
 	rc_style.border_color = Color("e0d2b8")
@@ -1817,7 +1790,7 @@ func _build_hud() -> void:
 	rc_gloss.anchor_bottom = 0.5
 	rc_gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var rcg_style = StyleBoxFlat.new()
-	rcg_style.bg_color = Color(1, 1, 1, 0.4)
+	rcg_style.bg_color = Color(1, 1, 1, 0.18)
 	rcg_style.corner_radius_top_left = 32
 	rcg_style.corner_radius_top_right = 32
 	rc_gloss.add_theme_stylebox_override("panel", rcg_style)
@@ -1826,118 +1799,53 @@ func _build_hud() -> void:
 	var rc_margin := MarginContainer.new()
 	rc_margin.add_theme_constant_override("margin_left", 24)
 	rc_margin.add_theme_constant_override("margin_right", 24)
-	rc_margin.add_theme_constant_override("margin_top", 24)
-	rc_margin.add_theme_constant_override("margin_bottom", 24)
+	rc_margin.add_theme_constant_override("margin_top", 20)
+	rc_margin.add_theme_constant_override("margin_bottom", 20)
 	rc_panel.add_child(rc_margin)
 
 	var rc_vbox := VBoxContainer.new()
 	rc_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	rc_vbox.add_theme_constant_override("separation", 16)
+	rc_vbox.add_theme_constant_override("separation", 14)
 	rc_margin.add_child(rc_vbox)
 
 	var rc_title := Label.new()
 	rc_title.text = "Restart"
 	rc_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	rc_title.add_theme_font_size_override("font_size", 18)
-	rc_title.add_theme_color_override("font_color", Color("9e7655"))
+	rc_title.add_theme_font_size_override("font_size", 22)
+	rc_title.add_theme_color_override("font_color", Color("4a2810"))
 	rc_vbox.add_child(rc_title)
 
 	var rc_line := ColorRect.new()
 	rc_line.custom_minimum_size = Vector2(0, 2)
-	rc_line.color = Color("c4b29c")
+	rc_line.color = Color("d4c3ad")
 	rc_vbox.add_child(rc_line)
-
-	# Inner confirmation container
-	var rc_inner_panel := PanelContainer.new()
-	var rc_inner_style = StyleBoxFlat.new()
-	rc_inner_style.bg_color = Color("f1f5f9")
-	rc_inner_style.corner_radius_top_left = 12
-	rc_inner_style.corner_radius_top_right = 12
-	rc_inner_style.corner_radius_bottom_left = 12
-	rc_inner_style.corner_radius_bottom_right = 12
-	rc_inner_style.border_width_bottom = 3
-	rc_inner_style.border_color = Color("e2e8f0")
-	rc_inner_panel.add_theme_stylebox_override("panel", rc_inner_style)
-	rc_inner_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	rc_vbox.add_child(rc_inner_panel)
-
-	var rc_inner_margin = MarginContainer.new()
-	rc_inner_margin.add_theme_constant_override("margin_left", 12)
-	rc_inner_margin.add_theme_constant_override("margin_right", 12)
-	rc_inner_margin.add_theme_constant_override("margin_top", 12)
-	rc_inner_margin.add_theme_constant_override("margin_bottom", 12)
-	rc_inner_panel.add_child(rc_inner_margin)
-
-	var rc_inner_vbox = VBoxContainer.new()
-	rc_inner_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	rc_inner_vbox.add_theme_constant_override("separation", 9)
-	rc_inner_margin.add_child(rc_inner_vbox)
-
-	var rc_icon = TextureRect.new()
-	rc_icon.texture = load("res://assets/ui/gameplay_buttons/restart_normal.svg")
-	rc_icon.ignore_texture_size = true
-	rc_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	rc_icon.custom_minimum_size = Vector2(64, 64)
-	rc_icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	rc_inner_vbox.add_child(rc_icon)
 
 	var rc_lbl = Label.new()
 	rc_lbl.text = "Restart this level?"
 	rc_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	rc_lbl.add_theme_font_size_override("font_size", 18)
-	rc_lbl.add_theme_color_override("font_color", Color("475569"))
-	rc_inner_vbox.add_child(rc_lbl)
+	rc_lbl.add_theme_font_size_override("font_size", 16)
+	rc_lbl.add_theme_color_override("font_color", Color("5c3d2e"))
+	rc_vbox.add_child(rc_lbl)
 
 	# YES / NO buttons
 	var rc_btns = HBoxContainer.new()
 	rc_btns.alignment = BoxContainer.ALIGNMENT_CENTER
-	rc_btns.add_theme_constant_override("separation", 12)
+	rc_btns.add_theme_constant_override("separation", 16)
 	rc_vbox.add_child(rc_btns)
 
-	rc_btns.add_child(_create_procedural_glossy_button("Yes", Color("22c55e"), Color("166534"), _confirm_restart_yes))
-	rc_btns.add_child(_create_procedural_glossy_button("No", Color("f97316"), Color("9a3412"), _confirm_restart_no))
+	rc_btns.add_child(_create_procedural_glossy_button("Yes", Color("22c55e"), Color("166534"), _confirm_restart_yes, Vector2(104, 44)))
+	rc_btns.add_child(_create_procedural_glossy_button("No", Color("f97316"), Color("9a3412"), _confirm_restart_no, Vector2(104, 44)))
 
 	# Close button (top right)
-	var rc_close_btn := Button.new()
-	rc_close_btn.text = "✖"
-	rc_close_btn.add_theme_font_size_override("font_size", 14)
-	rc_close_btn.add_theme_color_override("font_color", Color.WHITE)
-	rc_close_btn.custom_minimum_size = Vector2(30, 30)
+	var rc_close_btn := _create_close_button(_confirm_restart_no)
 	rc_close_btn.anchor_left = 1.0
 	rc_close_btn.anchor_right = 1.0
 	rc_close_btn.anchor_top = 0.0
 	rc_close_btn.anchor_bottom = 0.0
-	rc_close_btn.offset_left = -18.0
-	rc_close_btn.offset_top = -12.0
-	rc_close_btn.offset_right = 18.0
-	rc_close_btn.offset_bottom = 24.0
-	var rcc_style = StyleBoxFlat.new()
-	rcc_style.bg_color = Color("ef4444")
-	rcc_style.set_corner_radius_all(18)
-	rcc_style.shadow_color = Color(0, 0, 0, 0.3)
-	rcc_style.shadow_size = 4
-	rcc_style.shadow_offset = Vector2(0, 3)
-	rc_close_btn.add_theme_stylebox_override("normal", rcc_style)
-	var rcc_hover = rcc_style.duplicate()
-	rcc_hover.bg_color = Color("f87171")
-	rc_close_btn.add_theme_stylebox_override("hover", rcc_hover)
-	var rcc_pressed = rcc_style.duplicate()
-	rcc_pressed.bg_color = Color("dc2626")
-	rcc_pressed.shadow_size = 0
-	rcc_pressed.shadow_offset = Vector2(0,0)
-	rc_close_btn.add_theme_stylebox_override("pressed", rcc_pressed)
-	var rc_cg = Panel.new()
-	rc_cg.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	rc_cg.anchor_bottom = 0.5
-	rc_cg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var rc_cgs = StyleBoxFlat.new()
-	rc_cgs.bg_color = Color(1, 1, 1, 0.3)
-	rc_cgs.corner_radius_top_left = 24
-	rc_cgs.corner_radius_top_right = 24
-	rc_cg.add_theme_stylebox_override("panel", rc_cgs)
-	rc_close_btn.add_child(rc_cg)
-	
-	rc_close_btn.pressed.connect(_confirm_restart_no)
+	rc_close_btn.offset_left = -22.0
+	rc_close_btn.offset_top = -14.0
+	rc_close_btn.offset_right = 22.0
+	rc_close_btn.offset_bottom = 30.0
 	rc_wrapper.add_child(rc_close_btn)
 
 	# 8. Parking Full Toast Popup
@@ -2117,9 +2025,9 @@ func _confirm_restart_no() -> void:
 	restart_confirm_overlay.visible = false
 	get_tree().paused = _was_paused_before_confirm
 
-func _create_procedural_glossy_button(btn_text: String, bg_color: Color, border_color: Color, on_click: Callable) -> Control:
+func _create_procedural_glossy_button(btn_text: String, bg_color: Color, border_color: Color, on_click: Callable, min_size: Vector2 = Vector2(104, 44)) -> Control:
 	var wrapper = Control.new()
-	wrapper.custom_minimum_size = Vector2(82, 38)
+	wrapper.custom_minimum_size = min_size
 	
 	var panel = PanelContainer.new()
 	panel.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -2153,7 +2061,7 @@ func _create_procedural_glossy_button(btn_text: String, bg_color: Color, border_
 	lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	lbl.add_theme_font_size_override("font_size", 15)
+	lbl.add_theme_font_size_override("font_size", 16)
 	lbl.add_theme_color_override("font_color", Color.WHITE)
 	lbl.add_theme_color_override("font_outline_color", border_color)
 	lbl.add_theme_constant_override("outline_size", 3)
@@ -2477,27 +2385,32 @@ func _on_individual_boarded(pid: int, vehicle_id: int, color_id: String, token: 
 	p["state"] = "BOARDED"
 	_oval_freed_capacity += 1
 
-func _create_custom_toggle(text: String, icon_text: String, is_on: bool, on_toggle: Callable) -> Control:
+func _create_custom_toggle(text: String, icon_path: String, is_on: bool, on_toggle: Callable) -> Control:
 	var row := HBoxContainer.new()
-	row.custom_minimum_size = Vector2(210, 36)
+	row.custom_minimum_size = Vector2(230, 38)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
 
-	var icon := Label.new()
-	icon.text = icon_text
-	icon.add_theme_font_size_override("font_size", 12)
-	icon.add_theme_color_override("font_color", Color("9e7655"))
-	icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	var icon := TextureRect.new()
+	icon.texture = load(icon_path)
+	icon.custom_minimum_size = Vector2(24, 24)
+	icon.size = Vector2(24, 24)
+	icon.ignore_texture_size = true
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(icon)
 
 	var spacer := Control.new()
-	spacer.custom_minimum_size = Vector2(9, 0)
+	spacer.custom_minimum_size = Vector2(10, 0)
+	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(spacer)
 
 	var lbl := Label.new()
 	lbl.text = text
-	lbl.add_theme_font_size_override("font_size", 12)
-	lbl.add_theme_color_override("font_color", Color("9e7655"))
+	lbl.add_theme_font_size_override("font_size", 16)
+	lbl.add_theme_color_override("font_color", Color("5c3d2e")) # High contrast chocolate brown (WCAG AAA)
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(lbl)
 
 	const PILL_W := 52.0
@@ -2580,3 +2493,67 @@ func _create_custom_toggle(text: String, icon_text: String, is_on: bool, on_togg
 	wrap.add_child(pill)
 	row.add_child(wrap)
 	return row
+
+
+func _create_close_button(on_close: Callable) -> Button:
+	var btn := Button.new()
+	btn.custom_minimum_size = Vector2(44, 44)
+	btn.size = Vector2(44, 44)
+	btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	btn.focus_mode = Control.FOCUS_NONE
+	
+	var c_style = StyleBoxFlat.new()
+	c_style.bg_color = Color("ef4444")
+	c_style.set_corner_radius_all(22)
+	c_style.shadow_color = Color(0, 0, 0, 0.35)
+	c_style.shadow_size = 5
+	c_style.shadow_offset = Vector2(0, 3)
+	c_style.border_width_bottom = 3
+	c_style.border_color = Color("b91c1c")
+	btn.add_theme_stylebox_override("normal", c_style)
+	
+	var c_hover = c_style.duplicate()
+	c_hover.bg_color = Color("f87171")
+	btn.add_theme_stylebox_override("hover", c_hover)
+	
+	var c_pressed = c_style.duplicate()
+	c_pressed.bg_color = Color("dc2626")
+	c_pressed.shadow_size = 1
+	c_pressed.shadow_offset = Vector2(0, 1)
+	btn.add_theme_stylebox_override("pressed", c_pressed)
+	
+	var cg = Panel.new()
+	cg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	cg.anchor_bottom = 0.5
+	cg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var cgs = StyleBoxFlat.new()
+	cgs.bg_color = Color(1, 1, 1, 0.35)
+	cgs.corner_radius_top_left = 22
+	cgs.corner_radius_top_right = 22
+	cg.add_theme_stylebox_override("panel", cgs)
+	btn.add_child(cg)
+	
+	var icon = TextureRect.new()
+	icon.texture = load("res://assets/ui/icons/close.svg")
+	icon.ignore_texture_size = true
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.custom_minimum_size = Vector2(18, 18)
+	icon.size = Vector2(18, 18)
+	icon.position = Vector2(13, 12)
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	btn.add_child(icon)
+	
+	btn.pivot_offset = Vector2(22, 22)
+	btn.button_down.connect(func():
+		var tw = btn.create_tween()
+		tw.tween_property(btn, "scale", Vector2(0.92, 0.92), 0.05).set_trans(Tween.TRANS_QUAD)
+	)
+	btn.button_up.connect(func():
+		var tw = btn.create_tween()
+		tw.tween_property(btn, "scale", Vector2.ONE, 0.08).set_trans(Tween.TRANS_QUAD)
+	)
+	btn.pressed.connect(func():
+		_play_sfx("ui")
+		on_close.call()
+	)
+	return btn

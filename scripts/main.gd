@@ -179,7 +179,7 @@ func _show_settings_overlay() -> void:
 	# Wrapper Control so the close button can anchor freely OUTSIDE the
 	# PanelContainer (PanelContainer forces child layout and ignores anchors).
 	var wrapper := Control.new()
-	wrapper.custom_minimum_size = Vector2(255, 215)
+	wrapper.custom_minimum_size = Vector2(280, 250)
 	wrapper.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	center.add_child(wrapper)
 
@@ -194,133 +194,102 @@ func _show_settings_overlay() -> void:
 	ps.shadow_size = 9
 	ps.shadow_offset = Vector2(0, 6)
 	_settings_panel.add_theme_stylebox_override("panel", ps)
-	# REMOVED clip_children because it breaks the shadow and layout!
 	wrapper.add_child(_settings_panel)
 	
-	# Add the gloss Panel OVER the settings panel as a sibling so it doesn't break PanelContainer layout
+	# Subtle gloss Panel OVER the settings panel
 	var pop_gloss = Panel.new()
 	pop_gloss.set_anchors_preset(Control.PRESET_FULL_RECT)
 	pop_gloss.anchor_bottom = 0.5
 	pop_gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var pg_style = StyleBoxFlat.new()
-	pg_style.bg_color = Color(1, 1, 1, 0.4)
+	pg_style.bg_color = Color(1, 1, 1, 0.18) # Clean subtle gloss, does not wash out title
 	pg_style.corner_radius_top_left = 24
 	pg_style.corner_radius_top_right = 24
 	pop_gloss.add_theme_stylebox_override("panel", pg_style)
 	wrapper.add_child(pop_gloss)
 
 	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 21)
-	margin.add_theme_constant_override("margin_right", 21)
-	margin.add_theme_constant_override("margin_top", 21)
-	margin.add_theme_constant_override("margin_bottom", 21)
+	margin.add_theme_constant_override("margin_left", 22)
+	margin.add_theme_constant_override("margin_right", 22)
+	margin.add_theme_constant_override("margin_top", 20)
+	margin.add_theme_constant_override("margin_bottom", 20)
 	_settings_panel.add_child(margin)
 
 	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 13)
+	vbox.add_theme_constant_override("separation", 12)
 	margin.add_child(vbox)
 
 	var title := Label.new()
 	title.text = "Settings"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 18)
-	title.add_theme_color_override("font_color", Color("9e7655"))
+	title.add_theme_font_size_override("font_size", 22)
+	title.add_theme_color_override("font_color", Color("4a2810")) # High contrast warm brown (WCAG AAA)
 	vbox.add_child(title)
 
 	var line := ColorRect.new()
 	line.custom_minimum_size = Vector2(0, 2)
-	line.color = Color("c4b29c")
+	line.color = Color("d4c3ad")
 	vbox.add_child(line)
 
 	var toggles := VBoxContainer.new()
-	toggles.add_theme_constant_override("separation", 9)
+	toggles.add_theme_constant_override("separation", 10)
 	vbox.add_child(toggles)
 
-	toggles.add_child(_create_custom_toggle("Sound", "🔊", SettingsManager.sfx_enabled(), func(on):
+	toggles.add_child(_create_custom_toggle("Sound", "res://assets/ui/icons/sound.svg", SettingsManager.sfx_enabled(), func(on):
 		SettingsManager.set_sfx(on)))
-	toggles.add_child(_create_custom_toggle("Music", "🎵", SettingsManager.music_enabled(), func(on):
+	toggles.add_child(_create_custom_toggle("Music", "res://assets/ui/icons/music.svg", SettingsManager.music_enabled(), func(on):
 		SettingsManager.set_music(on)
 		if on:
 			AudioManager.play_music()
 		else:
 			AudioManager.stop_music()))
-	toggles.add_child(_create_custom_toggle("Vibration", "📳", SettingsManager.haptics_enabled(), func(on):
+	toggles.add_child(_create_custom_toggle("Vibration", "res://assets/ui/icons/vibration.svg", SettingsManager.haptics_enabled(), func(on):
 		SettingsManager.set_haptics(on)))
 
-	# --- Premium 2D Glossy Close button ---
-	var close_btn := Button.new()
-	close_btn.text = "✖"
-	close_btn.add_theme_font_size_override("font_size", 18)
-	close_btn.add_theme_color_override("font_color", Color.WHITE)
-	close_btn.custom_minimum_size = Vector2(40, 40)
+	# --- Professional Vector Close Button (44x44 minimum touch target) ---
+	var close_btn := _create_close_button(func():
+		AudioManager.play(AudioManager.SFX_UI)
+		_settings_overlay.queue_free()
+	)
 	close_btn.anchor_left = 1.0
 	close_btn.anchor_right = 1.0
 	close_btn.anchor_top = 0.0
 	close_btn.anchor_bottom = 0.0
-	close_btn.offset_left = -24.0
-	close_btn.offset_top = -16.0
-	close_btn.offset_right = 24.0
-	close_btn.offset_bottom = 32.0
-	# NO clip_children to prevent shadow bug
-	var c_style = StyleBoxFlat.new()
-	c_style.bg_color = Color("ef4444")
-	c_style.set_corner_radius_all(18)
-	c_style.shadow_color = Color(0, 0, 0, 0.3)
-	c_style.shadow_size = 4
-	c_style.shadow_offset = Vector2(0, 3)
-	close_btn.add_theme_stylebox_override("normal", c_style)
-	
-	var c_hover = c_style.duplicate()
-	c_hover.bg_color = Color("f87171")
-	close_btn.add_theme_stylebox_override("hover", c_hover)
-	
-	var c_pressed = c_style.duplicate()
-	c_pressed.bg_color = Color("dc2626")
-	c_pressed.shadow_size = 0
-	c_pressed.shadow_offset = Vector2(0,0)
-	close_btn.add_theme_stylebox_override("pressed", c_pressed)
-	
-	var cg = Panel.new()
-	cg.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	cg.anchor_bottom = 0.5
-	cg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var cgs = StyleBoxFlat.new()
-	cgs.bg_color = Color(1, 1, 1, 0.3)
-	cgs.corner_radius_top_left = 18
-	cgs.corner_radius_top_right = 18
-	cg.add_theme_stylebox_override("panel", cgs)
-	close_btn.add_child(cg)
-	
-	close_btn.pressed.connect(func():
-		AudioManager.play(AudioManager.SFX_UI)
-		_settings_overlay.queue_free()
-	)
+	close_btn.offset_left = -22.0
+	close_btn.offset_top = -14.0
+	close_btn.offset_right = 22.0
+	close_btn.offset_bottom = 30.0
 	wrapper.add_child(close_btn)
 
 	add_child(_settings_overlay)
 
 
-func _create_custom_toggle(text: String, icon_text: String, is_on: bool, on_toggle: Callable) -> Control:
+func _create_custom_toggle(text: String, icon_path: String, is_on: bool, on_toggle: Callable) -> Control:
 	var row := HBoxContainer.new()
-	row.custom_minimum_size = Vector2(210, 36)
+	row.custom_minimum_size = Vector2(230, 40)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
 
-	var icon := Label.new()
-	icon.text = icon_text
-	icon.add_theme_font_size_override("font_size", 12)
-	icon.add_theme_color_override("font_color", Color("9e7655"))
-	icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	var icon := TextureRect.new()
+	icon.texture = load(icon_path)
+	icon.custom_minimum_size = Vector2(24, 24)
+	icon.size = Vector2(24, 24)
+	icon.ignore_texture_size = true
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(icon)
 
 	var spacer := Control.new()
-	spacer.custom_minimum_size = Vector2(9, 0)
+	spacer.custom_minimum_size = Vector2(10, 0)
+	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(spacer)
 
 	var lbl := Label.new()
 	lbl.text = text
-	lbl.add_theme_font_size_override("font_size", 12)
-	lbl.add_theme_color_override("font_color", Color("9e7655"))
+	lbl.add_theme_font_size_override("font_size", 16)
+	lbl.add_theme_color_override("font_color", Color("5c3d2e")) # High contrast chocolate brown (WCAG AAA)
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(lbl)
 
 	# Procedural 3D toggle pill (no PNG — sharp at any resolution)
@@ -408,3 +377,66 @@ func _create_custom_toggle(text: String, icon_text: String, is_on: bool, on_togg
 	wrap.add_child(pill)
 	row.add_child(wrap)
 	return row
+
+
+func _create_close_button(on_close: Callable) -> Button:
+	var btn := Button.new()
+	btn.custom_minimum_size = Vector2(44, 44)
+	btn.size = Vector2(44, 44)
+	btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	btn.focus_mode = Control.FOCUS_NONE
+	
+	var c_style = StyleBoxFlat.new()
+	c_style.bg_color = Color("ef4444")
+	c_style.set_corner_radius_all(22)
+	c_style.shadow_color = Color(0, 0, 0, 0.35)
+	c_style.shadow_size = 5
+	c_style.shadow_offset = Vector2(0, 3)
+	c_style.border_width_bottom = 3
+	c_style.border_color = Color("b91c1c")
+	btn.add_theme_stylebox_override("normal", c_style)
+	
+	var c_hover = c_style.duplicate()
+	c_hover.bg_color = Color("f87171")
+	btn.add_theme_stylebox_override("hover", c_hover)
+	
+	var c_pressed = c_style.duplicate()
+	c_pressed.bg_color = Color("dc2626")
+	c_pressed.shadow_size = 1
+	c_pressed.shadow_offset = Vector2(0, 1)
+	btn.add_theme_stylebox_override("pressed", c_pressed)
+	
+	var cg = Panel.new()
+	cg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	cg.anchor_bottom = 0.5
+	cg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var cgs = StyleBoxFlat.new()
+	cgs.bg_color = Color(1, 1, 1, 0.35)
+	cgs.corner_radius_top_left = 22
+	cgs.corner_radius_top_right = 22
+	cg.add_theme_stylebox_override("panel", cgs)
+	btn.add_child(cg)
+	
+	var icon = TextureRect.new()
+	icon.texture = load("res://assets/ui/icons/close.svg")
+	icon.ignore_texture_size = true
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.custom_minimum_size = Vector2(18, 18)
+	icon.size = Vector2(18, 18)
+	icon.position = Vector2(13, 12)
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	btn.add_child(icon)
+	
+	btn.pivot_offset = Vector2(22, 22)
+	btn.button_down.connect(func():
+		var tw = btn.create_tween()
+		tw.tween_property(btn, "scale", Vector2(0.92, 0.92), 0.05).set_trans(Tween.TRANS_QUAD)
+	)
+	btn.button_up.connect(func():
+		var tw = btn.create_tween()
+		tw.tween_property(btn, "scale", Vector2.ONE, 0.08).set_trans(Tween.TRANS_QUAD)
+	)
+	btn.pressed.connect(func():
+		on_close.call()
+	)
+	return btn
