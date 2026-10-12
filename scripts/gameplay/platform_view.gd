@@ -5,70 +5,65 @@ var p_top: float = -500.0
 var p_bottom: float = 2000.0
 var p_width: float = 2000.0
 var p_partition_y: float = 0.0
+var p_separator_y: float = -9999.0
+var p_deck_w: float = 580.0
 
-func setup_full(top_y: float, bottom_y: float, w: float, partition_y: float) -> void:
+func setup_full(top_y: float, bottom_y: float, w: float, partition_y: float, separator_y: float = -9999.0, deck_w: float = 580.0) -> void:
 	p_top = top_y
 	p_bottom = bottom_y
 	p_width = w
 	p_partition_y = partition_y
+	p_separator_y = separator_y
+	p_deck_w = deck_w
 	queue_redraw()
 
 func _draw() -> void:
-	var bg_color = Color("d1d5e6") # Lavender-grey
-	var curb_color = Color("ffffff", 0.8)
-	var shadow_color = Color("a5abc2")
-	var deep_color = Color("959caf")
-	var road_color = Color("c7cddf") # Slightly darker for the road surface
+	# 1. Authoritative base lavender-grey material
+	var base_grey := Color("d1d5e6") # Approved lavender-grey material for platform and ground
+	var curb_highlight := Color("ffffff", 0.85)
+	var curb_shadow := Color("a5abc2")
+	var curb_deep := Color("8c93a8")
 
-	var hill_w = 540.0
-	var slope_w = 80.0
-	var gy = p_partition_y
-	
-	# The road's lower boundary
-	var road_height = 170.0
-	var line_y = gy + road_height
+	var hill_w: float = p_deck_w
+	var slope_w: float = 75.0
+	var gy: float = p_partition_y
+	var hw: float = p_width / 2.0
+	var sep_y: float = p_separator_y
 
+	# 2. Continuous lavender-grey polygon (raised platform deck, sloped sides, and full-width floor)
 	var points = PackedVector2Array([
-		Vector2(-p_width/2.0, p_bottom),
-		Vector2(-p_width/2.0, gy),
-		Vector2(-hill_w/2.0 - slope_w, gy),
-		Vector2(-hill_w/2.0, p_top),
-		Vector2(hill_w/2.0, p_top),
-		Vector2(hill_w/2.0 + slope_w, gy),
-		Vector2(p_width/2.0, gy),
-		Vector2(p_width/2.0, p_bottom)
+		Vector2(-hw, p_bottom),
+		Vector2(-hw, gy),
+		Vector2(-hill_w / 2.0 - slope_w, gy),
+		Vector2(-hill_w / 2.0, p_top),
+		Vector2(hill_w / 2.0, p_top),
+		Vector2(hill_w / 2.0 + slope_w, gy),
+		Vector2(hw, gy),
+		Vector2(hw, p_bottom)
 	])
+	draw_colored_polygon(points, base_grey)
 
-	# Fill the entire platform base
-	draw_colored_polygon(points, bg_color)
-	
-	# Draw the actual EXIT ROAD surface shading
-	# From the trapezoid base down to line_y
-	draw_rect(Rect2(-p_width/2.0, gy, p_width, road_height), road_color)
-	
-	# Draw the 3D curb along the top edge of the trapezoid shape
+	# 3. Subtle road corridor shading between parking platform and separator line
+	if sep_y > gy:
+		draw_rect(Rect2(-hw, gy, p_width, sep_y - gy), Color(0.79, 0.81, 0.88, 0.22))
+
+	# 4. Clean 3D curb outlining the platform perimeter and connecting seamlessly with the horizon floor
 	var top_edge = PackedVector2Array([
-		Vector2(-p_width/2.0, gy),
-		Vector2(-hill_w/2.0 - slope_w, gy),
-		Vector2(-hill_w/2.0, p_top),
-		Vector2(hill_w/2.0, p_top),
-		Vector2(hill_w/2.0 + slope_w, gy),
-		Vector2(p_width/2.0, gy)
+		Vector2(-hw, gy),
+		Vector2(-hill_w / 2.0 - slope_w, gy),
+		Vector2(-hill_w / 2.0, p_top),
+		Vector2(hill_w / 2.0, p_top),
+		Vector2(hill_w / 2.0 + slope_w, gy),
+		Vector2(hw, gy)
 	])
-	
-	for offset_y in range(0, 10):
-		var color = deep_color
-		if offset_y < 2: color = curb_color
-		elif offset_y < 6: color = shadow_color
-		
-		var offset_pts = PackedVector2Array()
-		for pt in top_edge:
-			offset_pts.append(pt + Vector2(0, offset_y))
-			
-		draw_polyline(offset_pts, color, 2.0, true)
-		
-	# Draw the lower road boundary (the straight horizontal line requested)
-	draw_rect(Rect2(-p_width/2.0, line_y, p_width, 4), shadow_color)
-	draw_rect(Rect2(-p_width/2.0, line_y + 4, p_width, 3), deep_color)
-	draw_rect(Rect2(-p_width/2.0, line_y + 7, p_width, 3), curb_color)
 
+	# Draw 3D curb bevel along the entire continuous perimeter
+	draw_polyline(top_edge, curb_shadow, 4.0, true)
+	draw_polyline(top_edge, curb_deep, 2.5, true)
+	draw_polyline(top_edge, curb_highlight, 1.5, true)
+
+	# 5. Authoritative Road Divider / Separator line (placed safely above puzzle buses)
+	if sep_y > -9000.0:
+		draw_rect(Rect2(-hw, sep_y, p_width, 2.5), curb_shadow)
+		draw_rect(Rect2(-hw, sep_y + 2.5, p_width, 2.0), curb_deep)
+		draw_rect(Rect2(-hw, sep_y + 4.5, p_width, 2.0), curb_highlight)

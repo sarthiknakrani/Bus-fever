@@ -443,7 +443,9 @@ func _setup_controller() -> void:
 
 func _load_current_level() -> void:
 	var lvl_num = 1
-	var gc = get_tree().root.get_node_or_null("GameController") if is_inside_tree() and get_tree() and get_tree().root else null
+	var gc = null
+	if is_inside_tree() and get_tree() != null and get_tree().root != null:
+		gc = get_tree().root.get_node_or_null("GameController")
 	if gc:
 		lvl_num = gc.current_level_number
 
@@ -470,7 +472,8 @@ func _load_current_level() -> void:
 	if result_subtitle_label != null:
 		result_subtitle_label.visible = false
 		result_subtitle_label.text = ""
-	get_tree().paused = false
+	if is_inside_tree() and get_tree() != null:
+		get_tree().paused = false
 
 	controller.load_level(lvl)
 	_setup_visuals(lvl)
@@ -530,17 +533,22 @@ func _setup_visuals(lvl: CarJamLevelData) -> void:
 	parking_bg.z_index = -1
 	
 
-	var bg_w = total_span + 62.0 + 32.0 # total_span + SLOT_WIDTH + padding
-	var bg_h = 104.0 + 32.0 # SLOT_HEIGHT + padding
+	var bg_w = total_span + 62.0 + 36.0 # total_span + SLOT_WIDTH + padding
+	var bg_h = 110.0 + 24.0 # SLOT_HEIGHT + padding
 	
 	parking_bg.draw.connect(func():
 		var style = StyleBoxFlat.new()
-		style.bg_color = Color("94a3b8") # Light grey concrete surrounding
-		style.set_corner_radius_all(16)
-		style.shadow_color = Color(0,0,0,0.2)
-		style.shadow_size = 10
-		style.shadow_offset = Vector2(0, 8)
-		style.draw(parking_bg.get_canvas_item(), Rect2(-bg_w/2.0 - 6, -bg_h/2.0 - 6, bg_w + 12, bg_h + 12))
+		style.bg_color = Color("c5c9db") # Seamlessly cohesive grey apron matching platform and road
+		style.set_corner_radius_all(14)
+		style.border_width_left = 2
+		style.border_width_top = 2
+		style.border_width_right = 2
+		style.border_width_bottom = 2
+		style.border_color = Color("a5abc2") # Clean subtle apron border matching platform curb shadow
+		style.shadow_color = Color(0, 0, 0, 0.08) # Soft integrated depth, no harsh floating-card look
+		style.shadow_size = 4
+		style.shadow_offset = Vector2(0, 2)
+		style.draw(parking_bg.get_canvas_item(), Rect2(-bg_w/2.0, -bg_h/2.0, bg_w, bg_h))
 	)
 	parking_slots_node.add_child(parking_bg)
 
@@ -1936,6 +1944,38 @@ func _build_hud() -> void:
 	_setup_toast_ui()
 
 
+func _calc_highest_bus_visual_y() -> float:
+	var highest_y := 999999.0
+	if board_root == null or vehicle_views == null:
+		return highest_y
+	for vid in vehicle_views:
+		var vv: VehicleView = vehicle_views[vid]
+		if not is_instance_valid(vv) or not vv.visible:
+			continue
+		if vv.is_in_parking:
+			continue
+		
+		var tw := 146.0
+		var th := 68.0
+		for c in vv.get_children():
+			if c is Sprite2D and c.texture != null:
+				tw = c.texture.get_size().x
+				th = c.texture.get_size().y
+				break
+		
+		var hw := tw / 2.0
+		var hh := th / 2.0
+		var corners = [
+			Vector2(-hw, -hh), Vector2(hw, -hh),
+			Vector2(hw, hh), Vector2(-hw, hh)
+		]
+		for corner in corners:
+			var world_pt: Vector2 = board_root.transform * (vv.position + corner)
+			highest_y = minf(highest_y, world_pt.y)
+			
+	return highest_y
+
+
 func _update_layout() -> void:
 	if world_root == null:
 		return
@@ -1947,8 +1987,8 @@ func _update_layout() -> void:
 	# 1. Determine local bounding sizes
 	var track_h = 392.0 # Authoritative track envelope (R=115, border 162px: -196 to +196)
 	var parking_h = 110.0 # Authoritative ParkingSlotView height (SLOT_HEIGHT = 110)
-	var board_cells_w = float(controller.level_data.board_size.x)
-	var board_cells_h = float(controller.level_data.board_size.y)
+	var board_cells_w = float(controller.level_data.board_size.x) if controller != null and controller.level_data != null else 7.0
+	var board_cells_h = float(controller.level_data.board_size.y) if controller != null and controller.level_data != null else 7.0
 	var board_local_size = max(board_cells_w, board_cells_h) * CELL_SIZE
 	# Rotated 45 deg, scale (1.0, 0.72)
 	var board_pixel_w = board_local_size * sqrt(2.0)
@@ -1961,14 +2001,15 @@ func _update_layout() -> void:
 
 	# Ensure we fit parking strip, board clearance, and track system with feeder
 	var slot_spacing = 76.0 # MATCHES what we set earlier
-	var parking_w = float(max(1, controller.level_data.parking_slots_count - 1)) * slot_spacing + 40.0
+	var slots_count: int = controller.level_data.parking_slots_count if controller != null and controller.level_data != null else 4
+	var parking_w = float(max(1, slots_count - 1)) * slot_spacing + 40.0
 	var board_padded_w = board_pixel_w + 100.0
 	var track_system_w = 702.0 # Full track system span (R=115, apex=270, border 162px)
 	var required_w = maxf(maxf(parking_w, board_padded_w), track_system_w)
 	
 	# Baseline content height with clean corridor below parking for turning buses
 	var min_gap_tp = 65.0
-	var bus_corridor_gap = 100.0
+	var bus_corridor_gap = 135.0 # Clean visual corridor ensuring buses never overlap the separator line
 	var base_content_h = track_h + min_gap_tp + parking_h + bus_corridor_gap + board_pixel_h
 
 	var scale_w = screen_safe_w / required_w
@@ -1981,7 +2022,7 @@ func _update_layout() -> void:
 
 	# Distribute extra height gracefully: comfortable spacing between track/parking and bus corridor
 	var gap_tp = clampf(min_gap_tp + extra_h * 0.15, 65.0, 100.0)
-	var gap_pb = clampf(bus_corridor_gap + extra_h * 0.20, 100.0, 150.0)
+	var gap_pb = clampf(bus_corridor_gap + extra_h * 0.20, 135.0, 175.0)
 	var total_content_h = track_h + gap_tp + parking_h + gap_pb + board_pixel_h
 	var remaining_h = maxf(0.0, available_local_h - total_content_h)
 
@@ -2020,13 +2061,26 @@ func _update_layout() -> void:
 		# Start platform slightly above the parking slots
 		var plat_top = parking_y - (parking_h / 2.0) - 20.0
 		
-		# Partition gap
-		var partition_y = parking_y + (parking_h / 2.0) + 15.0
+		# Partition gap (where parking bays end and road corridor begins)
+		var parking_bottom = parking_y + (parking_h / 2.0)
+		var partition_y = parking_bottom + 10.0
+		
+		# Determine safe separator Y dynamically relative to highest bus visual top
+		var highest_bus_y = _calc_highest_bus_visual_y()
+		var visual_margin = 25.0
+		var max_safe_divider_y = highest_bus_y - visual_margin
+		var nominal_divider_y = parking_bottom + 65.0
+		var separator_y = minf(nominal_divider_y, max_safe_divider_y)
+		if separator_y <= partition_y + 15.0:
+			separator_y = -9999.0 # omit cleanly if corridor space is too restricted
+		
+		# Deck plateau width (comfortably frames parking slots with padding)
+		var deck_w = maxf(580.0, parking_w + 50.0)
 		
 		# Width needs to cover entire screen width
 		var full_w = (vp_size.x / scale_factor) + 200.0
 		
-		platform_bg.setup_full(plat_top, local_bottom, full_w, partition_y)
+		platform_bg.setup_full(plat_top, local_bottom, full_w, partition_y, separator_y, deck_w)
 
 
 
