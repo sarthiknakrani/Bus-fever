@@ -39,6 +39,14 @@ func consume_head(amount: int) -> int:
 		_head_index += 1
 	return actual
 
+func board_group(group_id: int, count: int = 1) -> int:
+	if group_id >= 0 and group_id < _groups.size():
+		var g = _groups[group_id]
+		var actual := g.board(count)
+		get_head_group() # updates _head_index if head group emptied
+		return actual
+	return 0
+
 func is_empty() -> bool:
 	return get_head_group() == null
 

@@ -153,6 +153,7 @@ func _process(delta: float) -> void:
 					passenger_visuals.add_child(pv)
 					p["view"] = pv
 					p["state"] = "FEEDER"
+					controller.set_passenger_state(p["id"], "FEEDER")
 					var lpos = _calc_lane_pos(f_pt_info["pos"], f_pt_info["normal"], p["lane"])
 					pv.position = lpos
 					all_passengers[p["id"]] = p
@@ -197,6 +198,7 @@ func _process(delta: float) -> void:
 					lead_row.is_feeder = false
 					for p in lead_row.passengers:
 						p["state"] = "CIRCULATING"
+						controller.set_passenger_state(p["id"], "CIRCULATING")
 						circulating_ids.append(p["id"])
 						_feeder_passengers.erase(p)
 						if is_instance_valid(p.get("view")):
@@ -273,7 +275,7 @@ func _process(delta: float) -> void:
 					if v != null and v.remaining_capacity() > 0:
 						for p in row.passengers:
 							if p["state"] == "CIRCULATING" and p["color_id"] == v.color_id:
-								if controller.try_reserve_boarding(v.id, p["color_id"]):
+								if controller.try_reserve_boarding(p["id"], v.id, p["color_id"], p.get("group_id", -1)):
 									_board_circulating_passenger(p, v.id, slot_idx, trigger_prog)
 									to_board_from_row.append(p)
 									if v.remaining_capacity() <= 0:
@@ -609,15 +611,17 @@ func _build_universal_passenger_queue() -> Array[Dictionary]:
 		return []
 	var out: Array[Dictionary] = []
 	for p in seq.all():
-		out.append({"id": int(p.id), "color_id": String(p.color)})
+		out.append({"id": int(p.id), "color_id": String(p.color), "group_id": int(p.group_id)})
 	return out
 
 func _generate_mixed_passenger_sequence(groups: Array[PassengerGroupData]) -> Array[Dictionary]:
 	var total_counts := {}
 	var total_passengers := 0
+	var group_rem: Array[int] = []
 	for g in groups:
 		total_counts[g.color_id] = total_counts.get(g.color_id, 0) + g.initial_count
 		total_passengers += g.initial_count
+		group_rem.append(g.initial_count)
 
 	var colors: Array[String] = []
 	for c in total_counts:
@@ -647,7 +651,16 @@ func _generate_mixed_passenger_sequence(groups: Array[PassengerGroupData]) -> Ar
 
 		var pick_idx := rng.randi() % candidates.size()
 		var chosen := candidates[pick_idx]
-		result.append({"id": pid, "color_id": chosen})
+		
+		# Map to the earliest matching group with remaining capacity
+		var chosen_gid := 0
+		for g_i in groups.size():
+			if groups[g_i].color_id == chosen and group_rem[g_i] > 0:
+				chosen_gid = g_i
+				group_rem[g_i] -= 1
+				break
+
+		result.append({"id": pid, "color_id": chosen, "group_id": chosen_gid})
 		remaining[chosen] -= 1
 		if chosen == last_color:
 			run_count += 1
@@ -762,12 +775,16 @@ func _init_passenger_track() -> void:
 				var p_obj = {
 					"id": p_info["id"],
 					"color_id": p_info["color_id"],
+					"group_id": p_info.get("group_id", 0),
 					"lane": k,
 					"view": null,
 					"state": "PENDING"
 				}
 				row.passengers.append(p_obj)
+				all_passengers[p_obj["id"]] = p_obj
 		all_rows.append(row)
+
+	controller.register_passengers(all_queue_p)
 
 	# Main oval starts densely packed (38 rows = 152 passengers)
 	var track_len = passenger_track.curve.get_baked_length()
@@ -786,10 +803,10 @@ func _init_passenger_track() -> void:
 			passenger_visuals.add_child(pv)
 			p["view"] = pv
 			p["state"] = "CIRCULATING"
+			controller.set_passenger_state(p["id"], "CIRCULATING")
 			var lpos = _calc_lane_pos(pt_info["pos"], pt_info["normal"], p["lane"])
 			pv.position = lpos
 			
-			all_passengers[p["id"]] = p
 			circulating_ids.append(p["id"])
 		_circulating_rows.append(row)
 
@@ -811,9 +828,9 @@ func _init_passenger_track() -> void:
 				passenger_visuals.add_child(pv)
 				p["view"] = pv
 				p["state"] = "FEEDER"
+				controller.set_passenger_state(p["id"], "FEEDER")
 				var lpos = _calc_lane_pos(f_pt_info["pos"], f_pt_info["normal"], p["lane"])
 				pv.position = lpos
-				all_passengers[p["id"]] = p
 				_feeder_passengers.append(p)
 			_feeder_rows.append(row)
 		else:
@@ -822,10 +839,11 @@ func _init_passenger_track() -> void:
 			_pending_feeder_rows.append(row)
 			for p in row.passengers:
 				p["state"] = "PENDING"
+				controller.set_passenger_state(p["id"], "PENDING")
 				_pending_feeder_passengers.append(p)
 
 func _board_circulating_passenger(p: Dictionary, vehicle_id: int, slot_idx: int, trigger_prog: float) -> void:
-	p["state"] = "BOARDING"
+	p["state"] = "BOARDING_RESERVED"
 	_animate_individual_boarding(p, vehicle_id, slot_idx, trigger_prog)
 	circulating_ids.erase(p["id"])
 
@@ -839,7 +857,7 @@ func _try_board_passenger(p: Dictionary, slot_idx: int) -> bool:
 	if v == null or v.color_id != p["color_id"]:
 		return false
 		
-	if controller.try_reserve_boarding(slot.vehicle_id, p["color_id"]):
+	if controller.try_reserve_boarding(p["id"], slot.vehicle_id, p["color_id"], p.get("group_id", -1)):
 		var trigger_prog = slot_boarding_points.get(slot_idx, p.get("progress", 0.0))
 		_board_circulating_passenger(p, slot.vehicle_id, slot_idx, trigger_prog)
 		return true
@@ -971,7 +989,7 @@ func _recover_boarding_for_slot(slot_id: int) -> void:
 		var to_remove: Array[Dictionary] = []
 		for p in row.passengers:
 			if p["state"] == "CIRCULATING" and p["color_id"] == v.color_id:
-				if controller.try_reserve_boarding(v.id, p["color_id"]):
+				if controller.try_reserve_boarding(p["id"], v.id, p["color_id"], p.get("group_id", -1)):
 					_board_circulating_passenger(p, v.id, slot_id, trigger_prog)
 					to_remove.append(p)
 					if v.remaining_capacity() <= 0:
@@ -2393,12 +2411,17 @@ func _animate_individual_boarding(p: Dictionary, vehicle_id: int, slot_id: int, 
 func _on_individual_boarded(pid: int, vehicle_id: int, color_id: String, token: int) -> void:
 	if token != controller.session_token: return
 	var p = all_passengers.get(pid, null)
-	if p != null:
-		if is_instance_valid(p["view"]):
-			p["view"].queue_free()
-		p["state"] = "BOARDED"
+	if p == null: return
+	if p.get("state", "") == "BOARDED": return # Idempotent rejection of duplicate callback
+
+	var committed := controller.commit_boarding(pid, vehicle_id, color_id, token)
+	if not committed:
+		return # Stale, duplicate, or rejected reservation - DO NOT credit freed capacity!
+
+	if is_instance_valid(p.get("view")):
+		p["view"].queue_free()
+	p["state"] = "BOARDED"
 	_oval_freed_capacity += 1
-	controller.commit_boarding(vehicle_id, color_id, token)
 
 func _create_custom_toggle(text: String, icon_text: String, is_on: bool, on_toggle: Callable) -> Control:
 	var row := HBoxContainer.new()

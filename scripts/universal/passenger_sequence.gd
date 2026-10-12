@@ -25,6 +25,7 @@ class Passenger:
 	var id: int
 	var color: String
 	var lane: int = 0
+	var group_id: int = 0
 	var state: int = PState.PENDING
 	var release_index: int = -1 # position in feeder; -1 if not yet released
 
@@ -40,6 +41,7 @@ func _init(plan, initial_circulating_count: int = 40) -> void:
 		p.id = i
 		p.color = String(flat[i]["color"])
 		p.lane = i % 4 # 4-wide formation
+		p.group_id = int(flat[i].get("wave_index", 0))
 		p.state = PState.PENDING
 		# The first `initial_count` passengers are placed on the loop at start.
 		if i < initial_count:
@@ -230,6 +232,7 @@ func snapshot() -> Dictionary:
 			"id": p.id,
 			"color": p.color,
 			"lane": p.lane,
+			"group_id": p.group_id,
 			"state": p.state,
 			"release_index": p.release_index
 		})
