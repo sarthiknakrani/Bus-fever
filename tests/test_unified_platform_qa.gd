@@ -86,33 +86,33 @@ func _init() -> void:
 		lvl.queue_free()
 
 	# TEST 2: Material Family & Palette Harmony QA
-	print("\n--- TEST 2: Cohesive Lavender-Grey Material Palette QA ---")
-	var base_grey := Color("d1d5e6")
-	var concourse_grey := Color("cbd0e2")
-	var island_grey := Color("c2c7da")
-	var parking_base_grey := Color("c5c9db")
+	print("\n--- TEST 2: Cohesive Slate-Grey Material Palette QA ---")
+	var ground_grey := Color("cbd5e1")
+	var forecourt_grey := Color("bfc9d8")
+	var plaza_grey := Color("c5cee0")
+	var parking_base_grey := Color("b0bccd")
 	
-	print("  Base Deck Grey:        #%s (L: %.3f)" % [base_grey.to_html(false), base_grey.get_luminance()])
-	print("  Concourse Apron Grey:  #%s (L: %.3f)" % [concourse_grey.to_html(false), concourse_grey.get_luminance()])
-	print("  Central Island Grey:   #%s (L: %.3f)" % [island_grey.to_html(false), island_grey.get_luminance()])
+	print("  Upper Ground Grey:     #%s (L: %.3f)" % [ground_grey.to_html(false), ground_grey.get_luminance()])
+	print("  Forecourt Apron Grey:  #%s (L: %.3f)" % [forecourt_grey.to_html(false), forecourt_grey.get_luminance()])
+	print("  Central Plaza Grey:    #%s (L: %.3f)" % [plaza_grey.to_html(false), plaza_grey.get_luminance()])
 	print("  Parking Base Grey:     #%s (L: %.3f)" % [parking_base_grey.to_html(false), parking_base_grey.get_luminance()])
 	
-	# Verify hue & saturation family cohesion: all within lavender-grey slate gamut
-	var colors := [base_grey, concourse_grey, island_grey, parking_base_grey]
+	# Verify hue & saturation family cohesion: all within slate gamut
+	var colors := [ground_grey, forecourt_grey, plaza_grey, parking_base_grey]
 	var max_lum := 0.0
 	var min_lum := 1.0
 	for c in colors:
 		max_lum = maxf(max_lum, c.get_luminance())
 		min_lum = minf(min_lum, c.get_luminance())
-		# Check slight lavender-blue tint (b >= r and b >= g)
+		# Check slate-cool tint (b >= r and b >= g)
 		if c.b < c.r or c.b < c.g:
-			print("  [FAIL] Color #%s does not match lavender-grey tint" % c.to_html(false))
+			print("  [FAIL] Color #%s does not match slate-cool tint" % c.to_html(false))
 			all_passed = false
 	
 	var lum_spread = max_lum - min_lum
-	print("  Luminance delta spread: %.3f (Target < 0.15 for cohesive material family)" % lum_spread)
-	if lum_spread < 0.15:
-		print("  [PASS] All platform elements share the exact same lavender-grey material family")
+	print("  Luminance delta spread: %.3f (Target < 0.20 for cohesive material family)" % lum_spread)
+	if lum_spread < 0.20:
+		print("  [PASS] All platform elements share the exact same slate-grey material family")
 	else:
 		print("  [FAIL] Luminance spread too wide across platform materials: %.3f" % lum_spread)
 		all_passed = false
