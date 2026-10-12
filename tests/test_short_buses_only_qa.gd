@@ -146,7 +146,9 @@ func _run_short_bus_tests() -> void:
 		var test_vv := VehicleView.new()
 		test_vv.setup(99, "test", "blue", d, 40, fp)
 		var unscaled: Vector2 = test_vv.get_unscaled_parked_size()
-		var visual_body: Vector2 = Vector2(VehicleView.CANONICAL_BODY_WIDTH, VehicleView.CANONICAL_BODY_LENGTH)
+		var is_vert: bool = (d == 0 or d == 1)
+		var body_w = VehicleView.CANONICAL_BODY_WIDTH_V if is_vert else VehicleView.CANONICAL_BODY_WIDTH_H
+		var visual_body: Vector2 = Vector2(body_w, VehicleView.CANONICAL_BODY_LENGTH)
 		var w_margin: float = (62.0 - visual_body.x) / 2.0
 		var h_margin: float = (110.0 - visual_body.y) / 2.0
 

@@ -15,9 +15,10 @@ var is_in_parking: bool = false
 
 const CELL_SIZE: float = 78.0
 
-# Canonical short bus dimensions (uniform across all variants)
-const CANONICAL_BODY_WIDTH: float = 54.0
+# Canonical short bus dimensions (proportional without distortion)
 const CANONICAL_BODY_LENGTH: float = 102.0
+const CANONICAL_BODY_WIDTH_V: float = 48.0
+const CANONICAL_BODY_WIDTH_H: float = 46.0
 const CANONICAL_CANVAS_WIDTH: float = 62.0
 const CANONICAL_CANVAS_HEIGHT: float = 110.0
 
