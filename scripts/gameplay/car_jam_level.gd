@@ -69,11 +69,11 @@ class PassengerRow extends RefCounted:
 	var is_feeder: bool = false
 	var passengers: Array[Dictionary] = [] # {"id": int, "color_id": String, "lane": int, "view": PassengerView, "state": String}
 
-const LANE_SPACING := 23.5
-const ROW_SPACING := 33.5
+const LANE_SPACING := 22.2
+const ROW_SPACING := 26.85
 const NUM_LANES := 4
-const PASSENGER_SPACING := 33.5
-const MAX_INITIAL_LOOP_PASSENGERS := 160
+const PASSENGER_SPACING := 26.85
+const MAX_INITIAL_LOOP_PASSENGERS := 200
 
 var passenger_track: Path2D
 var feeder_track: Path2D
@@ -160,10 +160,11 @@ func _process(delta: float) -> void:
 					_pending_feeder_passengers.erase(p)
 				_feeder_rows.append(next_row)
 				
-		# B. Advance feeder rows forward towards gate / row ahead
+		# B. Advance feeder rows forward towards stop line / row ahead
+		var feeder_stop_pos: float = f_len - 60.0
 		for j in range(_feeder_rows.size()):
 			var f_row = _feeder_rows[j]
-			var max_prog: float = f_len
+			var max_prog: float = f_len if (_oval_freed_capacity >= f_row.passengers.size() and j == 0) else feeder_stop_pos
 			if j > 0:
 				max_prog = _feeder_rows[j - 1].progress - ROW_SPACING
 			var dist_ahead: float = max_prog - f_row.progress
@@ -178,36 +179,40 @@ func _process(delta: float) -> void:
 			
 		# C. Merge lead feeder row onto main loop if:
 		#    1. Enough capacity has been freed on the loop by boarded passengers (_oval_freed_capacity >= row.size)
-		#    2. Entrance (progress 0) is geometrically clear
+		#    2. Lead row has arrived at or past merge threshold (f_len - 2.0)
+		#    3. Merge zone on the oval is clear
 		if not _feeder_rows.is_empty():
 			var lead_row = _feeder_rows.front()
-			if lead_row.progress >= f_len - 1.0:
-				var needed_cap: int = lead_row.passengers.size()
-				if _oval_freed_capacity >= needed_cap:
-					var merge_clear := true
-					var clearance_buffer := ROW_SPACING * 1.35
-					for cr in _circulating_rows:
-						if cr.progress < clearance_buffer or cr.progress > (track_len - clearance_buffer):
-							merge_clear = false
-							break
-					if merge_clear:
-						_feeder_rows.pop_front()
-						lead_row.progress = 0.0
-						lead_row.is_feeder = false
-						for p in lead_row.passengers:
-							p["state"] = "CIRCULATING"
-							circulating_ids.append(p["id"])
-							_feeder_passengers.erase(p)
-						_circulating_rows.append(lead_row)
-						_oval_freed_capacity -= needed_cap
+			var needed_cap: int = lead_row.passengers.size()
+			if _oval_freed_capacity >= needed_cap and lead_row.progress >= f_len - 2.0:
+				var merge_clear := true
+				var clearance_buffer := ROW_SPACING * 1.35
+				for cr in _circulating_rows:
+					if cr.progress < clearance_buffer or cr.progress > (track_len - clearance_buffer):
+						merge_clear = false
+						break
+				if merge_clear:
+					_feeder_rows.pop_front()
+					lead_row.progress = 0.0
+					lead_row.is_feeder = false
+					for p in lead_row.passengers:
+						p["state"] = "CIRCULATING"
+						circulating_ids.append(p["id"])
+						_feeder_passengers.erase(p)
+						if is_instance_valid(p.get("view")):
+							p["view"].set_waiting(false)
+					_circulating_rows.append(lead_row)
+					_oval_freed_capacity -= needed_cap
 
 		# D. Update positions of passengers in active feeder rows
 		for f_row in _feeder_rows:
 			var f_pt_info = _get_curve_point_and_normal(feeder_track.curve, f_row.progress, false)
+			var is_row_stopped: bool = f_row.progress >= feeder_stop_pos - 0.5 and _oval_freed_capacity < f_row.passengers.size()
 			for p in f_row.passengers:
 				if p["state"] == "FEEDER" and is_instance_valid(p.get("view")):
 					var lpos = _calc_lane_pos(f_pt_info["pos"], f_pt_info["normal"], p["lane"])
 					p["view"].position = lpos
+					p["view"].set_waiting(is_row_stopped)
 
 	# ---------------------------------------------
 	# 2. CIRCULATING ROWS ON MAIN TRACK
@@ -678,11 +683,12 @@ func _init_passenger_track() -> void:
 	feeder_track = Path2D.new()
 	feeder_track.name = "FeederTrack"
 	var f_curve := Curve2D.new()
-	# Smooth, continuous curve from deep offscreen entrance merging into loop at (270, 0)
-	f_curve.add_point(Vector2(885, -891), Vector2.ZERO, Vector2(-60, 84))
-	f_curve.add_point(Vector2(420, -240), Vector2(60, -84), Vector2(-40, 60))
-	f_curve.add_point(Vector2(320, -100), Vector2(30, -50), Vector2(-20, 45))
-	f_curve.add_point(Vector2(270, 0), Vector2(0, -45), Vector2.ZERO)
+	# Smooth, continuous curve from deep offscreen entrance merging into loop tangentially at (270, 0)
+	# Stays well clear of the main oval until the intentional merge approach
+	f_curve.add_point(Vector2(650, -420), Vector2.ZERO, Vector2(-80, 80))
+	f_curve.add_point(Vector2(440, -180), Vector2(60, -70), Vector2(-50, 60))
+	f_curve.add_point(Vector2(350, -70), Vector2(30, -45), Vector2(-25, 35))
+	f_curve.add_point(Vector2(270, 0), Vector2(-15, -45), Vector2.ZERO)
 	feeder_track.curve = f_curve
 
 	# PREMIUM PLAZA INTEGRATION
@@ -789,10 +795,11 @@ func _init_passenger_track() -> void:
 
 	# Remaining rows form a separate dense waiting queue on feeder cross-track
 	var f_len = feeder_track.curve.get_baked_length()
+	var feeder_stop_pos: float = f_len - 60.0 # Queue stop line rests 60px before junction, completely clear of oval
 	for r in range(initial_rows_count, all_rows.size()):
 		var row = all_rows[r]
 		var feeder_idx = r - initial_rows_count
-		var target_f_prog = f_len - float(feeder_idx) * ROW_SPACING
+		var target_f_prog = feeder_stop_pos - float(feeder_idx) * ROW_SPACING
 		if target_f_prog >= 0.0:
 			row.is_feeder = true
 			row.progress = target_f_prog
@@ -800,6 +807,7 @@ func _init_passenger_track() -> void:
 			for p in row.passengers:
 				var pv := PassengerView.new()
 				pv.setup(p["color_id"], p["id"], p["lane"])
+				pv.set_waiting(true)
 				passenger_visuals.add_child(pv)
 				p["view"] = pv
 				p["state"] = "FEEDER"
@@ -889,26 +897,17 @@ func _on_vehicle_dispatch_started(vehicle_id: int, slot_id: int, corridor: Array
 	# parking slots.
 	var corridor_pos := Vector2(target_slot_pos.x, target_slot_pos.y + 110.0)
 
-	# Dynamically calculate the parking scale to perfectly fit the slot bounds
-	var max_w = 88.0
-	var max_h = 180.0
-	var cells_w: float = float(vv.vehicle_footprint.size()) if vv.vehicle_dir == CarJamVehicleData.Direction.RIGHT or vv.vehicle_dir == CarJamVehicleData.Direction.LEFT else 1.0
-	var cells_h: float = float(vv.vehicle_footprint.size()) if vv.vehicle_dir == CarJamVehicleData.Direction.UP or vv.vehicle_dir == CarJamVehicleData.Direction.DOWN else 1.0
-	var pixel_w = cells_w * 78.0 - 10.0
-	var pixel_h = cells_h * 78.0 - 10.0
+	# Authoritative parking slot dimensions from ParkingSlotView
+	# SLOT_WIDTH = 62.0, SLOT_HEIGHT = 110.0
+	# Target visual bus body in parking: width <= 54.0, height <= 102.0 with preserved aspect ratio
+	var parked_size: Vector2 = vv.get_unscaled_parked_size()
+	var target_max_w: float = 54.0
+	var target_max_h: float = 102.0
 
-	# WIDE buses (LEFT/RIGHT) will be rotated 90 degrees in parking!
-	# So their visual width becomes pixel_h and visual height becomes pixel_w
-	var parked_pixel_w = pixel_w
-	var parked_pixel_h = pixel_h
-	if vv.vehicle_dir == CarJamVehicleData.Direction.LEFT or vv.vehicle_dir == CarJamVehicleData.Direction.RIGHT:
-		parked_pixel_w = pixel_h
-		parked_pixel_h = pixel_w
-
-	var scale_w = max_w / parked_pixel_w
-	var scale_h = max_h / parked_pixel_h
-	var final_scale = clampf(min(scale_w, scale_h), 0.35, 0.9)
-	var final_scale_vec = Vector2(final_scale, final_scale)
+	var scale_w: float = target_max_w / parked_size.x
+	var scale_h: float = target_max_h / parked_size.y
+	var final_scale: float = minf(scale_w, scale_h)
+	var final_scale_vec := Vector2(final_scale, final_scale)
 
 	VehicleMovement.animate_dispatch(
 		vv,

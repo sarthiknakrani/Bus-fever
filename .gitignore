@@ -10,3 +10,4 @@ export_presets.cfg
 .DS_Store
 *.DS_Store
 Thumbs.db
+.user_save.cfg

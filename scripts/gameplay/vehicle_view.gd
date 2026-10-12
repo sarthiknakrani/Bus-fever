@@ -234,3 +234,20 @@ func _load_interim_sprite(path: String) -> Texture2D:
 	if err == OK:
 		return ImageTexture.create_from_image(img)
 	return null
+
+## Returns the unscaled pixel dimensions of the bus when rotated into parking (facing UP)
+func get_unscaled_parked_size() -> Vector2:
+	if _base_sprite != null and _base_sprite.texture != null:
+		var tex_sz := _base_sprite.texture.get_size()
+		# When parked vertical UP:
+		# LEFT / RIGHT buses are rotated 90 degrees, so width is tex_sz.y, length is tex_sz.x
+		if vehicle_dir == CarJamVehicleData.Direction.LEFT or vehicle_dir == CarJamVehicleData.Direction.RIGHT:
+			return Vector2(tex_sz.y, tex_sz.x)
+		else:
+			return Vector2(tex_sz.x, tex_sz.y)
+	
+	# Authoritative fallback based on footprint length
+	var is_long := vehicle_footprint.size() > 2
+	var h: float = 224.0 if is_long else 146.0
+	return Vector2(68.0, h)
+

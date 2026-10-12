@@ -135,17 +135,24 @@ func set_level_stars(lvl: int, stars: int) -> void:
 	if stars > prev:
 		set_value("level_%d_stars" % lvl, clampi(stars, 0, 3))
 
+const FALLBACK_PATH: String = "res://.user_save.cfg"
+
 func _save() -> void:
 	var cfg := ConfigFile.new()
 	for k in _data.keys():
 		cfg.set_value("data", k, _data[k])
 	var err := cfg.save(_path)
 	if err != OK:
-		push_warning("SaveManager: failed to save %s (err %d)" % [_path, err])
+		# Fallback to local workspace save if user:// is sandboxed or unwritable
+		var fallback_err := cfg.save(FALLBACK_PATH)
+		if fallback_err != OK:
+			push_warning("SaveManager: failed to save %s (err %d) and fallback (err %d)" % [_path, err, fallback_err])
 
 func _load() -> void:
 	var cfg := ConfigFile.new()
 	var err := cfg.load(_path)
+	if err != OK:
+		err = cfg.load(FALLBACK_PATH)
 	if err != OK:
 		# First launch / missing save — fine.
 		_data = {}

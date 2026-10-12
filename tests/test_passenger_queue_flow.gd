@@ -31,16 +31,16 @@ func _run_queue_flow_tests() -> void:
 	print("  [MEASURED] Level 1 Feeder waiting: %d" % l1_feeder)
 	print("  [MEASURED] Level 1 Total: %d" % l1_total)
 
-	if l1_oval == 160:
-		print("  [PASS] Oval starts densely packed with exactly 160 passengers (40 rows x 4 lanes)")
+	if l1_oval == 200:
+		print("  [PASS] Oval starts densely packed with exactly 200 passengers (50 rows x 4 lanes)")
 	else:
-		print("  [FAIL] Expected 160 passengers on oval, got %d" % l1_oval)
+		print("  [FAIL] Expected 200 passengers on oval, got %d" % l1_oval)
 		failures += 1
 
-	if l1_feeder == 80:
-		print("  [PASS] Feeder queue starts with remaining 80 passengers waiting")
+	if l1_feeder == 40:
+		print("  [PASS] Feeder queue starts with remaining 40 passengers waiting")
 	else:
-		print("  [FAIL] Expected 80 feeder passengers, got %d" % l1_feeder)
+		print("  [FAIL] Expected 40 feeder passengers, got %d" % l1_feeder)
 		failures += 1
 
 	if l1_total == 240:
@@ -61,7 +61,7 @@ func _run_queue_flow_tests() -> void:
 
 	print("  [MEASURED] After 1.5s unboarded circulation: Oval=%d, Feeder=%d" % [l1_oval_after, l1_feeder_after])
 
-	if l1_oval_after == 160 and l1_feeder_after == 80:
+	if l1_oval_after == 200 and l1_feeder_after == 40:
 		print("  [PASS] Zero feeder passengers merged into oval while unboarded (Backpressure strictly enforced)")
 	else:
 		print("  [FAIL] Premature feeder merge detected: Oval=%d, Feeder=%d" % [l1_oval_after, l1_feeder_after])
@@ -138,8 +138,8 @@ func _run_queue_flow_tests() -> void:
 	print("  [MEASURED] Level 2 Feeder waiting: %d" % l2_feeder)
 	print("  [MEASURED] Level 2 Total: %d" % l2_total)
 
-	if l2_oval == 160 and l2_feeder == 320 and l2_total == 480:
-		print("  [PASS] Level 2 (480 demand): Oval starts with 160, Feeder starts with 320, Total 480 strictly conserved")
+	if l2_oval == 200 and l2_feeder == 280 and l2_total == 480:
+		print("  [PASS] Level 2 (480 demand): Oval starts with 200, Feeder starts with 280, Total 480 strictly conserved")
 	else:
 		print("  [FAIL] Level 2 distribution unexpected: Oval=%d, Feeder=%d, Total=%d" % [l2_oval, l2_feeder, l2_total])
 		failures += 1
