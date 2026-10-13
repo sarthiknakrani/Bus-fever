@@ -97,10 +97,10 @@ static func animate_dispatch(
 	curve.add_point(P1, -forward_world * 100.0, forward_world * 100.0)
 	# P2 - corridor below parking strip; in tangent = vertical UP, out
 	# tangent = vertical UP, so segment P2->P3 is straight.
-	curve.add_point(P2, Vector2(0.0, 100.0), Vector2(0.0, -100.0))
+	curve.add_point(P2, Vector2(0.0, 50.0), Vector2(0.0, -32.0))
 	# P3 - slot center; in tangent = vertical UP, so the bus enters the
 	# bay driving straight up with its front facing passengers.
-	curve.add_point(slot_pos, Vector2(0.0, 130.0), Vector2.ZERO)
+	curve.add_point(slot_pos, Vector2(0.0, 32.0), Vector2.ZERO)
 
 	# Derive front vector (the bus sprite's "front" in its NATIVE puzzle orientation).
 	var v_dir: int = vehicle_node.get("vehicle_dir") if vehicle_node.get("vehicle_dir") != null else CarJamVehicleData.Direction.UP
@@ -195,7 +195,7 @@ static func animate_departure(
 	var total_duration: float = BUS_DEPARTURE_DURATION * duration_mult
 	print("[QA] Bus %d DEPARTURE START at %.3f (Target: %.2fs)" % [vehicle_id, t_dep_start, total_duration])
 
-	var reverse_pos: Vector2 = slot_pos + Vector2(0.0, 160.0)
+	var reverse_pos: Vector2 = slot_pos + Vector2(0.0, 115.0)
 
 	var curve := Curve2D.new()
 	var vp_rect := vehicle_node.get_viewport_rect()
@@ -203,8 +203,8 @@ static func animate_departure(
 	var exit_global := Vector2(global_right_x, 0.0)
 	var exit_local: Vector2 = vehicle_node.get_parent().get_global_transform().affine_inverse() * exit_global
 
-	var final_target := Vector2(exit_local.x, reverse_pos.y - 15.0)
-	curve.add_point(reverse_pos, Vector2.ZERO, Vector2(0.0, -60.0))
+	var final_target := Vector2(exit_local.x, reverse_pos.y)
+	curve.add_point(reverse_pos, Vector2.ZERO, Vector2(80.0, 0.0))
 	curve.add_point(final_target, Vector2(-160.0, 0.0), Vector2.ZERO)
 
 	var v_dir: int = vehicle_node.get("vehicle_dir") if vehicle_node.get("vehicle_dir") != null else CarJamVehicleData.Direction.UP

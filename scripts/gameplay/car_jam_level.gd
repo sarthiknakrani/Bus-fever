@@ -169,13 +169,13 @@ func _process(delta: float) -> void:
 			if j == 0 and _oval_freed_capacity >= f_row.passengers.size():
 				var junction_clear := true
 				for cr in _circulating_rows:
-					if cr.progress > (track_len - 150.0) or cr.progress < 50.0:
+					if cr.progress > (track_len - 140.0) or cr.progress < 60.0:
 						junction_clear = false
 						break
 				if junction_clear:
 					max_prog = f_len
-				elif f_row.progress > feeder_stop_pos + 1.0:
-					max_prog = f_len - 35.0
+				else:
+					max_prog = maxf(feeder_stop_pos, f_row.progress)
 			elif j > 0:
 				max_prog = _feeder_rows[j - 1].progress - ROW_SPACING
 			var dist_ahead: float = max_prog - f_row.progress
@@ -197,7 +197,7 @@ func _process(delta: float) -> void:
 			var needed_cap: int = lead_row.passengers.size()
 			if _oval_freed_capacity >= needed_cap and lead_row.progress >= f_len - 2.0:
 				var merge_clear := true
-				var clearance_buffer := ROW_SPACING * 0.95
+				var clearance_buffer := ROW_SPACING * 1.35
 				for cr in _circulating_rows:
 					if cr.progress < clearance_buffer or cr.progress > (track_len - clearance_buffer):
 						merge_clear = false
@@ -761,7 +761,8 @@ func _init_passenger_track() -> void:
 	var max_trig: float = -999999.0
 	for i in controller.level_data.parking_slots_count:
 		var slot_x: float = slot_views[i].position.x if i < slot_views.size() else (-total_span / 2.0 + float(i) * slot_spacing)
-		var closest: float = passenger_track.curve.get_closest_offset(Vector2(slot_x, 115.0))
+		var trig_x: float = clampf(slot_x, -75.0, 75.0)
+		var closest: float = passenger_track.curve.get_closest_offset(Vector2(trig_x, 115.0))
 		slot_boarding_points[i] = closest
 		min_trig = minf(min_trig, closest)
 		max_trig = maxf(max_trig, closest)
@@ -2401,18 +2402,57 @@ func _animate_individual_boarding(p: Dictionary, vehicle_id: int, slot_id: int, 
 	target_pos += fan_offset
 	pv.z_index = 100
 	
-	# Waypoint route: Leave the track through the existing boarding gateway corridor
-	var local_tgt: Vector2 = passenger_track_root.to_local(target_pos)
-	var lane_offset: float = (float(lane_idx) - 1.5) * 8.0
-	# Funnel through gateway opening (-115 to 115) at gateway depth (y = 190.0)
-	var gw_local := Vector2(clampf(local_tgt.x + lane_offset, -115.0, 115.0), 190.0)
-	var mid_wp: Vector2 = passenger_track_root.to_global(gw_local)
+	# -----------------------------------------------------------------
+	# ROAD-CONTAINED BOARDING CORRIDOR
+	# Funnel through gateway opening into parking apron with zero curb clipping
+	#
+	# In passenger_track_root space:
+	# - Oval track road surface is at y in [50, 180].
+	# - Gateway neck opening into parking is between x = -110 and +110.
+	# - At y >= 245, the wide platform apron covers all bays (x in [-172, 172]).
+	#
+	# Waypoints:
+	#   W0: Current position on track (gpos)
+	#   W1: Gateway neck mouth (y = 190, x clamped to [-80, 80])
+	#   W2: Platform apron entry (y = 245, x moving towards slot_x)
+	#   W3: Final doorway target (target_pos)
+	# -----------------------------------------------------------------
+	var p0_local: Vector2 = passenger_track_root.to_local(gpos)
+	var tgt_local: Vector2 = passenger_track_root.to_local(target_pos)
+	var lane_offset: float = (float(lane_idx) - 1.5) * 7.0
 
-	var travel_dist = gpos.distance_to(mid_wp) + mid_wp.distance_to(target_pos)
-	var flight_duration := clampf(travel_dist / 450.0, 0.16, 0.20)
+	# W1: Gateway neck mouth (well inside the [-110, 110] neck opening)
+	var w1_x: float = clampf(lerpf(p0_local.x, tgt_local.x * 0.3, 0.3) + lane_offset, -75.0, 75.0)
+	var w1_local := Vector2(w1_x, 185.0)
+	var w1_global: Vector2 = passenger_track_root.to_global(w1_local)
+
+	# W2: Gateway neck exit onto platform apron (still strictly within gateway corridor)
+	var plat_y_local: float = 240.0
+	if passenger_track_bg != null:
+		var tr = passenger_track_bg.get_node_or_null("TrackRenderer") as CarJamTrackRenderer
+		if tr != null and tr.plat_top_local > 150.0:
+			plat_y_local = tr.plat_top_local
+	var w2_x: float = clampf(lerpf(p0_local.x, tgt_local.x * 0.5, 0.5) + lane_offset, -75.0, 75.0)
+	var w2_local := Vector2(w2_x, plat_y_local)
+	var w2_global: Vector2 = passenger_track_root.to_global(w2_local)
+
+	# W3: Platform apron fan-out (wide grey apron comfortably covers all bays x in [-172, 172])
+	var w3_y: float = maxf(plat_y_local + 15.0, tgt_local.y - 15.0)
+	var w3_local := Vector2(tgt_local.x + (float(lane_idx) - 1.5) * 5.0, w3_y)
+	var w3_global: Vector2 = passenger_track_root.to_global(w3_local)
+
+	# Build smooth Curve2D along the waypoints
+	var board_curve := Curve2D.new()
+	board_curve.add_point(gpos, Vector2.ZERO, (w1_global - gpos).normalized() * 25.0)
+	board_curve.add_point(w1_global, Vector2(0.0, -20.0), Vector2(0.0, 20.0))
+	board_curve.add_point(w2_global, Vector2(0.0, -20.0), (w3_global - w2_global).normalized() * 20.0)
+	board_curve.add_point(w3_global, Vector2(0.0, -15.0), (target_pos - w3_global).normalized() * 15.0)
+	board_curve.add_point(target_pos, Vector2(0.0, -10.0), Vector2.ZERO)
+
+	var travel_dist = board_curve.get_baked_length()
+	var flight_duration := clampf(travel_dist / 480.0, 0.18, 0.24)
 	
-	# Paced lane micro-stagger: Lane 0 (outermost) steps out first, followed by Lane 1, 2, 3
-	# Prevents simultaneous stacking and keeps passengers moving without stationary freeze
+	# Paced lane micro-stagger: Lane 0 steps out first, followed by Lane 1, 2, 3
 	var start_delay: float = float(lane_idx) * 0.025
 	var overlap_time = flight_duration * 0.70
 	var fade_time = flight_duration * 0.30
@@ -2428,13 +2468,12 @@ func _animate_individual_boarding(p: Dictionary, vehicle_id: int, slot_id: int, 
 	
 	var tw = create_tween().set_parallel(true)
 	
-	# Smooth quadratic Bézier movement cleanly merging lanes into the bus entrance
-	var bezier_func = func(t: float):
+	var curve_len = board_curve.get_baked_length()
+	var path_func = func(t: float):
 		if is_instance_valid(pv):
-			var one_minus_t = 1.0 - t
-			pv.global_position = one_minus_t * one_minus_t * gpos + 2.0 * one_minus_t * t * mid_wp + t * t * target_pos
+			pv.global_position = board_curve.sample_baked(t * curve_len)
 	
-	tw.tween_method(bezier_func, 0.0, 1.0, flight_duration).set_delay(start_delay).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_method(path_func, 0.0, 1.0, flight_duration).set_delay(start_delay).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	
 	# Shrink/fade cleanly during the final entry portion without reparenting scale pop
 	var start_pv_scale: Vector2 = pv.scale
@@ -2447,20 +2486,47 @@ func _animate_individual_boarding(p: Dictionary, vehicle_id: int, slot_id: int, 
 	tw_done.tween_callback(self._on_individual_boarded.bind(p["id"], vehicle_id, p["color_id"], token))
 
 func _on_individual_boarded(pid: int, vehicle_id: int, color_id: String, token: int) -> void:
-	if token != controller.session_token: return
+	if token != controller.session_token:
+		return
 	var p = all_passengers.get(pid, null)
-	if p == null: return
-	if p.get("state", "") == "BOARDED": return # Idempotent rejection of duplicate callback
+	if p == null:
+		return
+	if p.get("state", "") == "BOARDED":
+		return # Idempotent rejection of duplicate callback
 
-	if is_instance_valid(p.get("view")):
-		p["view"].queue_free()
-	p["state"] = "BOARDED"
-	_oval_freed_capacity += 1
-
+	# Authoritative commit FIRST
 	var committed := controller.commit_boarding(pid, vehicle_id, color_id, token)
 	if not committed:
-		_oval_freed_capacity -= 1
-		return # Stale, duplicate, or rejected reservation - reverted freed capacity!
+		_rollback_uncommitted_passenger(p, pid)
+		return
+
+	# Atomic visual cleanup & capacity grant ONLY after successful commit
+	p["state"] = "BOARDED"
+	if is_instance_valid(p.get("view")):
+		p["view"].queue_free()
+		p["view"] = null
+	_oval_freed_capacity += 1
+	controller.check_terminal_states()
+
+func _rollback_uncommitted_passenger(p: Dictionary, pid: int) -> void:
+	if p == null:
+		return
+	# Restore visual opacity and scale
+	if is_instance_valid(p.get("view")):
+		var pv: PassengerView = p["view"]
+		pv.modulate.a = 1.0
+		pv.scale = Vector2.ONE
+	p["state"] = "CIRCULATING"
+	controller.set_passenger_state(pid, "CIRCULATING")
+	# Put back into a circulating row if not already present
+	var found := false
+	for row in _circulating_rows:
+		if row.passengers.has(p):
+			found = true
+			break
+	if not found and not _circulating_rows.is_empty():
+		_circulating_rows.back().passengers.append(p)
+	print("[QA] Boarding commit rejected for passenger %d; safely rolled back to CIRCULATING." % pid)
 
 func _create_custom_toggle(text: String, icon_path: String, is_on: bool, on_toggle: Callable) -> Control:
 	var row := HBoxContainer.new()
