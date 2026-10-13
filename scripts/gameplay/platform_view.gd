@@ -18,11 +18,11 @@ func setup_full(top_y: float, bottom_y: float, w: float, partition_y: float, sep
 	queue_redraw()
 
 func _draw() -> void:
-	# 1. Authoritative base grey material matching passenger road (#767786)
-	var base_grey := Color("767786")
-	var curb_highlight := Color("f8fafc")
+	# 1. Authoritative base lavender-grey material matching swatch 1 (#D2D5E4)
+	var base_grey := Color("d2d5e4")
+	var curb_highlight := Color("ffffff", 0.85)
 	var curb_shadow := Color("a5abc2")
-	var curb_deep := Color("545564")
+	var curb_deep := Color("8c93a8")
 
 	var hill_w: float = p_deck_w
 	var slope_w: float = 75.0

@@ -75,6 +75,7 @@ class PassengerRow extends RefCounted:
 
 const LANE_SPACING := 24.2
 const ROW_SPACING := 35.33
+const MIN_ROW_GAP := 22.0
 const NUM_LANES := 4
 const PASSENGER_SPACING := 35.33
 const MAX_INITIAL_LOOP_PASSENGERS := 152
@@ -170,27 +171,40 @@ func _process(delta: float) -> void:
 		for j in range(_feeder_rows.size()):
 			var f_row = _feeder_rows[j]
 			var max_prog: float = feeder_stop_pos
-			if j == 0 and _oval_freed_capacity >= f_row.passengers.size():
-				var junction_clear := true
-				for cr in _circulating_rows:
-					if cr.progress > (track_len - 140.0) or cr.progress < 60.0:
-						junction_clear = false
-						break
-				if junction_clear:
-					max_prog = f_len
+			if j == 0:
+				if f_row.progress < feeder_stop_pos:
+					if _oval_freed_capacity >= f_row.passengers.size():
+						var junction_clear := true
+						for cr in _circulating_rows:
+							if cr.progress > (track_len - 160.0) or cr.progress < 50.0:
+								junction_clear = false
+								break
+						if junction_clear:
+							max_prog = f_len
+						else:
+							max_prog = feeder_stop_pos
+					else:
+						max_prog = feeder_stop_pos
 				else:
-					max_prog = maxf(feeder_stop_pos, f_row.progress)
-			elif j > 0:
-				max_prog = _feeder_rows[j - 1].progress - ROW_SPACING
-			var dist_ahead: float = max_prog - f_row.progress
-			var speed: float = passenger_normal_speed
-			if dist_ahead > ROW_SPACING * 1.25:
-				speed = passenger_sprint_speed
-			elif dist_ahead < ROW_SPACING * 0.95:
-				speed = passenger_normal_speed * 0.85
-			var dist_moved: float = speed * delta
-			dist_moved = minf(dist_moved, maxf(dist_ahead, 0.0))
-			f_row.progress += dist_moved
+					# Once committed past feeder_stop_pos, continue smoothly to f_len without mid-junction pause
+					max_prog = f_len
+				var dist_ahead: float = max_prog - f_row.progress
+				var dist_moved: float = passenger_normal_speed * delta
+				dist_moved = minf(dist_moved, maxf(dist_ahead, 0.0))
+				f_row.progress += dist_moved
+			else:
+				var actual_gap: float = _feeder_rows[j - 1].progress - f_row.progress
+				var speed: float = passenger_normal_speed
+				if actual_gap > ROW_SPACING * 1.25:
+					speed = passenger_sprint_speed
+				elif actual_gap < ROW_SPACING * 0.90:
+					speed = passenger_normal_speed * 0.85
+				var dist_moved: float = speed * delta
+				if actual_gap <= MIN_ROW_GAP:
+					dist_moved = 0.0
+				else:
+					dist_moved = minf(dist_moved, actual_gap - MIN_ROW_GAP)
+				f_row.progress += dist_moved
 			
 		# C. Merge lead feeder row onto main loop if:
 		#    1. Enough capacity has been freed on the loop by boarded passengers (_oval_freed_capacity >= row.size)
@@ -201,7 +215,7 @@ func _process(delta: float) -> void:
 			var needed_cap: int = lead_row.passengers.size()
 			if _oval_freed_capacity >= needed_cap and lead_row.progress >= f_len - 2.0:
 				var merge_clear := true
-				var clearance_buffer := ROW_SPACING * 1.35
+				var clearance_buffer := MIN_ROW_GAP * 1.15
 				for cr in _circulating_rows:
 					if cr.progress < clearance_buffer or cr.progress > (track_len - clearance_buffer):
 						merge_clear = false
@@ -256,14 +270,17 @@ func _process(delta: float) -> void:
 				ahead_row = _circulating_rows[i - 1]
 				dist_ahead = ahead_row.progress - row.progress
 
+			if dist_ahead < 0.0:
+				dist_ahead += track_len
+
 			if dist_ahead > ROW_SPACING * 1.25:
 				speed = passenger_sprint_speed
-			elif dist_ahead < ROW_SPACING * 0.95:
+			elif dist_ahead < ROW_SPACING * 0.90:
 				speed = passenger_normal_speed * 0.85
 
 		var old_prog = row.progress
 		var dist_moved = speed * delta
-		var min_gap: float = ROW_SPACING
+		var min_gap: float = MIN_ROW_GAP
 		if _circulating_rows.size() > 1:
 			if dist_ahead <= min_gap:
 				dist_moved = 0.0
@@ -2415,7 +2432,7 @@ func _animate_individual_boarding(p: Dictionary, vehicle_id: int, slot_id: int, 
 
 	# Doorway fan-in offset to prevent multi-passenger stacking on a single point
 	var lane_idx: int = p.get("lane", 0)
-	var fan_offset := Vector2((float(lane_idx) - 1.5) * 6.0, 0.0)
+	var fan_offset := Vector2((float(lane_idx) - 1.5) * 8.0, 0.0)
 	target_pos += fan_offset
 	pv.z_index = 100
 	
@@ -2430,16 +2447,16 @@ func _animate_individual_boarding(p: Dictionary, vehicle_id: int, slot_id: int, 
 	#
 	# Waypoints:
 	#   W0: Current position on track (gpos)
-	#   W1: Gateway neck mouth (y = 190, x clamped to [-80, 80])
+	#   W1: Gateway neck mouth (y = 190, x clamped to [-85, 85])
 	#   W2: Platform apron entry (y = 245, x moving towards slot_x)
 	#   W3: Final doorway target (target_pos)
 	# -----------------------------------------------------------------
 	var p0_local: Vector2 = passenger_track_root.to_local(gpos)
 	var tgt_local: Vector2 = passenger_track_root.to_local(target_pos)
-	var lane_offset: float = (float(lane_idx) - 1.5) * 7.0
+	var lane_offset: float = (float(lane_idx) - 1.5) * 20.0
 
 	# W1: Gateway neck mouth (well inside the [-110, 110] neck opening)
-	var w1_x: float = clampf(lerpf(p0_local.x, tgt_local.x * 0.3, 0.3) + lane_offset, -75.0, 75.0)
+	var w1_x: float = clampf(lerpf(p0_local.x, tgt_local.x * 0.3, 0.3) + lane_offset, -85.0, 85.0)
 	var w1_local := Vector2(w1_x, 185.0)
 	var w1_global: Vector2 = passenger_track_root.to_global(w1_local)
 
@@ -2449,13 +2466,13 @@ func _animate_individual_boarding(p: Dictionary, vehicle_id: int, slot_id: int, 
 		var tr = passenger_track_bg.get_node_or_null("TrackRenderer") as CarJamTrackRenderer
 		if tr != null and tr.plat_top_local > 150.0:
 			plat_y_local = tr.plat_top_local
-	var w2_x: float = clampf(lerpf(p0_local.x, tgt_local.x * 0.5, 0.5) + lane_offset, -75.0, 75.0)
+	var w2_x: float = clampf(lerpf(p0_local.x, tgt_local.x * 0.5, 0.5) + lane_offset, -85.0, 85.0)
 	var w2_local := Vector2(w2_x, plat_y_local)
 	var w2_global: Vector2 = passenger_track_root.to_global(w2_local)
 
 	# W3: Platform apron fan-out (wide grey apron comfortably covers all bays x in [-172, 172])
 	var w3_y: float = maxf(plat_y_local + 15.0, tgt_local.y - 15.0)
-	var w3_local := Vector2(tgt_local.x + (float(lane_idx) - 1.5) * 5.0, w3_y)
+	var w3_local := Vector2(tgt_local.x + (float(lane_idx) - 1.5) * 12.0, w3_y)
 	var w3_global: Vector2 = passenger_track_root.to_global(w3_local)
 
 	# Build smooth Curve2D along the waypoints
@@ -2470,12 +2487,12 @@ func _animate_individual_boarding(p: Dictionary, vehicle_id: int, slot_id: int, 
 	var flight_duration := clampf(travel_dist / 480.0, 0.18, 0.24)
 	
 	# Paced lane micro-stagger: Lane 0 steps out first, followed by Lane 1, 2, 3
-	var start_delay: float = float(lane_idx) * 0.025
+	var start_delay: float = float(lane_idx) * 0.035
 	var overlap_time = flight_duration * 0.70
 	var fade_time = flight_duration * 0.30
 	
 	# Hop animation starts with flight
-	var tw_jump = create_tween()
+	var tw_jump = pv.create_tween()
 	if start_delay > 0.0:
 		tw_jump.tween_interval(start_delay)
 	tw_jump.tween_callback(func():
@@ -2483,7 +2500,7 @@ func _animate_individual_boarding(p: Dictionary, vehicle_id: int, slot_id: int, 
 			pv.animate_jump(0.0)
 	)
 	
-	var tw = create_tween().set_parallel(true)
+	var tw = pv.create_tween().set_parallel(true)
 	
 	var curve_len = board_curve.get_baked_length()
 	var path_func = func(t: float):
