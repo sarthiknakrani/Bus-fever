@@ -33,6 +33,7 @@ func _run_all_captures() -> void:
 
 func _capture_view(lvl_num: int, show_failure: bool, win_size: Vector2i, out_path: String) -> void:
 	DisplayServer.window_set_size(win_size)
+	root.size = win_size
 	var lvl: CarJamLevel = CarJamLevelScene.instantiate()
 	root.add_child(lvl)
 	if not lvl.is_node_ready():

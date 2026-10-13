@@ -2093,9 +2093,10 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 		var deck_w = maxf(500.0, parking_w + 45.0)
 		
 		# Width needs to cover entire screen width
-		var full_w = (vp_size.x / scale_factor) + 200.0
+		var visible_w = vp_size.x / scale_factor
+		var full_w = visible_w + 200.0
 		
-		platform_bg.setup_full(plat_top, local_bottom, full_w, partition_y, separator_y, deck_w)
+		platform_bg.setup_full(plat_top, local_bottom, full_w, partition_y, separator_y, deck_w, visible_w)
 
 	if passenger_track_bg != null:
 		var tr = passenger_track_bg.get_node_or_null("TrackRenderer") as CarJamTrackRenderer
