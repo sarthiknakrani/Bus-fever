@@ -19,7 +19,7 @@ var _is_waiting: bool = false
 var _last_pos: Vector2 = Vector2.ZERO
 var _facing_right: bool = true
 
-const BASE_SCALE := 0.22
+const BASE_SCALE := 0.20
 
 func set_waiting(waiting: bool) -> void:
 	_is_waiting = waiting

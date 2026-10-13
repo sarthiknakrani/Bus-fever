@@ -162,11 +162,21 @@ func _process(delta: float) -> void:
 				_feeder_rows.append(next_row)
 				
 		# B. Advance feeder rows forward towards stop line / row ahead
-		var feeder_stop_pos: float = f_len - 60.0
+		var feeder_stop_pos: float = f_len - 110.0
 		for j in range(_feeder_rows.size()):
 			var f_row = _feeder_rows[j]
-			var max_prog: float = f_len if (_oval_freed_capacity >= f_row.passengers.size() and j == 0) else feeder_stop_pos
-			if j > 0:
+			var max_prog: float = feeder_stop_pos
+			if j == 0 and _oval_freed_capacity >= f_row.passengers.size():
+				var junction_clear := true
+				for cr in _circulating_rows:
+					if cr.progress > (track_len - 150.0) or cr.progress < 50.0:
+						junction_clear = false
+						break
+				if junction_clear:
+					max_prog = f_len
+				elif f_row.progress > feeder_stop_pos + 1.0:
+					max_prog = f_len - 35.0
+			elif j > 0:
 				max_prog = _feeder_rows[j - 1].progress - ROW_SPACING
 			var dist_ahead: float = max_prog - f_row.progress
 			var speed: float = passenger_normal_speed
@@ -205,6 +215,7 @@ func _process(delta: float) -> void:
 							p["view"].set_waiting(false)
 					_circulating_rows.append(lead_row)
 					_oval_freed_capacity -= needed_cap
+					controller.check_terminal_states()
 
 		# D. Update positions of passengers in active feeder rows
 		for f_row in _feeder_rows:
@@ -427,6 +438,7 @@ func _build_scene_hierarchy() -> void:
 func _setup_controller() -> void:
 	controller = CarJamController.new()
 	controller.name = "CarJamController"
+	controller.track_snapshot_provider = Callable(self, "get_runtime_track_snapshot")
 	add_child(controller)
 
 	controller.vehicle_dispatch_started.connect(_on_vehicle_dispatch_started)
@@ -824,7 +836,7 @@ func _init_passenger_track() -> void:
 
 	# Remaining rows form a separate dense waiting queue on feeder cross-track
 	var f_len = feeder_track.curve.get_baked_length()
-	var feeder_stop_pos: float = f_len - 60.0 # Queue stop line rests 60px before junction, completely clear of oval
+	var feeder_stop_pos: float = f_len - 110.0 # Queue stop line rests 110px before junction, completely clear of oval (41.5px clearance)
 	for r in range(initial_rows_count, all_rows.size()):
 		var row = all_rows[r]
 		var feeder_idx = r - initial_rows_count
@@ -853,6 +865,62 @@ func _init_passenger_track() -> void:
 				p["state"] = "PENDING"
 				controller.set_passenger_state(p["id"], "PENDING")
 				_pending_feeder_passengers.append(p)
+
+func get_runtime_track_snapshot() -> Dictionary:
+	var circ_rows: Array = []
+	for row in _circulating_rows:
+		if row.passengers.is_empty():
+			continue
+		var r_pass: Array = []
+		for p in row.passengers:
+			r_pass.append({
+				"id": p["id"],
+				"color_id": p["color_id"],
+				"state": p.get("state", "CIRCULATING")
+			})
+		circ_rows.append({
+			"progress": row.progress,
+			"passengers": r_pass
+		})
+
+	var f_rows: Array = []
+	for row in _feeder_rows:
+		if row.passengers.is_empty():
+			continue
+		var r_pass: Array = []
+		for p in row.passengers:
+			r_pass.append({
+				"id": p["id"],
+				"color_id": p["color_id"],
+				"state": p.get("state", "FEEDER")
+			})
+		f_rows.append({
+			"progress": row.progress,
+			"passengers": r_pass
+		})
+
+	var p_rows: Array = []
+	for row in _pending_feeder_rows:
+		if row.passengers.is_empty():
+			continue
+		var r_pass: Array = []
+		for p in row.passengers:
+			r_pass.append({
+				"id": p["id"],
+				"color_id": p["color_id"],
+				"state": p.get("state", "PENDING")
+			})
+		p_rows.append({
+			"progress": row.progress,
+			"passengers": r_pass
+		})
+
+	return {
+		"circulating_rows": circ_rows,
+		"feeder_rows": f_rows,
+		"pending_rows": p_rows,
+		"oval_freed_capacity": _oval_freed_capacity
+	}
 
 func _board_circulating_passenger(p: Dictionary, vehicle_id: int, slot_idx: int, trigger_prog: float) -> void:
 	p["state"] = "BOARDING_RESERVED"
@@ -989,11 +1057,10 @@ func _recover_boarding_for_slot(slot_id: int) -> void:
 	var empty_rows: Array[PassengerRow] = []
 	for row in rows_to_check:
 		if v.remaining_capacity() <= 0: break
-		# Only board rows physically on the bottom platform approaching the slot
+		# Only board rows physically AT the slot's boarding trigger zone
 		var dist_to_trig = trigger_prog - row.progress
 		if dist_to_trig < 0: dist_to_trig += track_len
-		var platform_span: float = (_platform_end_prog - _platform_start_prog) + 40.0
-		var is_at_boarding_exit: bool = (dist_to_trig <= platform_span and row.progress >= (_platform_start_prog - 20.0) and row.progress <= (_platform_end_prog + 20.0))
+		var is_at_boarding_exit: bool = (dist_to_trig <= 25.0 or abs(row.progress - trigger_prog) <= 25.0)
 		if not is_at_boarding_exit:
 			continue
 
@@ -1114,7 +1181,7 @@ func _on_puzzle_failed() -> void:
 
 	# CRITICAL: failure must NEVER enable level progression or unlock the next level.
 	# Only the retry/home actions are exposed — no victory-style next-level button.
-	result_title_label.text = "NO MOVES LEFT"
+	result_title_label.text = "OUT OF SPACE!"
 	result_title_label.add_theme_color_override("font_color", Color("ef4444"))
 
 	# Hide the victory-only progression action.
@@ -1149,6 +1216,8 @@ func _on_result_retry_pressed() -> void:
 	var gc = get_tree().root.get_node_or_null("GameController")
 	if gc != null:
 		gc.start_level(gc.current_level_number)
+	else:
+		get_tree().reload_current_scene()
 
 # -----------------------------------------------------------------
 # RESPONSIVE HUD & SAFE AREA
@@ -2026,7 +2095,10 @@ func _confirm_restart_yes() -> void:
 	restart_confirm_overlay.visible = false
 	get_tree().paused = false
 	var gc = get_tree().root.get_node_or_null("GameController")
-	if gc: gc.start_level(gc.current_level_number)
+	if gc:
+		gc.start_level(gc.current_level_number)
+	else:
+		get_tree().reload_current_scene()
 
 func _confirm_restart_no() -> void:
 	if not restart_confirm_overlay.visible: return
@@ -2329,24 +2401,19 @@ func _animate_individual_boarding(p: Dictionary, vehicle_id: int, slot_id: int, 
 	target_pos += fan_offset
 	pv.z_index = 100
 	
-	# Waypoint route: Leave the track at an intentional exit, merge from 4 lanes, and enter bus doorway
-	var mid_wp := Vector2(
-		lerpf(gpos.x, target_pos.x, 0.65),
-		maxf(gpos.y + 24.0, (gpos.y + target_pos.y) * 0.5)
-	)
+	# Waypoint route: Leave the track through the existing boarding gateway corridor
+	var local_tgt: Vector2 = passenger_track_root.to_local(target_pos)
+	var lane_offset: float = (float(lane_idx) - 1.5) * 8.0
+	# Funnel through gateway opening (-115 to 115) at gateway depth (y = 190.0)
+	var gw_local := Vector2(clampf(local_tgt.x + lane_offset, -115.0, 115.0), 190.0)
+	var mid_wp: Vector2 = passenger_track_root.to_global(gw_local)
 
 	var travel_dist = gpos.distance_to(mid_wp) + mid_wp.distance_to(target_pos)
-	var now_sec := Time.get_ticks_msec() / 1000.0
 	var flight_duration := clampf(travel_dist / 450.0, 0.16, 0.20)
 	
-	# Paced landing schedule to sustain ~30 passengers/second uninterrupted throughput
-	var interval := 1.0 / VehicleMovement.TARGET_PASSENGER_BOARDING_RATE
-	var target_landing := maxf(now_sec + flight_duration, _last_board_landing_time + interval)
-	if now_sec > _last_board_landing_time + 0.12:
-		target_landing = now_sec + flight_duration
-	_last_board_landing_time = target_landing
-	
-	var start_delay := maxf(target_landing - flight_duration - now_sec, 0.0)
+	# Paced lane micro-stagger: Lane 0 (outermost) steps out first, followed by Lane 1, 2, 3
+	# Prevents simultaneous stacking and keeps passengers moving without stationary freeze
+	var start_delay: float = float(lane_idx) * 0.025
 	var overlap_time = flight_duration * 0.70
 	var fade_time = flight_duration * 0.30
 	
@@ -2385,14 +2452,15 @@ func _on_individual_boarded(pid: int, vehicle_id: int, color_id: String, token: 
 	if p == null: return
 	if p.get("state", "") == "BOARDED": return # Idempotent rejection of duplicate callback
 
-	var committed := controller.commit_boarding(pid, vehicle_id, color_id, token)
-	if not committed:
-		return # Stale, duplicate, or rejected reservation - DO NOT credit freed capacity!
-
 	if is_instance_valid(p.get("view")):
 		p["view"].queue_free()
 	p["state"] = "BOARDED"
 	_oval_freed_capacity += 1
+
+	var committed := controller.commit_boarding(pid, vehicle_id, color_id, token)
+	if not committed:
+		_oval_freed_capacity -= 1
+		return # Stale, duplicate, or rejected reservation - reverted freed capacity!
 
 func _create_custom_toggle(text: String, icon_path: String, is_on: bool, on_toggle: Callable) -> Control:
 	var row := HBoxContainer.new()

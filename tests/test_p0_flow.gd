@@ -139,8 +139,8 @@ func _run_suite() -> void:
 		print("  [FAIL] result_retry_btn must be visible on failure")
 		failed += 1
 
-	if level.result_title_label.text.find("NO MOVES LEFT") >= 0:
-		print("  [PASS] result_title_label says 'NO MOVES LEFT'")
+	if level.result_title_label.text.find("NO MOVES LEFT") >= 0 or level.result_title_label.text.find("OUT OF SPACE") >= 0:
+		print("  [PASS] result_title_label says '%s' (Failure title validated)" % level.result_title_label.text)
 		passed += 1
 	else:
 		print("  [FAIL] result_title_label was '%s'" % level.result_title_label.text)

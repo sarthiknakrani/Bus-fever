@@ -47,6 +47,7 @@ var session_token: int = 0
 var authoritative_passengers: Dictionary = {} # pid (int) -> Dictionary
 var boarding_reservations: Dictionary = {} # pid (int) -> BoardingReservation
 var pending_boarders: Dictionary = {} # vehicle_id -> int
+var track_snapshot_provider: Callable = Callable()
 
 func load_level(lvl: CarJamLevelData) -> void:
 	session_token += 1
@@ -536,6 +537,9 @@ func _process_boarding_cycle(token: int) -> void:
 			if evt["is_full"]:
 				vehicle_filled.emit(evt["vehicle_id"], evt["slot_id"])
 
+func check_terminal_states() -> void:
+	_check_terminal_states()
+
 func _check_terminal_states() -> void:
 	_debug_passenger_accounting()
 	if state != GameState.PLAYING:
@@ -583,8 +587,46 @@ func _check_terminal_states() -> void:
 						elif v.remaining_capacity() > 0:
 							parked_color_needs[v.color_id] = true
 
-		if not has_progress_in_flight:
-			# 2. Check if any circulating passenger matches any parked bus needing passengers
+		if has_progress_in_flight:
+			return
+
+		# 2. Check circulating matches
+		if track_snapshot_provider.is_valid():
+			var snapshot: Dictionary = track_snapshot_provider.call()
+			var circ_rows: Array = snapshot.get("circulating_rows", [])
+			for row in circ_rows:
+				for p in row.get("passengers", []):
+					if parked_color_needs.has(p.get("color_id", "")):
+						has_circulating_match = true
+						break
+				if has_circulating_match:
+					break
+
+			if not has_circulating_match:
+				# 3. Simulate ordered feeder reachability using currently earned credits
+				var credits: int = int(snapshot.get("oval_freed_capacity", 0))
+				var queue_to_check: Array = []
+				queue_to_check.append_array(snapshot.get("feeder_rows", []))
+				queue_to_check.append_array(snapshot.get("pending_rows", []))
+
+				for row in queue_to_check:
+					var r_pass: Array = row.get("passengers", [])
+					var cost: int = r_pass.size()
+					if cost == 0:
+						continue
+					if credits >= cost:
+						credits -= cost
+						for p in r_pass:
+							if parked_color_needs.has(p.get("color_id", "")):
+								has_feeder_match = true
+								break
+						if has_feeder_match:
+							break
+					else:
+						# Insufficient credits to admit this row. Queue is blocked.
+						break
+		else:
+			# Fallback for headless tests / solver without CarJamLevel
 			for p in authoritative_passengers.values():
 				var st: String = String(p.get("state", ""))
 				var col: String = String(p.get("color_id", ""))
@@ -592,19 +634,27 @@ func _check_terminal_states() -> void:
 					has_circulating_match = true
 					break
 
-			# 3. If no circulating passenger matches, check if oval has space or feeder can feed a matching passenger
 			if not has_circulating_match:
 				var circulating_count := 0
 				for p in authoritative_passengers.values():
 					if p.get("state", "") == "CIRCULATING":
 						circulating_count += 1
 
-				if circulating_count < 152:
-					for p in authoritative_passengers.values():
-						var st: String = String(p.get("state", ""))
-						var col: String = String(p.get("color_id", ""))
-						if (st == "FEEDER" or st == "PENDING") and parked_color_needs.has(col):
-							has_feeder_match = true
+				var credits: int = maxi(152 - circulating_count, 0)
+				# Check ordered feeder/pending passengers in registered order
+				var p_keys: Array = authoritative_passengers.keys()
+				p_keys.sort()
+				for pid in p_keys:
+					var p = authoritative_passengers[pid]
+					var st: String = String(p.get("state", ""))
+					var col: String = String(p.get("color_id", ""))
+					if st == "FEEDER" or st == "PENDING":
+						if credits >= 1:
+							credits -= 1
+							if parked_color_needs.has(col):
+								has_feeder_match = true
+								break
+						else:
 							break
 
 		if not has_progress_in_flight and not has_circulating_match and not has_feeder_match:

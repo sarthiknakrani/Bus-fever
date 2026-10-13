@@ -118,6 +118,21 @@ func _on_draw_lines() -> void:
 		sb_hoop.set_corner_radius_all(5)
 		sb_hoop.draw(_draw_node.get_canvas_item(), Rect2(-5, -8, 10, 8))
 
+	if is_reserved:
+		# Draw clean upward docking arrows/chevrons so the player immediately
+		# recognizes the slot has an incoming bus en route and is claimed.
+		var chev_c = Color("bae6fd", 0.95)
+		var chev_dim = Color("bae6fd", 0.50)
+		# Upper chevron
+		_draw_node.draw_line(Vector2(-9, -6), Vector2(0, -15), chev_c, 2.2)
+		_draw_node.draw_line(Vector2(0, -15), Vector2(9, -6), chev_c, 2.2)
+		# Middle chevron
+		_draw_node.draw_line(Vector2(-9, 4), Vector2(0, -5), chev_c, 2.2)
+		_draw_node.draw_line(Vector2(0, -5), Vector2(9, 4), chev_c, 2.2)
+		# Lower chevron
+		_draw_node.draw_line(Vector2(-9, 14), Vector2(0, 5), chev_dim, 2.0)
+		_draw_node.draw_line(Vector2(0, 5), Vector2(9, 14), chev_dim, 2.0)
+
 	if is_departing:
 		# Draw a small diagonal hatch so the slot reads as "in transition",
 		# not as the same neutral grey-blue that means FREE.

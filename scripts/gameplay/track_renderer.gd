@@ -112,6 +112,7 @@ func _draw() -> void:
 
 	# Left outer curb: from gateway bottom-left around to feeder inner
 	var curb_left = PackedVector2Array()
+	curb_left.append(Vector2(-x_gate - 14.0, plat_y))
 	curb_left.append(Vector2(-x_gate, plat_y))
 	curb_left.append(Vector2(-x_gate, r_outer))
 	curb_left.append(Vector2(-straight_x, r_outer))
@@ -144,6 +145,7 @@ func _draw() -> void:
 	curb_right.append(Vector2(straight_x, r_outer))
 	curb_right.append(Vector2(x_gate, r_outer))
 	curb_right.append(Vector2(x_gate, plat_y))
+	curb_right.append(Vector2(x_gate + 14.0, plat_y))
 
 	# -----------------------------------------------------------------
 	# 4. ROAD SURFACE POLYGONS (Top & Bottom halves, perfectly seamless)
@@ -195,9 +197,9 @@ func _draw() -> void:
 		btm_poly.append(c_right + Vector2(cos(ang), sin(ang)) * r_outer)
 	btm_poly.append(Vector2(straight_x, r_outer))
 	btm_poly.append(Vector2(x_gate, r_outer))
-	# Gateway neck down to platform apron (overlapping slightly to eliminate any gap)
-	btm_poly.append(Vector2(x_gate, plat_y + 6.0))
-	btm_poly.append(Vector2(-x_gate, plat_y + 6.0))
+	# Gateway neck down to platform apron (tucking under ParkingBase to integrate naturally)
+	btm_poly.append(Vector2(x_gate, plat_y + 16.0))
+	btm_poly.append(Vector2(-x_gate, plat_y + 16.0))
 	btm_poly.append(Vector2(-x_gate, r_outer))
 	btm_poly.append(Vector2(-straight_x, r_outer))
 	for i in range(1, n_arc / 2):
