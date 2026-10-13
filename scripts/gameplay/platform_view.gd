@@ -50,19 +50,34 @@ func _draw() -> void:
 	var curb_deep := Color("545564")
 
 	var hill_w: float = p_deck_w
+	var top_hw: float = hill_w / 2.0
 	var hw: float = p_width / 2.0
 	var visible_hw: float = (p_visible_w / 2.0) if p_visible_w > 0.0 else hw
 	var plat_btm: float = get_band_bottom_y()
 
+	# Flare slope matching user's red guide lines (~0.95 outward slant)
+	var flare_slope: float = 0.95
+	var y_edge: float = p_top + (visible_hw - top_hw) / flare_slope
+
 	# 2. Continuous platform polygon in authoritative track grey (#767786)
-	# Fills the raised platform deck and the diagonal side regions down to plat_btm (matching user's red guide lines)
-	var platform_poly = PackedVector2Array([
-		Vector2(-visible_hw, plat_btm),
-		Vector2(-hill_w / 2.0, p_top),
-		Vector2(hill_w / 2.0, p_top),
-		Vector2(visible_hw, plat_btm)
-	])
-	draw_colored_polygon(platform_poly, color_track_grey)
+	# Extends outward to red guide line boundaries and fills full width down to plat_btm
+	var poly_pts := PackedVector2Array()
+	if y_edge < plat_btm:
+		poly_pts.append(Vector2(-hw, plat_btm))
+		poly_pts.append(Vector2(-visible_hw, plat_btm))
+		poly_pts.append(Vector2(-visible_hw, y_edge))
+		poly_pts.append(Vector2(-top_hw, p_top))
+		poly_pts.append(Vector2(top_hw, p_top))
+		poly_pts.append(Vector2(visible_hw, y_edge))
+		poly_pts.append(Vector2(visible_hw, plat_btm))
+		poly_pts.append(Vector2(hw, plat_btm))
+	else:
+		var btm_w = minf(visible_hw, top_hw + flare_slope * (plat_btm - p_top))
+		poly_pts.append(Vector2(-btm_w, plat_btm))
+		poly_pts.append(Vector2(-top_hw, p_top))
+		poly_pts.append(Vector2(top_hw, p_top))
+		poly_pts.append(Vector2(btm_w, plat_btm))
+	draw_colored_polygon(poly_pts, color_track_grey)
 
 	# 3. Lower bus-playfield polygon in Swatch 1 light lavender (#D2D5E4) below platform
 	if p_bottom > plat_btm:
@@ -74,20 +89,44 @@ func _draw() -> void:
 		])
 		draw_colored_polygon(playfield_poly, color_playfield)
 
-	# 4. Clean 3D curb outlining the platform perimeter along the diagonal sides with open central gateway
+	# 4. Clean 3D curb outlining platform perimeter along diagonal shoulders with open central gateway
 	var x_gate: float = 110.0
-	var left_edge = PackedVector2Array([
-		Vector2(-visible_hw, plat_btm),
-		Vector2(-hill_w / 2.0, p_top),
-		Vector2(-x_gate, p_top)
-	])
-	var right_edge = PackedVector2Array([
-		Vector2(x_gate, p_top),
-		Vector2(hill_w / 2.0, p_top),
-		Vector2(visible_hw, plat_btm)
-	])
+	var left_edge := PackedVector2Array()
+	var right_edge := PackedVector2Array()
+
+	if y_edge < plat_btm:
+		left_edge.append(Vector2(-visible_hw, y_edge))
+		left_edge.append(Vector2(-top_hw, p_top))
+		left_edge.append(Vector2(-x_gate, p_top))
+
+		right_edge.append(Vector2(x_gate, p_top))
+		right_edge.append(Vector2(top_hw, p_top))
+		right_edge.append(Vector2(visible_hw, y_edge))
+	else:
+		var btm_w = minf(visible_hw, top_hw + flare_slope * (plat_btm - p_top))
+		left_edge.append(Vector2(-btm_w, plat_btm))
+		left_edge.append(Vector2(-top_hw, p_top))
+		left_edge.append(Vector2(-x_gate, p_top))
+
+		right_edge.append(Vector2(x_gate, p_top))
+		right_edge.append(Vector2(top_hw, p_top))
+		right_edge.append(Vector2(btm_w, plat_btm))
 
 	for edge in [left_edge, right_edge]:
 		draw_polyline(edge, curb_shadow, 4.0, true)
 		draw_polyline(edge, curb_deep, 2.5, true)
 		draw_polyline(edge, curb_highlight, 1.5, true)
+
+	# 5. Soft divider / separator style termination along bottom edge of grey platform
+	# Eliminates sharp abrupt color cutoff transitioning into Swatch 1 light lavender playfield
+	var btm_left := Vector2(-hw, plat_btm)
+	var btm_right := Vector2(hw, plat_btm)
+
+	# Drop shadow onto playfield
+	draw_line(btm_left + Vector2(0, 2.0), btm_right + Vector2(0, 2.0), Color(0.0, 0.0, 0.0, 0.08), 3.5)
+	# Soft divider bevel border
+	draw_line(btm_left, btm_right, curb_shadow, 2.5)
+	# Deep shadow groove
+	draw_line(btm_left - Vector2(0, 1.0), btm_right - Vector2(0, 1.0), curb_deep, 1.8)
+	# Highlight line
+	draw_line(btm_left - Vector2(0, 2.2), btm_right - Vector2(0, 2.2), curb_highlight, 1.2)

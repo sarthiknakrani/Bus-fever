@@ -2089,8 +2089,8 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 		# Partition gap (where parking bays end and road corridor begins)
 		var partition_y = parking_bottom + 10.0
 		
-		# Deck plateau width (comfortably frames parking slots with padding)
-		var deck_w = maxf(500.0, parking_w + 45.0)
+		# Deck plateau width (comfortably frames parking slots matching user red guides)
+		var deck_w = maxf(570.0, parking_w + 120.0)
 		
 		# Width needs to cover entire screen width
 		var visible_w = vp_size.x / scale_factor

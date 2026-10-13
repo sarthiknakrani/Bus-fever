@@ -34,15 +34,22 @@ func _run_all_captures() -> void:
 func _capture_view(lvl_num: int, show_failure: bool, win_size: Vector2i, out_path: String) -> void:
 	DisplayServer.window_set_size(win_size)
 	root.size = win_size
+	
+	var gc = root.get_node_or_null("GameController")
+	if gc == null:
+		gc = load("res://scripts/autoload/game_controller.gd").new()
+		gc.name = "GameController"
+		root.add_child(gc)
+	gc.current_level_number = lvl_num
+	
 	var lvl: CarJamLevel = CarJamLevelScene.instantiate()
 	root.add_child(lvl)
 	if not lvl.is_node_ready():
 		lvl._ready()
-		
-	var res_path = "res://levels/level_%03d.tres" % lvl_num
-	var level_data: CarJamLevelData = ResourceLoader.load(res_path) as CarJamLevelData
-	lvl.controller.load_level(level_data)
-	lvl._setup_visuals(level_data)
+	
+	if lvl.camera_2d != null:
+		lvl.camera_2d.enabled = true
+		lvl.camera_2d.make_current()
 	lvl._update_layout(Vector2(win_size))
 	
 	if show_failure:
