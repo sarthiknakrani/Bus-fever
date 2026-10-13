@@ -57,3 +57,7 @@ func _draw() -> void:
 		])
 		draw_colored_polygon(playfield_poly, color_playfield)
 
+func draw_parking_strip(_top_y: float, _bottom_y: float, _w: float) -> void:
+	# Handled by ParkingStrip node (kept for PlatformView API compatibility)
+	pass
+
