@@ -13,12 +13,12 @@ static func create_level_1() -> CarJamLevelData:
 
 	# Vehicles: 6 buses with capacity 40 (2 Yellow, 2 Blue, 2 Red = 240 seats)
 	var configs := [
-		{"id": 1, "code": "v1_yellow", "color": "yellow", "pos": Vector2i(1, 0), "footprint": [Vector2i(0, 0), Vector2i(0, 1)], "dir": CarJamVehicleData.Direction.DOWN},
-		{"id": 2, "code": "v2_blue",   "color": "blue",   "pos": Vector2i(3, 1), "footprint": [Vector2i(0, 0), Vector2i(-1, 0)], "dir": CarJamVehicleData.Direction.LEFT},
-		{"id": 3, "code": "v3_red",    "color": "red",    "pos": Vector2i(1, 2), "footprint": [Vector2i(0, 0), Vector2i(1, 0)], "dir": CarJamVehicleData.Direction.RIGHT},
-		{"id": 4, "code": "v4_yellow", "color": "yellow", "pos": Vector2i(3, 4), "footprint": [Vector2i(0, 0), Vector2i(0, -1)], "dir": CarJamVehicleData.Direction.UP},
-		{"id": 5, "code": "v5_blue",   "color": "blue",   "pos": Vector2i(2, 3), "footprint": [Vector2i(0, 0), Vector2i(0, 1)], "dir": CarJamVehicleData.Direction.DOWN},
-		{"id": 6, "code": "v6_red",    "color": "red",    "pos": Vector2i(1, 3), "footprint": [Vector2i(0, 0), Vector2i(-1, 0)], "dir": CarJamVehicleData.Direction.LEFT},
+		{"id": 1, "code": "v1_yellow", "color": "yellow", "pos": Vector2i(3, 2), "footprint": [Vector2i(0, 0), Vector2i(0, 1)], "dir": CarJamVehicleData.Direction.UP},
+		{"id": 2, "code": "v2_blue",   "color": "blue",   "pos": Vector2i(3, 1), "footprint": [Vector2i(0, 0), Vector2i(1, 0)], "dir": CarJamVehicleData.Direction.LEFT},
+		{"id": 3, "code": "v3_red",    "color": "red",    "pos": Vector2i(1, 2), "footprint": [Vector2i(0, 0), Vector2i(1, 0)], "dir": CarJamVehicleData.Direction.LEFT},
+		{"id": 4, "code": "v4_yellow", "color": "yellow", "pos": Vector2i(4, 2), "footprint": [Vector2i(0, 0), Vector2i(0, 1)], "dir": CarJamVehicleData.Direction.UP},
+		{"id": 5, "code": "v5_blue",   "color": "blue",   "pos": Vector2i(0, 2), "footprint": [Vector2i(0, 0), Vector2i(0, 1)], "dir": CarJamVehicleData.Direction.UP},
+		{"id": 6, "code": "v6_red",    "color": "red",    "pos": Vector2i(1, 3), "footprint": [Vector2i(0, 0), Vector2i(1, 0)], "dir": CarJamVehicleData.Direction.LEFT},
 	]
 
 	for cfg in configs:

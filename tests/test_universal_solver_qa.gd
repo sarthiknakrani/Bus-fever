@@ -380,8 +380,8 @@ func _test_11_illegal_escape_paths() -> void:
 	var ctrl := CarJamController.new()
 	ctrl.load_level(lvl)
 
-	# Vehicle 1 (v1_yellow) starts at (1, 0), dir DOWN (towards Vehicle 6 & 3)
-	# It is blocked by v6_red or v3_red
+	# Vehicle 1 (v1_yellow) starts at (3, 2), dir UP (towards Vehicle 2)
+	# It is blocked by v2_blue
 	var tap_res = ctrl.tap_vehicle(1)
 	_expect(not tap_res, "Blocked vehicle tap rejected by controller")
 	_expect(ctrl.vehicles[1].state == VehicleModel.VehicleState.ON_BOARD, "Blocked vehicle remains ON_BOARD")
@@ -395,11 +395,11 @@ func _test_12_repeated_rapid_taps() -> void:
 	var ctrl := CarJamController.new()
 	ctrl.load_level(lvl)
 
-	# Vehicle 3 can escape
-	var tap1 = ctrl.tap_vehicle(3)
-	_expect(tap1, "First tap on Vehicle 3 accepted")
-	var tap2 = ctrl.tap_vehicle(3)
-	_expect(not tap2, "Immediate second tap on Vehicle 3 rejected (already EXITING)")
+	# Vehicle 2 can escape
+	var tap1 = ctrl.tap_vehicle(2)
+	_expect(tap1, "First tap on Vehicle 2 accepted")
+	var tap2 = ctrl.tap_vehicle(2)
+	_expect(not tap2, "Immediate second tap on Vehicle 2 rejected (already EXITING)")
 
 # -----------------------------------------------------------------
 # 13. Restart During Boarding
@@ -411,9 +411,9 @@ func _test_13_restart_during_boarding() -> void:
 	ctrl.load_level(lvl)
 
 	var old_token = ctrl.session_token
-	# Dispatch vehicle 3
-	ctrl.tap_vehicle(3)
-	_expect(ctrl.parking.get_slot(1).vehicle_id == 3, "Slot 1 reserved for bus 3")
+	# Dispatch vehicle 2
+	ctrl.tap_vehicle(2)
+	_expect(ctrl.parking.get_slot(1).vehicle_id == 2, "Slot 1 reserved for bus 2")
 
 	# Restart
 	ctrl.restart_level()
@@ -422,7 +422,7 @@ func _test_13_restart_during_boarding() -> void:
 	_expect(ctrl.boarding_reservations.is_empty(), "Boarding reservations wiped")
 
 	# Stale callback with old token rejected
-	ctrl.on_vehicle_departed_from_slot(3, 1, old_token)
+	ctrl.on_vehicle_departed_from_slot(2, 1, old_token)
 	_expect(ctrl.state == CarJamController.GameState.PLAYING, "Stale callback ignored")
 
 # -----------------------------------------------------------------
