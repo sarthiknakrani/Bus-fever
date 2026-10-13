@@ -18,11 +18,11 @@ func setup_full(top_y: float, bottom_y: float, w: float, partition_y: float, sep
 	queue_redraw()
 
 func _draw() -> void:
-	# 1. Authoritative base lavender-grey material
-	var base_grey := Color("d1d5e6") # Approved lavender-grey material for platform and ground
-	var curb_highlight := Color("ffffff", 0.85)
+	# 1. Authoritative base grey material matching passenger road (#767786)
+	var base_grey := Color("767786")
+	var curb_highlight := Color("f8fafc")
 	var curb_shadow := Color("a5abc2")
-	var curb_deep := Color("8c93a8")
+	var curb_deep := Color("545564")
 
 	var hill_w: float = p_deck_w
 	var slope_w: float = 75.0
@@ -30,7 +30,7 @@ func _draw() -> void:
 	var hw: float = p_width / 2.0
 	var sep_y: float = p_separator_y
 
-	# 2. Continuous lavender-grey polygon (raised platform deck, sloped sides, and full-width floor)
+	# 2. Continuous grey polygon (raised platform deck, sloped sides, and full-width floor)
 	var points = PackedVector2Array([
 		Vector2(-hw, p_bottom),
 		Vector2(-hw, gy),
@@ -42,11 +42,6 @@ func _draw() -> void:
 		Vector2(hw, p_bottom)
 	])
 	draw_colored_polygon(points, base_grey)
-
-	# 3. Subtle road corridor shading between parking platform and separator line
-	var line_top: float = sep_y - 3.25
-	if sep_y > -9000.0 and line_top > gy:
-		draw_rect(Rect2(-hw, gy, p_width, line_top - gy), Color(0.79, 0.81, 0.88, 0.22))
 
 	# 4. Clean 3D curb outlining the platform perimeter and connecting seamlessly with the horizon floor
 	var top_edge = PackedVector2Array([

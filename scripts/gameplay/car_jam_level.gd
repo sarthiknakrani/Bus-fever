@@ -50,6 +50,7 @@ var result_btn: TextureButton
 var result_btn_label: Label
 var result_retry_btn: TextureButton
 var result_subtitle_label: Label
+var result_icon: TextureRect
 var _result_outcome: String = ""  # "victory" or "failure" — guards which buttons are shown
 
 var _toast_container: CenterContainer
@@ -118,7 +119,7 @@ func _calc_lane_pos(center_pos: Vector2, normal: Vector2, lane: int) -> Vector2:
 	return center_pos + normal * lane_offset
 
 func _process(delta: float) -> void:
-	if passenger_track == null or controller == null: return
+	if passenger_track == null or controller == null or controller.parking == null: return
 	if controller.state != CarJamController.GameState.PLAYING: return
 	
 	var track_len = passenger_track.curve.get_baked_length()
@@ -484,6 +485,8 @@ func _load_current_level() -> void:
 	if result_subtitle_label != null:
 		result_subtitle_label.visible = false
 		result_subtitle_label.text = ""
+	if result_icon != null:
+		result_icon.texture = load("res://assets/ui/icons/trophy.svg")
 	if is_inside_tree() and get_tree() != null:
 		get_tree().paused = false
 
@@ -491,6 +494,8 @@ func _load_current_level() -> void:
 	_setup_visuals(lvl)
 
 func _setup_visuals(lvl: CarJamLevelData) -> void:
+	if level_title_label != null:
+		level_title_label.text = "Level %d" % lvl.level_id
 	# Clear previous visuals
 	for v in vehicle_views.values():
 		if is_instance_valid(v): v.queue_free()
@@ -550,7 +555,7 @@ func _setup_visuals(lvl: CarJamLevelData) -> void:
 	
 	parking_bg.draw.connect(func():
 		var style = StyleBoxFlat.new()
-		style.bg_color = Color("c5c9db") # Seamlessly cohesive grey apron matching platform and road
+		style.bg_color = Color("767786") # Exact reference grey matching passenger road and platform
 		style.set_corner_radius_all(12)
 		style.border_width_left = 2
 		style.border_width_top = 2
@@ -1180,15 +1185,24 @@ func _on_puzzle_failed() -> void:
 	_result_outcome = "failure"
 	_play_sfx("failure")
 
+	# Dismiss any active toast immediately so it doesn't overlap failure popup
+	if _toast_panel != null:
+		if _toast_tween != null and _toast_tween.is_valid():
+			_toast_tween.kill()
+		_toast_panel.visible = false
+
 	# CRITICAL: failure must NEVER enable level progression or unlock the next level.
 	# Only the retry/home actions are exposed — no victory-style next-level button.
 	result_title_label.text = "OUT OF SPACE!"
 	result_title_label.add_theme_color_override("font_color", Color("ef4444"))
 
+	if result_icon != null:
+		result_icon.texture = load("res://assets/ui/icons/warning_icon.svg")
+
 	# Hide the victory-only progression action.
 	result_btn.visible = false
-	result_subtitle_label.text = ""
-	result_subtitle_label.visible = false
+	result_subtitle_label.text = "No parking spaces left!"
+	result_subtitle_label.visible = true
 	result_retry_btn.visible = true
 
 	result_overlay.visible = true
@@ -1668,13 +1682,13 @@ func _build_hud() -> void:
 	header_vbox.add_theme_constant_override("separation", 8)
 	res_vbox.add_child(header_vbox)
 	
-	var trophy_icon = TextureRect.new()
-	trophy_icon.texture = load("res://assets/ui/icons/trophy.svg")
-	trophy_icon.ignore_texture_size = true
-	trophy_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	trophy_icon.custom_minimum_size = Vector2(64, 64)
-	trophy_icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	header_vbox.add_child(trophy_icon)
+	result_icon = TextureRect.new()
+	result_icon.texture = load("res://assets/ui/icons/trophy.svg")
+	result_icon.ignore_texture_size = true
+	result_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	result_icon.custom_minimum_size = Vector2(64, 64)
+	result_icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	header_vbox.add_child(result_icon)
 	
 	result_title_label = Label.new()
 	result_title_label.text = "LEVEL CLEAR!"
@@ -2527,6 +2541,7 @@ func _rollback_uncommitted_passenger(p: Dictionary, pid: int) -> void:
 	if not found and not _circulating_rows.is_empty():
 		_circulating_rows.back().passengers.append(p)
 	print("[QA] Boarding commit rejected for passenger %d; safely rolled back to CIRCULATING." % pid)
+	controller.check_terminal_states()
 
 func _create_custom_toggle(text: String, icon_path: String, is_on: bool, on_toggle: Callable) -> Control:
 	var row := HBoxContainer.new()

@@ -135,6 +135,13 @@ func tap_vehicle(vehicle_id: int) -> bool:
 		print("[QA %d] Tap Bus %d | State: %s | Legal: %s | Slots: %s | REJECTED: Invalid state" % [t0, vehicle_id, state_str, str(can_disp), slots_str])
 		return false
 
+	# If parking is full, evaluate terminal states first
+	if parking.is_full():
+		_check_terminal_states()
+		if state == GameState.FAIL:
+			print("[QA %d] Tap Bus %d | REJECTED: Deadlock detected -> OUT OF SPACE" % [Time.get_ticks_msec(), vehicle_id])
+			return false
+
 	# 1. Swept corridor collision check
 	var escape_res := board.check_swept_escape(v)
 	if not escape_res["can_escape"]:
@@ -145,6 +152,10 @@ func tap_vehicle(vehicle_id: int) -> bool:
 	# 2. Atomic parking slot reservation
 	var slot_id := parking.reserve_slot(vehicle_id)
 	if slot_id == -1:
+		_check_terminal_states()
+		if state == GameState.FAIL:
+			print("[QA %d] Tap Bus %d | REJECTED: Deadlock detected -> OUT OF SPACE" % [Time.get_ticks_msec(), vehicle_id])
+			return false
 		print("[QA %d] Tap Bus %d | State: %s | Legal: %s | Slots: %s | REJECTED: No Spot Available (Toast Triggered)" % [Time.get_ticks_msec(), vehicle_id, state_str, str(can_disp), slots_str])
 		parking_full_warning.emit()
 		return false
