@@ -13,6 +13,9 @@ const PARKING_Y: float = 405.0
 const PASSENGER_TRACK_Y: float = 195.0
 const FUNNEL_Y: float = 315.0
 
+# Colors
+const COLOR_WORLD_BG := Color("d2d5e4") # Authoritative background fill sampled directly from swatch 1 (#D2D5E4)
+
 # Hierarchy Nodes
 var world_root: Node2D
 var board_root: Node2D
@@ -348,7 +351,7 @@ func _build_scene_hierarchy() -> void:
 	var bg_layer := CanvasLayer.new()
 	bg_layer.layer = -1
 	var bg := ColorRect.new()
-	bg.color = Color("87CEEB") # Sharp sky blue
+	bg.color = COLOR_WORLD_BG # Exact authoritative color sampled from swatch 1 (#D2D5E4)
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bg_layer.add_child(bg)
