@@ -195,8 +195,8 @@ func _init() -> void:
 		all_passed = false
 	plat_test.queue_free()
 
-	# TEST 4: ParkingBase Left-Border Removal Verification
-	print("\n--- TEST: ParkingBase StyleBox Left Border Removal ---")
+	# TEST 4: ParkingBase Removal Verification
+	print("\n--- TEST: ParkingBase Removal Verification ---")
 	var test_lvl: CarJamLevel = CarJamLevelScene.instantiate()
 	root.add_child(test_lvl)
 	if not test_lvl.is_node_ready():
@@ -206,11 +206,11 @@ func _init() -> void:
 	test_lvl._setup_visuals(ldata)
 
 	var pbase = test_lvl.parking_slots_node.get_node_or_null("ParkingBase")
-	if pbase == null:
-		print("  [FAIL] ParkingBase node not found!")
+	if pbase != null:
+		print("  [FAIL] ParkingBase should be removed from parking_slots_node!")
 		all_passed = false
 	else:
-		print("  [PASS] ParkingBase node found in parking_slots_node")
+		print("  [PASS] ParkingBase removed — slots sit directly on playfield")
 	test_lvl.queue_free()
 
 	print("\n=======================================================")

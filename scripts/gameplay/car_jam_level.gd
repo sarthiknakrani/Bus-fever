@@ -564,30 +564,7 @@ func _setup_visuals(lvl: CarJamLevelData) -> void:
 	var slot_spacing := 65.0
 	var total_span: float = float(lvl.parking_slots_count - 1) * slot_spacing
 	
-	# Draw a thick rounded asphalt background for parking
-	var parking_bg = Node2D.new()
-	parking_bg.name = "ParkingBase"
-	parking_bg.z_index = -1
-	
-
-	var bg_w = total_span + ParkingSlotView.SLOT_WIDTH + 32.0 # total_span + SLOT_WIDTH + padding
-	var bg_h = ParkingSlotView.SLOT_HEIGHT + 20.0 # SLOT_HEIGHT + padding
-	
-	parking_bg.draw.connect(func():
-		var style = StyleBoxFlat.new()
-		style.bg_color = Color("767786") # Exact reference grey matching passenger road and platform
-		style.set_corner_radius_all(12)
-		style.border_width_left = 0 # Targeted removal of unwanted left-side vertical border beside VIP slot
-		style.border_width_top = 2
-		style.border_width_right = 2
-		style.border_width_bottom = 2
-		style.border_color = Color("a5abc2") # Clean subtle apron border matching platform curb shadow
-		style.shadow_color = Color(0, 0, 0, 0.08) # Soft integrated depth, no harsh floating-card look
-		style.shadow_size = 3
-		style.shadow_offset = Vector2(0, 2)
-		style.draw(parking_bg.get_canvas_item(), Rect2(-bg_w/2.0, -bg_h/2.0, bg_w, bg_h))
-	)
-	parking_slots_node.add_child(parking_bg)
+	# ParkingBase removed — slots sit directly on the playfield
 
 	for i in lvl.parking_slots_count:
 		var slot_view := ParkingSlotView.new()
