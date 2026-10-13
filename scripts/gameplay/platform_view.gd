@@ -8,6 +8,10 @@ var p_partition_y: float = 0.0
 var p_separator_y: float = -9999.0
 var p_deck_w: float = 580.0
 
+# Authoritative source-of-truth track grey matching passenger track & connector
+const COLOR_TRACK_GREY := Color("767786")
+const COLOR_PLAYFIELD := Color("d2d5e4") # Swatch 1 light lavender playfield
+
 func setup_full(top_y: float, bottom_y: float, w: float, partition_y: float, separator_y: float = -9999.0, deck_w: float = 580.0) -> void:
 	p_top = top_y
 	p_bottom = bottom_y
@@ -18,45 +22,63 @@ func setup_full(top_y: float, bottom_y: float, w: float, partition_y: float, sep
 	queue_redraw()
 
 func _draw() -> void:
-	# 1. Authoritative base lavender-grey material matching swatch 1 (#D2D5E4)
-	var base_grey := Color("d2d5e4")
-	var curb_highlight := Color("ffffff", 0.85)
+	# 1. Authoritative materials matching passenger track & reference curbs
+	var color_track_grey := COLOR_TRACK_GREY
+	var color_playfield := COLOR_PLAYFIELD
+	var curb_highlight := Color("f8fafc")
 	var curb_shadow := Color("a5abc2")
-	var curb_deep := Color("8c93a8")
+	var curb_deep := Color("545564")
 
 	var hill_w: float = p_deck_w
 	var slope_w: float = 75.0
 	var gy: float = p_partition_y
 	var hw: float = p_width / 2.0
 	var sep_y: float = p_separator_y
+	var band_btm: float = maxf(sep_y, gy) if sep_y > -9000.0 else gy
 
-	# 2. Continuous grey polygon (raised platform deck, sloped sides, and full-width floor)
-	var points = PackedVector2Array([
-		Vector2(-hw, p_bottom),
+	# 2. Continuous platform & separator polygon in authoritative track grey (#767786)
+	# Fills the raised platform deck, left/right slanted shoulders, and horizontal band down to separator line
+	var platform_poly = PackedVector2Array([
+		Vector2(-hw, band_btm),
 		Vector2(-hw, gy),
 		Vector2(-hill_w / 2.0 - slope_w, gy),
 		Vector2(-hill_w / 2.0, p_top),
 		Vector2(hill_w / 2.0, p_top),
 		Vector2(hill_w / 2.0 + slope_w, gy),
 		Vector2(hw, gy),
-		Vector2(hw, p_bottom)
+		Vector2(hw, band_btm)
 	])
-	draw_colored_polygon(points, base_grey)
+	draw_colored_polygon(platform_poly, color_track_grey)
 
-	# 4. Clean 3D curb outlining the platform perimeter and connecting seamlessly with the horizon floor
-	var top_edge = PackedVector2Array([
+	# 3. Lower bus-playfield polygon in Swatch 1 light lavender (#D2D5E4) below separator line
+	if p_bottom > band_btm:
+		var playfield_poly = PackedVector2Array([
+			Vector2(-hw, band_btm),
+			Vector2(hw, band_btm),
+			Vector2(hw, p_bottom),
+			Vector2(-hw, p_bottom)
+		])
+		draw_colored_polygon(playfield_poly, color_playfield)
+
+	# 4. Clean 3D curb outlining the platform perimeter with open central gateway for seamless road flow
+	var x_gate: float = 110.0
+	var left_edge = PackedVector2Array([
 		Vector2(-hw, gy),
 		Vector2(-hill_w / 2.0 - slope_w, gy),
 		Vector2(-hill_w / 2.0, p_top),
+		Vector2(-x_gate, p_top)
+	])
+	var right_edge = PackedVector2Array([
+		Vector2(x_gate, p_top),
 		Vector2(hill_w / 2.0, p_top),
 		Vector2(hill_w / 2.0 + slope_w, gy),
 		Vector2(hw, gy)
 	])
 
-	# Draw 3D curb bevel along the entire continuous perimeter
-	draw_polyline(top_edge, curb_shadow, 4.0, true)
-	draw_polyline(top_edge, curb_deep, 2.5, true)
-	draw_polyline(top_edge, curb_highlight, 1.5, true)
+	for edge in [left_edge, right_edge]:
+		draw_polyline(edge, curb_shadow, 4.0, true)
+		draw_polyline(edge, curb_deep, 2.5, true)
+		draw_polyline(edge, curb_highlight, 1.5, true)
 
 	# 5. Authoritative Road Divider / Separator line (exact vertical center on sep_y)
 	if sep_y > -9000.0:

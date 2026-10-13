@@ -112,7 +112,6 @@ func _draw() -> void:
 
 	# Left outer curb: from gateway bottom-left around to feeder inner
 	var curb_left = PackedVector2Array()
-	curb_left.append(Vector2(-x_gate - 14.0, plat_y))
 	curb_left.append(Vector2(-x_gate, plat_y))
 	curb_left.append(Vector2(-x_gate, r_outer))
 	curb_left.append(Vector2(-straight_x, r_outer))
@@ -145,7 +144,6 @@ func _draw() -> void:
 	curb_right.append(Vector2(straight_x, r_outer))
 	curb_right.append(Vector2(x_gate, r_outer))
 	curb_right.append(Vector2(x_gate, plat_y))
-	curb_right.append(Vector2(x_gate + 14.0, plat_y))
 
 	# -----------------------------------------------------------------
 	# 4. ROAD SURFACE POLYGONS (Top & Bottom halves, perfectly seamless)
