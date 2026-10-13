@@ -16,6 +16,7 @@ const SFX_BOARD := "board"
 const SFX_DEPART := "depart"
 const SFX_VICTORY := "victory"
 const SFX_FAILURE := "failure"
+const SFX_FAILURE_ALARM := "failure_alarm"
 const SFX_BOOSTER := "booster"
 
 const MIX_RATE: int = 44100
@@ -23,6 +24,7 @@ const MIX_RATE: int = 44100
 var _players: Array[AudioStreamPlayer] = []
 var _player_index: int = 0
 var _music_player: AudioStreamPlayer
+var _alarm_player: AudioStreamPlayer
 
 var _streams: Dictionary = {}
 var _music_stream: AudioStreamWAV
@@ -45,6 +47,10 @@ func _init_players() -> void:
 	_music_player.bus = "Master"
 	_music_player.volume_db = -12.0
 	add_child(_music_player)
+	_alarm_player = AudioStreamPlayer.new()
+	_alarm_player.bus = "Master"
+	_alarm_player.volume_db = -8.0
+	add_child(_alarm_player)
 
 func play(sfx_name: String) -> void:
 	if not SettingsManager.sfx_enabled():
@@ -72,6 +78,20 @@ func stop_music() -> void:
 	if _music_player != null and _music_player.playing:
 		_music_player.stop()
 
+func play_alarm_loop() -> void:
+	if not SettingsManager.sfx_enabled():
+		return
+	if _alarm_player == null or not _streams.has(SFX_FAILURE_ALARM):
+		return
+	if _alarm_player.playing:
+		return
+	_alarm_player.stream = _streams[SFX_FAILURE_ALARM]
+	_alarm_player.play()
+
+func stop_alarm_loop() -> void:
+	if _alarm_player != null and _alarm_player.playing:
+		_alarm_player.stop()
+
 # -----------------------------------------------------------------
 # PROCEDURAL SOUND SYNTHESIS
 # -----------------------------------------------------------------
@@ -86,6 +106,7 @@ func _generate_all_sfx() -> void:
 	_streams[SFX_DEPART] = _gen_depart_horn()
 	_streams[SFX_VICTORY] = _gen_victory_fanfare()
 	_streams[SFX_FAILURE] = _gen_failure_buzzer()
+	_streams[SFX_FAILURE_ALARM] = _gen_failure_alarm()
 	_streams[SFX_BOOSTER] = _gen_booster_sparkle()
 
 func _gen_wav(samples: PackedFloat32Array, loop: bool = false) -> AudioStreamWAV:
@@ -225,6 +246,31 @@ func _gen_failure_buzzer() -> AudioStreamWAV:
 		var s: float = (sin(t * freq * TAU) + float(signf(sin(t * freq * TAU))) * 0.5) * 0.3
 		samples[i] = s * env
 	return _gen_wav(samples)
+
+func _gen_failure_alarm() -> AudioStreamWAV:
+	# Alarm alternating between 800Hz and 600Hz every 0.25s
+	# Gated by envelope: 0.4s on / 0.2s off / repeat (0.6s cycle)
+	# 3.0s duration gives exactly 5 on/off bursts and 6 pitch cycles, looping seamlessly.
+	var dur: float = 3.0
+	var count: int = int(float(MIX_RATE) * dur)
+	var samples: PackedFloat32Array = PackedFloat32Array()
+	samples.resize(count)
+	var phase: float = 0.0
+	for i in count:
+		var t: float = float(i) / float(MIX_RATE)
+		var freq: float = 800.0 if fmod(t, 0.5) < 0.25 else 600.0
+		var env_t: float = fmod(t, 0.6)
+		var env: float = 0.0
+		if env_t < 0.38:
+			env = 1.0 if env_t >= 0.01 else (env_t / 0.01)
+		elif env_t < 0.40:
+			env = (0.40 - env_t) / 0.02
+		else:
+			env = 0.0
+		phase += freq * (TAU / float(MIX_RATE))
+		var sq: float = float(signf(sin(phase)))
+		samples[i] = sq * 0.15 * env
+	return _gen_wav(samples, true)
 
 func _gen_booster_sparkle() -> AudioStreamWAV:
 	var dur: float = 0.45

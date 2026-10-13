@@ -220,6 +220,17 @@ func play_blocked_shake() -> void:
 	tw.tween_property(self, "position", position + nudge_vec, 0.07).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tw.tween_property(self, "position", position, 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
+func play_angry_shake() -> void:
+	var orig_pos := position
+	var tw := create_tween()
+	# Two extra-strong horizontal shakes (10px, 0.18s each, EASE_BACK)
+	tw.tween_property(self, "position", orig_pos + Vector2(10.0, 0), 0.045).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(self, "position", orig_pos - Vector2(10.0, 0), 0.09).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(self, "position", orig_pos, 0.045).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(self, "position", orig_pos + Vector2(10.0, 0), 0.045).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(self, "position", orig_pos - Vector2(10.0, 0), 0.09).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(self, "position", orig_pos, 0.045).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
 func play_badge_pulse() -> void:
 	if _badge_node != null:
 		var tw := create_tween()

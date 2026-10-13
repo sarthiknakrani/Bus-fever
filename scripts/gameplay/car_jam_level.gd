@@ -56,6 +56,13 @@ var result_subtitle_label: Label
 var result_icon: TextureRect
 var _result_outcome: String = ""  # "victory" or "failure" — guards which buttons are shown
 
+var _result_panel: PanelContainer
+var _result_scrim: ColorRect
+var _victory_panel_style: StyleBoxFlat
+var _failure_panel_style: StyleBoxFlat
+var _failure_tweens: Array[Tween] = []
+var _failure_temp_nodes: Array[Node] = []
+
 var _toast_container: CenterContainer
 var _toast_panel: PanelContainer
 var _toast_tween: Tween
@@ -496,6 +503,7 @@ func _load_current_level() -> void:
 
 	# Reset result overlay state for this fresh level run.
 	_result_outcome = ""
+	_stop_failure_animations()
 	if result_overlay != null:
 		result_overlay.visible = false
 	if result_btn != null:
@@ -507,6 +515,10 @@ func _load_current_level() -> void:
 		result_subtitle_label.text = ""
 	if result_icon != null:
 		result_icon.texture = load("res://assets/ui/icons/trophy.svg")
+		result_icon.scale = Vector2.ONE
+		result_icon.position = Vector2.ZERO
+	if _result_panel != null and _victory_panel_style != null:
+		_result_panel.add_theme_stylebox_override("panel", _victory_panel_style)
 	if is_inside_tree() and get_tree() != null:
 		get_tree().paused = false
 
@@ -1136,7 +1148,13 @@ func _on_level_completed() -> void:
 		# Failure is terminal for this attempt; do not flip to victory.
 		return
 	_result_outcome = "victory"
+	_stop_failure_animations()
 	_play_sfx("victory")
+
+	if _result_panel != null and _victory_panel_style != null:
+		_result_panel.add_theme_stylebox_override("panel", _victory_panel_style)
+	if _result_scrim != null:
+		_result_scrim.color = Color(0, 0, 0, 0.8)
 
 	var gc = get_tree().root.get_node_or_null("GameController")
 	var current_num: int = 1
@@ -1153,8 +1171,15 @@ func _on_level_completed() -> void:
 		if gc != null and gc.has_level(next_num):
 			save_mgr.unlock_level(next_num)
 
+	if result_icon != null:
+		result_icon.texture = load("res://assets/ui/icons/trophy.svg")
+		result_icon.scale = Vector2.ONE
+		result_icon.position = Vector2.ZERO
+
 	result_title_label.text = "LEVEL %d CLEAR!" % current_num
 	result_title_label.add_theme_color_override("font_color", Color("facc15"))
+	result_title_label.scale = Vector2.ONE
+	result_title_label.rotation = 0.0
 
 	# Configure the next-level button based on actual authored levels.
 	var next_num: int = current_num + 1
@@ -1179,6 +1204,7 @@ func _on_puzzle_failed() -> void:
 	if _result_outcome == "failure":
 		return
 	_result_outcome = "failure"
+	_stop_failure_animations()
 	_play_sfx("failure")
 
 	# Dismiss any active toast immediately so it doesn't overlap failure popup
@@ -1187,8 +1213,11 @@ func _on_puzzle_failed() -> void:
 			_toast_tween.kill()
 		_toast_panel.visible = false
 
-	# CRITICAL: failure must NEVER enable level progression or unlock the next level.
-	# Only the retry/home actions are exposed — no victory-style next-level button.
+	# 1. Switch panel to alarm theme (Requirement 1)
+	if _result_panel != null and _failure_panel_style != null:
+		_result_panel.add_theme_stylebox_override("panel", _failure_panel_style)
+
+	# 2. Setup labels and icons
 	result_title_label.text = "OUT OF SPACE!"
 	result_title_label.add_theme_color_override("font_color", Color("ef4444"))
 
@@ -1203,11 +1232,162 @@ func _on_puzzle_failed() -> void:
 
 	result_overlay.visible = true
 
+	# 3. Start failure animations & audio
+	_start_failure_animations()
+
+func _start_failure_animations() -> void:
+	# 1. RED PULSING SCRIM (Requirement 4)
+	if _result_scrim != null:
+		_result_scrim.color = Color(0.18, 0.02, 0.02, 0.55)
+		var tw_scrim := create_tween().set_loops()
+		tw_scrim.tween_property(_result_scrim, "color", Color(0.24, 0.03, 0.03, 0.85), 0.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tw_scrim.tween_property(_result_scrim, "color", Color(0.14, 0.02, 0.02, 0.55), 0.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		_failure_tweens.append(tw_scrim)
+
+	# 2. TITLE TEXT ANIMATION (Requirement 3)
+	if result_title_label != null:
+		if result_title_label.size.x > 0:
+			result_title_label.pivot_offset = result_title_label.size / 2.0
+		else:
+			result_title_label.pivot_offset = Vector2(126, 18)
+		result_title_label.scale = Vector2(0.6, 0.6)
+		result_title_label.rotation = 0.0
+		var tw_punch := create_tween()
+		tw_punch.tween_property(result_title_label, "scale", Vector2(1.15, 1.15), 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tw_punch.tween_property(result_title_label, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		_failure_tweens.append(tw_punch)
+
+		var tw_wobble := create_tween().set_loops()
+		var rad_3deg := deg_to_rad(3.0)
+		tw_wobble.tween_property(result_title_label, "rotation", rad_3deg, 0.083).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tw_wobble.tween_property(result_title_label, "rotation", -rad_3deg, 0.166).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tw_wobble.tween_property(result_title_label, "rotation", 0.0, 0.083).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		_failure_tweens.append(tw_wobble)
+
+	# 3. WARNING ICON ANIMATION (Requirement 2)
+	if result_icon != null:
+		result_icon.position = Vector2.ZERO
+		result_icon.scale = Vector2.ONE
+		result_icon.pivot_offset = Vector2(32, 32)
+
+		var tw_icon_shake := create_tween().set_loops()
+		tw_icon_shake.tween_property(result_icon, "position:x", 4.0, 0.035).set_trans(Tween.TRANS_SINE)
+		tw_icon_shake.tween_property(result_icon, "position:x", -4.0, 0.07).set_trans(Tween.TRANS_SINE)
+		tw_icon_shake.tween_property(result_icon, "position:x", 0.0, 0.035).set_trans(Tween.TRANS_SINE)
+		_failure_tweens.append(tw_icon_shake)
+
+		var tw_icon_scale := create_tween().set_loops()
+		tw_icon_scale.tween_property(result_icon, "scale", Vector2(1.15, 1.15), 0.25).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tw_icon_scale.tween_property(result_icon, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		_failure_tweens.append(tw_icon_scale)
+
+	# 4. SUBTITLE FLASH (Requirement 8)
+	if result_subtitle_label != null:
+		result_subtitle_label.add_theme_color_override("font_color", Color.WHITE)
+		var tw_sub := create_tween().set_loops()
+		tw_sub.tween_property(result_subtitle_label, "theme_override_colors/font_color", Color("fca5a5"), 0.165).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tw_sub.tween_property(result_subtitle_label, "theme_override_colors/font_color", Color.WHITE, 0.165).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		_failure_tweens.append(tw_sub)
+
+	# 5. SLOT OVERLAY (Requirement 5)
+	_spawn_slot_block_overlays()
+
+	# 6. BUS SHAKE (Requirement 6)
+	for vid in vehicle_views:
+		var vv: VehicleView = vehicle_views[vid]
+		if is_instance_valid(vv) and vv.is_in_parking:
+			vv.play_angry_shake()
+
+	# 7. AUDIO ALARM LOOP (Requirement 7)
+	if is_inside_tree() and get_tree() != null:
+		var audio_timer := get_tree().create_timer(0.4)
+		audio_timer.timeout.connect(func():
+			if _result_outcome == "failure" and result_overlay != null and result_overlay.visible:
+				var cur_am = get_tree().root.get_node_or_null("AudioManager") if (is_inside_tree() and get_tree() != null) else null
+				if cur_am != null and cur_am.has_method("play_alarm_loop"):
+					cur_am.play_alarm_loop()
+		)
+
+func _spawn_slot_block_overlays() -> void:
+	if parking_slots_node == null or controller == null or controller.parking == null:
+		return
+	var cross_tex: Texture2D = null
+	if ResourceLoader.exists("res://assets/ui/icons/close.svg"):
+		cross_tex = load("res://assets/ui/icons/close.svg")
+
+	for i in slot_views.size():
+		var slot = controller.parking.get_slot(i)
+		if slot != null:
+			var slot_st = slot.state
+			var is_blocked = (slot_st == CarJamParkingManager.SlotState.OCCUPIED 
+				or slot_st == CarJamParkingManager.SlotState.RESERVED 
+				or slot_st == CarJamParkingManager.SlotState.DEPARTING)
+			if is_blocked and i < slot_views.size():
+				var slot_v: ParkingSlotView = slot_views[i]
+				var x_node := Node2D.new()
+				x_node.position = slot_v.position
+				x_node.z_index = 30
+				x_node.scale = Vector2.ZERO
+
+				if cross_tex != null:
+					var spr := Sprite2D.new()
+					spr.texture = cross_tex
+					spr.modulate = Color("ef4444")
+					spr.scale = Vector2(1.5, 1.5)
+					x_node.add_child(spr)
+				else:
+					var drawer := Node2D.new()
+					drawer.draw.connect(func():
+						drawer.draw_line(Vector2(-16, -16), Vector2(16, 16), Color("ef4444"), 4.0)
+						drawer.draw_line(Vector2(16, -16), Vector2(-16, 16), Color("ef4444"), 4.0)
+					)
+					x_node.add_child(drawer)
+
+				parking_slots_node.add_child(x_node)
+				_failure_temp_nodes.append(x_node)
+
+				var tw_x := create_tween()
+				tw_x.tween_property(x_node, "scale", Vector2.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+				tw_x.tween_property(x_node, "scale", Vector2.ZERO, 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+				tw_x.tween_callback(func():
+					_failure_temp_nodes.erase(x_node)
+					if is_instance_valid(x_node):
+						x_node.queue_free()
+				)
+				_failure_tweens.append(tw_x)
+
+func _stop_failure_animations() -> void:
+	for tw in _failure_tweens:
+		if is_instance_valid(tw) and tw.is_valid():
+			tw.kill()
+	_failure_tweens.clear()
+
+	for n in _failure_temp_nodes:
+		if is_instance_valid(n):
+			n.queue_free()
+	_failure_temp_nodes.clear()
+
+	var am = get_tree().root.get_node_or_null("AudioManager") if (is_inside_tree() and get_tree() != null) else null
+	if am != null and am.has_method("stop_alarm_loop"):
+		am.stop_alarm_loop()
+
+	if result_title_label != null:
+		result_title_label.scale = Vector2.ONE
+		result_title_label.rotation = 0.0
+	if result_icon != null:
+		result_icon.scale = Vector2.ONE
+		result_icon.position = Vector2.ZERO
+	if result_subtitle_label != null:
+		result_subtitle_label.add_theme_color_override("font_color", Color("475569"))
+	if _result_scrim != null:
+		_result_scrim.color = Color(0, 0, 0, 0.8)
+
 func _on_result_next_pressed() -> void:
 	# Defensive: if the user somehow taps this button outside a victory state,
 	# do nothing rather than silently advancing levels.
 	if _result_outcome != "victory":
 		return
+	_stop_failure_animations()
 	_play_sfx("ui")
 	get_tree().paused = false
 	var gc = get_tree().root.get_node_or_null("GameController")
@@ -1222,6 +1402,7 @@ func _on_result_next_pressed() -> void:
 func _on_result_retry_pressed() -> void:
 	if _result_outcome != "failure":
 		return
+	_stop_failure_animations()
 	_play_sfx("ui")
 	get_tree().paused = false
 	var gc = get_tree().root.get_node_or_null("GameController")
@@ -1637,6 +1818,7 @@ func _build_hud() -> void:
 	res_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	res_bg.mouse_filter = Control.MOUSE_FILTER_STOP
 	result_overlay.add_child(res_bg)
+	_result_scrim = res_bg
 	
 	var res_center := CenterContainer.new()
 	res_center.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -1644,20 +1826,35 @@ func _build_hud() -> void:
 	
 	var res_panel := PanelContainer.new()
 	res_panel.custom_minimum_size = Vector2(300, 320)
+	_result_panel = res_panel
 	
 	# Create a warm glowing panel style specifically for the victory screen
-	var res_style = StyleBoxFlat.new()
-	res_style.bg_color = Color("fffdf5") # warm white
-	res_style.corner_radius_top_left = 32
-	res_style.corner_radius_top_right = 32
-	res_style.corner_radius_bottom_left = 32
-	res_style.corner_radius_bottom_right = 32
-	res_style.shadow_color = Color(1.0, 0.85, 0.4, 0.25) # soft golden glow
-	res_style.shadow_size = 20
-	res_style.shadow_offset = Vector2(0, 4)
-	res_style.border_width_bottom = 6
-	res_style.border_color = Color("e5d3b3")
-	res_panel.add_theme_stylebox_override("panel", res_style)
+	_victory_panel_style = StyleBoxFlat.new()
+	_victory_panel_style.bg_color = Color("fffdf5") # warm white
+	_victory_panel_style.corner_radius_top_left = 32
+	_victory_panel_style.corner_radius_top_right = 32
+	_victory_panel_style.corner_radius_bottom_left = 32
+	_victory_panel_style.corner_radius_bottom_right = 32
+	_victory_panel_style.shadow_color = Color(1.0, 0.85, 0.4, 0.25) # soft golden glow
+	_victory_panel_style.shadow_size = 20
+	_victory_panel_style.shadow_offset = Vector2(0, 4)
+	_victory_panel_style.border_width_bottom = 6
+	_victory_panel_style.border_color = Color("e5d3b3")
+
+	# Create a darker alarm-themed panel style specifically for the failure screen (Requirement 1)
+	_failure_panel_style = StyleBoxFlat.new()
+	_failure_panel_style.bg_color = Color("1f1b2e") # deep charcoal background
+	_failure_panel_style.corner_radius_top_left = 32
+	_failure_panel_style.corner_radius_top_right = 32
+	_failure_panel_style.corner_radius_bottom_left = 32
+	_failure_panel_style.corner_radius_bottom_right = 32
+	_failure_panel_style.shadow_color = Color(0.937, 0.267, 0.267, 0.45) # red #ef4444 outer glow
+	_failure_panel_style.shadow_size = 30
+	_failure_panel_style.shadow_offset = Vector2(0, 4)
+	_failure_panel_style.border_width_bottom = 4 # 4px red bottom border
+	_failure_panel_style.border_color = Color("ef4444")
+
+	res_panel.add_theme_stylebox_override("panel", _victory_panel_style)
 	res_center.add_child(res_panel)
 	
 	var res_margin = MarginContainer.new()
@@ -1678,19 +1875,24 @@ func _build_hud() -> void:
 	header_vbox.add_theme_constant_override("separation", 8)
 	res_vbox.add_child(header_vbox)
 	
+	var icon_box := CenterContainer.new()
+	icon_box.custom_minimum_size = Vector2(72, 72)
+	header_vbox.add_child(icon_box)
+
 	result_icon = TextureRect.new()
 	result_icon.texture = load("res://assets/ui/icons/trophy.svg")
 	result_icon.ignore_texture_size = true
 	result_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	result_icon.custom_minimum_size = Vector2(64, 64)
-	result_icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	header_vbox.add_child(result_icon)
+	result_icon.pivot_offset = Vector2(32, 32)
+	icon_box.add_child(result_icon)
 	
 	result_title_label = Label.new()
 	result_title_label.text = "LEVEL CLEAR!"
 	result_title_label.add_theme_font_size_override("font_size", 28)
 	result_title_label.add_theme_color_override("font_color", Color("4a2810"))
 	result_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	result_title_label.pivot_offset = Vector2(126, 18)
 	header_vbox.add_child(result_title_label)
 	
 	var btn_vbox = VBoxContainer.new()
@@ -1822,6 +2024,7 @@ func _build_hud() -> void:
 	)
 	res_btn_home.pivot_offset = Vector2(80, 28)
 	res_btn_home.pressed.connect(func():
+		_stop_failure_animations()
 		_play_sfx("ui")
 		get_tree().paused = false
 		var gc = get_tree().root.get_node_or_null("GameController")
@@ -2085,6 +2288,7 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 
 
 func _direct_restart() -> void:
+	_stop_failure_animations()
 	_play_sfx("ui")
 	if pause_overlay and pause_overlay.visible:
 		pause_overlay.visible = false
