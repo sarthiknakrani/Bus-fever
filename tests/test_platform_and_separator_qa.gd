@@ -34,7 +34,7 @@ func _init() -> void:
 			lvl.queue_free()
 			continue
 			
-		var sep_y: float = plat.p_separator_y
+		var sep_y: float = plat.get_band_bottom_y()
 		var parking_y: float = lvl.parking_root.position.y
 		var parking_bottom = parking_y + ParkingSlotView.SLOT_HEIGHT / 2.0
 		var board_y: float = lvl.board_root.position.y
@@ -137,7 +137,7 @@ func _init() -> void:
 			lvl._update_layout(res)
 			
 			var plat: PlatformView = lvl.platform_bg as PlatformView
-			var sep_y = plat.p_separator_y
+			var sep_y = plat.get_band_bottom_y()
 			var scale_factor = lvl.world_root.scale.y
 			var sep_screen_y = (res.y / 2.0) + (sep_y * scale_factor)
 			var expected_center = res.y / 2.0

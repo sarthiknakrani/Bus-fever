@@ -32,9 +32,6 @@ func _run_all_captures() -> void:
 	quit(0)
 
 func _capture_view(lvl_num: int, show_failure: bool, win_size: Vector2i, out_path: String) -> void:
-	DisplayServer.window_set_size(win_size)
-	root.size = win_size
-	
 	var gc = root.get_node_or_null("GameController")
 	if gc == null:
 		gc = load("res://scripts/autoload/game_controller.gd").new()
@@ -42,8 +39,13 @@ func _capture_view(lvl_num: int, show_failure: bool, win_size: Vector2i, out_pat
 		root.add_child(gc)
 	gc.current_level_number = lvl_num
 	
+	var vp := SubViewport.new()
+	vp.size = win_size
+	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	root.add_child(vp)
+
 	var lvl: CarJamLevel = CarJamLevelScene.instantiate()
-	root.add_child(lvl)
+	vp.add_child(lvl)
 	if not lvl.is_node_ready():
 		lvl._ready()
 	
@@ -58,12 +60,12 @@ func _capture_view(lvl_num: int, show_failure: bool, win_size: Vector2i, out_pat
 	# Wait for rendering to settle
 	await create_timer(0.35).timeout
 	
-	var img = root.get_texture().get_image()
+	var img = vp.get_texture().get_image()
 	if img != null:
 		img.save_png(out_path)
 		print("Saved capture: %s (%dx%d)" % [out_path, img.get_width(), img.get_height()])
 	else:
 		printerr("Failed to get viewport image for %s" % out_path)
 		
-	lvl.queue_free()
+	vp.queue_free()
 	await create_timer(0.1).timeout

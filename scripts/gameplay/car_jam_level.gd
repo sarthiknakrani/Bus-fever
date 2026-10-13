@@ -2025,11 +2025,11 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 	
 	# Minimum essential dimensions for upper and lower screen halves
 	var min_gap_tp = 24.0 # Tightened gap to bring parking platform close to passenger track
-	var min_corridor = 40.0
-	var essential_upper_h = track_h + min_gap_tp + parking_h + min_corridor
+	var min_band_h = 55.0 # Platform grey band below parking slots
+	var essential_upper_h = track_h + min_gap_tp + parking_h + 10.0 + min_band_h + 30.0
 	
 	var min_sep_to_board = 60.0
-	var min_btm_pad = 20.0
+	var min_btm_pad = 30.0
 	var essential_lower_h = min_sep_to_board + board_pixel_h + min_btm_pad
 
 	var scale_w = screen_safe_w / required_w
@@ -2043,22 +2043,28 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 	
 	# In world_root coordinates, local Y = 0.0 corresponds to exact vertical screen center:
 	# separator_line_global_y = (vp_size.y / 2.0) + (0.0 * scale_factor) = H / 2.0
-	var separator_y: float = 0.0
+	var divider_y: float = 0.0
 	
 	var half_h = (vp_size.y / 2.0) / scale_factor
 	var top_safe_y = -half_h + (110.0 / scale_factor)
 	var btm_safe_y = half_h - (140.0 / scale_factor)
 
-	# Distribute extra upper space gracefully, keeping track and parking tightly connected
+	# Distribute extra upper space gracefully above divider line (which sits at screen center Y = 0.0)
 	var avail_upper_h = -top_safe_y
-	var extra_upper_h = maxf(0.0, avail_upper_h - essential_upper_h)
-	var gap_tp = clampf(min_gap_tp + extra_upper_h * 0.05, 24.0, 30.0)
+	var fixed_content_h = track_h + min_gap_tp + parking_h + 10.0
+	var extra_upper_h = maxf(0.0, avail_upper_h - fixed_content_h)
+	var gap_tp = clampf(min_gap_tp + extra_upper_h * 0.04, 24.0, 30.0)
+	var top_pad = maxf(30.0, 30.0 + extra_upper_h * 0.20)
+	var band_h = maxf(min_band_h, avail_upper_h - top_pad - track_h - gap_tp - parking_h - 10.0)
 
-	# Position upper elements tightly: track anchored comfortably at top, parking platform moved upward
-	var top_pad = 15.0 + extra_upper_h * 0.25
-	var track_y = top_safe_y + top_pad + (track_h / 2.0)
-	var parking_y = track_y + (track_h / 2.0) + gap_tp + (parking_h / 2.0)
-	var parking_bottom = parking_y + (parking_h / 2.0)
+	# Position upper elements tightly as one unified block anchored to divider_y = 0.0:
+	var partition_y = -band_h
+	var parking_bottom = partition_y - 10.0
+	var parking_y = parking_bottom - (parking_h / 2.0)
+	var track_bottom = parking_y - (parking_h / 2.0) - gap_tp
+	var track_y = track_bottom - (track_h / 2.0)
+	var plat_top = parking_y - (parking_h / 2.0) - 20.0
+	var separator_y = partition_y + (band_h / 2.0)
 
 	# Distribute extra lower space gracefully below separator line
 	var avail_lower_h = btm_safe_y
@@ -2077,17 +2083,12 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 	# Puzzle board in the lower middle area
 	if board_root != null:
 		board_root.position = Vector2(0, board_y)
-		
-	var plat_top = parking_y - (parking_h / 2.0) - 20.0
 
 	if platform_bg != null:
 		platform_bg.position = Vector2.ZERO # drawn relative to world_root
 		
 		# Full screen bounds in local space
 		var local_bottom = (vp_size.y / scale_factor) + 1000.0 # extend way down
-		
-		# Partition gap (where parking bays end and road corridor begins)
-		var partition_y = parking_bottom + 10.0
 		
 		# Deck plateau width (comfortably frames parking slots matching user red guides)
 		var deck_w = maxf(570.0, parking_w + 120.0)
