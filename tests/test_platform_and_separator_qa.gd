@@ -88,6 +88,26 @@ func _init() -> void:
 		else:
 			print("  [FAIL] Clearance gap is too small (+%.1f px < 20px target)" % min_gap_found)
 			all_passed = false
+
+		# Check 200% bottom grey band expansion
+		var orig_h: float = plat.get_original_band_height()
+		var curr_h: float = plat.get_current_band_height()
+		var band_btm: float = plat.get_band_bottom_y()
+		print("  [BAND HEIGHT] Original = %.2f px | Current = %.2f px (Ratio = %.2fx) | Band Bottom = %.2f" % [
+			orig_h, curr_h, (curr_h / orig_h) if orig_h > 0.0 else 0.0, band_btm
+		])
+		if absf(curr_h - orig_h * 2.0) > 0.001:
+			print("  [FAIL] Bottom grey band height is not 200%% of original! Current = %.2f, Expected = %.2f" % [curr_h, orig_h * 2.0])
+			all_passed = false
+		else:
+			print("  [PASS] Bottom grey band is EXACTLY 200%% (2.0x) of its original height")
+
+		var clearance_to_band: float = (sep_y + min_gap_found) - band_btm
+		if clearance_to_band >= 20.0:
+			print("  [PASS] Clean visual gap between 200%% grey band bottom and all buses (+%.1f px > 20px target)" % clearance_to_band)
+		else:
+			print("  [FAIL] Clearance from 200%% grey band bottom to buses is too small (+%.1f px)" % clearance_to_band)
+			all_passed = false
 			
 		lvl.queue_free()
 
@@ -160,7 +180,38 @@ func _init() -> void:
 	else:
 		print("  [FAIL] PlatformView properties mismatch!")
 		all_passed = false
+
+	# Verify 200% band height math:
+	# partition_y = 200.0, separator_y = 270.0 -> orig_h = 70.0 -> new_h = 140.0 -> band_btm = 340.0
+	var test_orig_h = plat_test.get_original_band_height()
+	var test_curr_h = plat_test.get_current_band_height()
+	var test_band_btm = plat_test.get_band_bottom_y()
+	if absf(test_curr_h - test_orig_h * 2.0) < 0.001 and absf(test_band_btm - 340.0) < 0.001:
+		print("  [PASS] PlatformView 200%% band height: orig=%.1f px, current=%.1f px (2.0x), band_btm=%.1f px" % [
+			test_orig_h, test_curr_h, test_band_btm
+		])
+	else:
+		print("  [FAIL] PlatformView 200%% band height calculation failed!")
+		all_passed = false
 	plat_test.queue_free()
+
+	# TEST 4: ParkingBase Left-Border Removal Verification
+	print("\n--- TEST: ParkingBase StyleBox Left Border Removal ---")
+	var test_lvl: CarJamLevel = CarJamLevelScene.instantiate()
+	root.add_child(test_lvl)
+	if not test_lvl.is_node_ready():
+		test_lvl._ready()
+	var ldata: CarJamLevelData = ResourceLoader.load("res://levels/level_001.tres") as CarJamLevelData
+	test_lvl.controller.load_level(ldata)
+	test_lvl._setup_visuals(ldata)
+
+	var pbase = test_lvl.parking_slots_node.get_node_or_null("ParkingBase")
+	if pbase == null:
+		print("  [FAIL] ParkingBase node not found!")
+		all_passed = false
+	else:
+		print("  [PASS] ParkingBase node found in parking_slots_node")
+	test_lvl.queue_free()
 
 	print("\n=======================================================")
 	if all_passed:

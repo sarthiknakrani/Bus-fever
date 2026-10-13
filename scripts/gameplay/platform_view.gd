@@ -21,6 +21,23 @@ func setup_full(top_y: float, bottom_y: float, w: float, partition_y: float, sep
 	p_deck_w = deck_w
 	queue_redraw()
 
+func get_original_band_height() -> float:
+	if p_separator_y > -9000.0:
+		return maxf(0.0, p_separator_y - p_partition_y)
+	return 0.0
+
+func get_band_bottom_y() -> float:
+	var orig_h := get_original_band_height()
+	if orig_h > 0.0:
+		# 200% height: final height = 2.0 * original_height, extending downward only
+		return p_partition_y + (orig_h * 2.0)
+	elif p_separator_y > -9000.0:
+		return maxf(p_separator_y, p_partition_y)
+	return p_partition_y
+
+func get_current_band_height() -> float:
+	return get_band_bottom_y() - p_partition_y
+
 func _draw() -> void:
 	# 1. Authoritative materials matching passenger track & reference curbs
 	var color_track_grey := COLOR_TRACK_GREY
@@ -34,7 +51,7 @@ func _draw() -> void:
 	var gy: float = p_partition_y
 	var hw: float = p_width / 2.0
 	var sep_y: float = p_separator_y
-	var band_btm: float = maxf(sep_y, gy) if sep_y > -9000.0 else gy
+	var band_btm: float = get_band_bottom_y()
 
 	# 2. Continuous platform & separator polygon in authoritative track grey (#767786)
 	# Fills the raised platform deck, left/right slanted shoulders, and horizontal band down to separator line

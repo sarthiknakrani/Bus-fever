@@ -577,7 +577,7 @@ func _setup_visuals(lvl: CarJamLevelData) -> void:
 		var style = StyleBoxFlat.new()
 		style.bg_color = Color("767786") # Exact reference grey matching passenger road and platform
 		style.set_corner_radius_all(12)
-		style.border_width_left = 2
+		style.border_width_left = 0 # Targeted removal of unwanted left-side vertical border beside VIP slot
 		style.border_width_top = 2
 		style.border_width_right = 2
 		style.border_width_bottom = 2
