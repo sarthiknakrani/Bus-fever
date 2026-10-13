@@ -22,8 +22,15 @@ const CANONICAL_BODY_WIDTH_H: float = 46.0
 const CANONICAL_CANVAS_WIDTH: float = 62.0
 const CANONICAL_CANVAS_HEIGHT: float = 110.0
 
-# Authoritative visual scale factor (~15% reduction across all short buses)
+# Authoritative visual scale factor (~15% reduction across all short buses in parking)
 const BUS_VISUAL_SCALE: float = 0.85
+
+# Board bus cell-fit parameters (tightens spacing on board to 4-8px gap)
+const BOARD_BUS_TARGET_WIDTH: float = 74.0
+const BOARD_ANCHOR_SHIFT: float = 14.0
+
+var board_scale_factor: float = 1.0
+var board_anchor_offset: Vector2 = Vector2.ZERO
 
 # Rendered target dimensions across board, transit and parking
 const RENDERED_BODY_LENGTH: float = CANONICAL_BODY_LENGTH * BUS_VISUAL_SCALE # 86.7
@@ -77,6 +84,9 @@ func set_parking_mode(in_parking: bool) -> void:
 		_badge_node.visible = in_parking
 		if in_parking:
 			_badge_node.global_rotation = 0.0
+	if in_parking and _base_sprite != null:
+		_base_sprite.position = Vector2.ZERO
+		_base_sprite.scale = Vector2.ONE
 
 func _process(_delta: float) -> void:
 	if _badge_node != null and _badge_node.visible:
@@ -127,8 +137,9 @@ func _build_visuals() -> void:
 	else:
 		push_warning("VehicleView: Missing bus texture for %s %s %s" % [length_str, col_str, dir_str])
 	
-	# Center sprite on node's origin matching geometric center
+	# Add base sprite and apply tightened board cell-fitting and leading-edge anchor shift
 	add_child(_base_sprite)
+	_apply_bus_cell_fit()
 	
 	# Boarding Layer and Anchor
 	if not boarding_layer:
@@ -145,6 +156,25 @@ func _build_visuals() -> void:
 		boarding_anchor.get_parent().remove_child(boarding_anchor)
 	boarding_layer.add_child(boarding_anchor)
 	boarding_anchor.position = Vector2(0, 0)
+
+## Computes uniform scale so the bus occupies ~74px in its 78px cell (leaves ~4px parallel gap)
+## and anchors the bus front towards the leading edge along its escape direction.
+func _apply_bus_cell_fit() -> void:
+	if _base_sprite == null or _base_sprite.texture == null:
+		return
+	var tex_sz := _base_sprite.texture.get_size()
+	var shorter_dim: float = minf(tex_sz.x, tex_sz.y)
+	if shorter_dim <= 0.0:
+		return
+	board_scale_factor = BOARD_BUS_TARGET_WIDTH / shorter_dim
+	_base_sprite.scale = Vector2(board_scale_factor, board_scale_factor)
+
+	# Shift the bus sprite forward along its escape direction so its front
+	# sits close to the cell's exit edge, while the tail extends backward into the cell
+	var dir_vec := Vector2(CarJamVehicleData.dir_to_vector(vehicle_dir))
+	board_anchor_offset = dir_vec * BOARD_ANCHOR_SHIFT
+	_base_sprite.position = board_anchor_offset
+
 func _setup_touch_area() -> void:
 	if _touch_area != null: return
 	_touch_area = Area2D.new()
@@ -164,6 +194,8 @@ func _setup_touch_area() -> void:
 	rect_shape.size = Vector2(cells_w * CELL_SIZE * 0.92, cells_h * CELL_SIZE * 0.92)
 	
 	col_shape.shape = rect_shape
+	if _base_sprite != null:
+		col_shape.position = _base_sprite.position
 	_touch_area.add_child(col_shape)
 	_touch_area.input_event.connect(_on_touch_input)
 	add_child(_touch_area)

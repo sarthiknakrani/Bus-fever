@@ -13,9 +13,10 @@ func _init() -> void:
 	var SLOT_W = 53.0
 	var SLOT_H = 94.0
 
-	var RENDERED_L = CANONICAL_L * VehicleView.BUS_VISUAL_SCALE # 86.7
-	var RENDERED_W_V = CANONICAL_W_V * VehicleView.BUS_VISUAL_SCALE # 40.8
-	var RENDERED_W_H = CANONICAL_W_H * VehicleView.BUS_VISUAL_SCALE # 39.1
+	var BOARD_SCALE = VehicleView.BOARD_BUS_TARGET_WIDTH / VehicleView.CANONICAL_CANVAS_WIDTH # 74.0 / 62.0 ≈ 1.1935
+	var RENDERED_L = CANONICAL_L * BOARD_SCALE # 121.7
+	var RENDERED_W_V = CANONICAL_W_V * BOARD_SCALE # 57.3
+	var RENDERED_W_H = CANONICAL_W_H * BOARD_SCALE # 54.9
 
 	# SECTION 1: Source PNG Texture Asset Bounds & Proportional Aspect Ratios
 	print("\n--- 1. PROPORTIONAL TEXTURE ASSET & ASPECT RATIO QA (28 VARIANTS) ---")
@@ -132,10 +133,11 @@ func _init() -> void:
 		
 		var pv := VehicleView.new()
 		pv.setup(100 + i, "park_test", "red", d, 40, fp)
+		pv.set_parking_mode(true)
 		var rendered_sz = pv.get_rendered_parked_size()
 		var is_vert = (d == 0 or d == 1)
-		var body_w = RENDERED_W_V if is_vert else RENDERED_W_H
-		var body_l = RENDERED_L
+		var body_w = CANONICAL_W_V * VehicleView.BUS_VISUAL_SCALE if is_vert else CANONICAL_W_H * VehicleView.BUS_VISUAL_SCALE
+		var body_l = CANONICAL_L * VehicleView.BUS_VISUAL_SCALE
 		var side_margin = (SLOT_W - body_w) / 2.0
 		var end_margin = (SLOT_H - body_l) / 2.0
 		
@@ -162,9 +164,9 @@ func _init() -> void:
 		var vv: VehicleView = lvl_test.vehicle_views[vid]
 		var sf = lvl_test.world_root.scale.x
 		var g_scale_before = vv.global_scale / sf
-		assert(absf(g_scale_before.x - VehicleView.BUS_VISUAL_SCALE) < 0.02, "Bus global scale X on board is not 0.85")
-		assert(absf(g_scale_before.y - VehicleView.BUS_VISUAL_SCALE) < 0.02, "Bus global scale Y on board is not 0.85")
-	print("  [PASS] All vehicles on board have strictly uniform (0.85, 0.85) world scale.")
+		assert(absf(g_scale_before.x - 1.0) < 0.02, "Bus global scale X on board is not 1.0")
+		assert(absf(g_scale_before.y - 1.0) < 0.02, "Bus global scale Y on board is not 1.0")
+	print("  [PASS] All vehicles on board have strictly uniform (1.0, 1.0) world scale.")
 	lvl_test.queue_free()
 
 	print("\n===============================================================")
@@ -211,10 +213,11 @@ func _measure_level_buses(lvl: CarJamLevel, lvl_num: int, target_w_v: float, tar
 		var screen_axis_l = vv.global_transform.basis_xform(local_axis_l)
 		var screen_axis_w = vv.global_transform.basis_xform(local_axis_w)
 		
-		# Body dimension on screen is canon body pixels * basis length / world_root scale
+		# Body dimension on screen is canon body pixels * sprite scale * basis length / world_root scale
 		var sf = lvl.world_root.scale.x
-		var screen_l = canon_l * (screen_axis_l.length() / sf)
-		var screen_w = canon_w * (screen_axis_w.length() / sf)
+		var spr_s = vv._base_sprite.scale.x if vv._base_sprite != null else 1.0
+		var screen_l = canon_l * spr_s * (screen_axis_l.length() / sf)
+		var screen_w = canon_w * spr_s * (screen_axis_w.length() / sf)
 		
 		var l_dev = absf(screen_l - target_l) / target_l * 100.0
 		var w_dev = absf(screen_w - target_w) / target_w * 100.0

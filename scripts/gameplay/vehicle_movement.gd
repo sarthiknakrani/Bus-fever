@@ -141,6 +141,15 @@ static func animate_dispatch(
 	tw.tween_method(curve_callable, 0.0, 1.0, duration) \
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
+	# Smoothly transition _base_sprite from board anchor offset & board scale to centered parking
+	if vehicle_node.get("_base_sprite") != null and vehicle_node._base_sprite != null:
+		var spr: Sprite2D = vehicle_node._base_sprite
+		var tw_spr := vehicle_node.create_tween()
+		tw_spr.set_parallel(true)
+		tw_spr.tween_property(spr, "position", Vector2.ZERO, duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tw_spr.tween_property(spr, "scale", Vector2.ONE, duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+
 	var lambda_func := func(v_node, t_scale, ctrl, v_id, s_id, tok, t_start_sec):
 		var t_arrival_end: float = Time.get_ticks_msec() / 1000.0
 		print("[QA] Bus %d ARRIVAL COMPLETE at %.3f (Actual: %.3fs | Target: %.2fs)" % [
@@ -168,6 +177,9 @@ static func animate_dispatch(
 			v_node.rotation = final_rot_target
 			v_node.position = slot_pos
 			v_node.scale = t_scale
+			if v_node.get("_base_sprite") != null and v_node._base_sprite != null:
+				v_node._base_sprite.position = Vector2.ZERO
+				v_node._base_sprite.scale = Vector2.ONE
 		ctrl.on_vehicle_arrived_at_slot(v_id, s_id, tok)
 
 	tw.tween_callback(lambda_func.bind(

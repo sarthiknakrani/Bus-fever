@@ -602,10 +602,9 @@ func _setup_visuals(lvl: CarJamLevelData) -> void:
 		vv.setup(vd.id, vd.code, vd.color_id, vd.direction, vd.capacity, vd.footprint)
 		var center_offset = _calc_footprint_center_offset(vd.footprint)
 		vv.position = _cell_to_board_local(vd.anchor, lvl.board_size) + center_offset
-		# Compensate board_root's 0.72 Y-scaling so buses render at uniform BUS_VISUAL_SCALE (0.85) global scale
-		# across all orientations (eliminates the 28% size difference between vertical and horizontal buses)
+		# Compensate board_root's 0.72 Y-scaling so buses render with square aspect ratio across all orientations
 		var board_scale_y = board_root.scale.y if board_root != null and board_root.scale.y != 0.0 else 0.72
-		vv.scale = Vector2(VehicleView.BUS_VISUAL_SCALE, VehicleView.BUS_VISUAL_SCALE / board_scale_y)
+		vv.scale = Vector2(1.0, 1.0 / board_scale_y)
 		vv.tapped.connect(_on_vehicle_tapped)
 		vehicle_layer.add_child(vv)
 		vehicle_views[vd.id] = vv
