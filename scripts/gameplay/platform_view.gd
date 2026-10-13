@@ -53,29 +53,19 @@ func _draw() -> void:
 	var sep_y: float = p_separator_y
 	var band_btm: float = get_band_bottom_y()
 
-	# 2. Continuous platform & separator polygon in authoritative track grey (#767786)
-	# Fills the raised platform deck, left/right slanted shoulders, and horizontal band down to separator line
+	# 2. Continuous unified grey platform polygon in authoritative track grey (#767786)
+	# Fills the raised platform deck, left/right slanted shoulders, and entire lower platform region
 	var platform_poly = PackedVector2Array([
-		Vector2(-hw, band_btm),
+		Vector2(-hw, p_bottom),
 		Vector2(-hw, gy),
 		Vector2(-hill_w / 2.0 - slope_w, gy),
 		Vector2(-hill_w / 2.0, p_top),
 		Vector2(hill_w / 2.0, p_top),
 		Vector2(hill_w / 2.0 + slope_w, gy),
 		Vector2(hw, gy),
-		Vector2(hw, band_btm)
+		Vector2(hw, p_bottom)
 	])
 	draw_colored_polygon(platform_poly, color_track_grey)
-
-	# 3. Lower bus-playfield polygon in Swatch 1 light lavender (#D2D5E4) below separator line
-	if p_bottom > band_btm:
-		var playfield_poly = PackedVector2Array([
-			Vector2(-hw, band_btm),
-			Vector2(hw, band_btm),
-			Vector2(hw, p_bottom),
-			Vector2(-hw, p_bottom)
-		])
-		draw_colored_polygon(playfield_poly, color_playfield)
 
 	# 4. Clean 3D curb outlining the platform perimeter with open central gateway for seamless road flow
 	var x_gate: float = 110.0

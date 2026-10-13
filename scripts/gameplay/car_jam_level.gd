@@ -2024,7 +2024,7 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 	var required_w = maxf(maxf(parking_w, board_padded_w), track_system_w)
 	
 	# Minimum essential dimensions for upper and lower screen halves
-	var min_gap_tp = 60.0
+	var min_gap_tp = 24.0 # Tightened gap to bring parking platform close to passenger track
 	var min_corridor = 40.0
 	var essential_upper_h = track_h + min_gap_tp + parking_h + min_corridor
 	
@@ -2049,16 +2049,16 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 	var top_safe_y = -half_h + (110.0 / scale_factor)
 	var btm_safe_y = half_h - (140.0 / scale_factor)
 
-	# Distribute extra upper space gracefully above separator line
+	# Distribute extra upper space gracefully, keeping track and parking tightly connected
 	var avail_upper_h = -top_safe_y
 	var extra_upper_h = maxf(0.0, avail_upper_h - essential_upper_h)
-	var gap_tp = clampf(min_gap_tp + extra_upper_h * 0.40, 60.0, 95.0)
-	var corridor_to_sep = clampf(min_corridor + extra_upper_h * 0.35, 40.0, 75.0)
+	var gap_tp = clampf(min_gap_tp + extra_upper_h * 0.05, 24.0, 30.0)
 
-	# Position upper elements strictly above separator line (y < 0.0)
-	var parking_bottom = -corridor_to_sep
-	var parking_y = parking_bottom - (parking_h / 2.0)
-	var track_y = parking_y - (parking_h / 2.0) - gap_tp - (track_h / 2.0)
+	# Position upper elements tightly: track anchored comfortably at top, parking platform moved upward
+	var top_pad = 15.0 + extra_upper_h * 0.25
+	var track_y = top_safe_y + top_pad + (track_h / 2.0)
+	var parking_y = track_y + (track_h / 2.0) + gap_tp + (parking_h / 2.0)
+	var parking_bottom = parking_y + (parking_h / 2.0)
 
 	# Distribute extra lower space gracefully below separator line
 	var avail_lower_h = btm_safe_y
