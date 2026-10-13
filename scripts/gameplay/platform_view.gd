@@ -80,7 +80,6 @@ func _draw() -> void:
 	# 4. Clean 3D curb outlining the platform perimeter with open central gateway for seamless road flow
 	var x_gate: float = 110.0
 	var left_edge = PackedVector2Array([
-		Vector2(-hw, gy),
 		Vector2(-hill_w / 2.0 - slope_w, gy),
 		Vector2(-hill_w / 2.0, p_top),
 		Vector2(-x_gate, p_top)
@@ -88,17 +87,10 @@ func _draw() -> void:
 	var right_edge = PackedVector2Array([
 		Vector2(x_gate, p_top),
 		Vector2(hill_w / 2.0, p_top),
-		Vector2(hill_w / 2.0 + slope_w, gy),
-		Vector2(hw, gy)
+		Vector2(hill_w / 2.0 + slope_w, gy)
 	])
 
 	for edge in [left_edge, right_edge]:
 		draw_polyline(edge, curb_shadow, 4.0, true)
 		draw_polyline(edge, curb_deep, 2.5, true)
 		draw_polyline(edge, curb_highlight, 1.5, true)
-
-	# 5. Authoritative Road Divider / Separator line (exact vertical center on sep_y)
-	if sep_y > -9000.0:
-		draw_rect(Rect2(-hw, sep_y - 3.25, p_width, 2.5), curb_shadow)
-		draw_rect(Rect2(-hw, sep_y - 0.75, p_width, 2.0), curb_deep)
-		draw_rect(Rect2(-hw, sep_y + 1.25, p_width, 2.0), curb_highlight)
