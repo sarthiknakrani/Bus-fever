@@ -26,8 +26,15 @@ const CANONICAL_CANVAS_HEIGHT: float = 110.0
 const BUS_VISUAL_SCALE: float = 0.85
 
 # Board bus cell-fit parameters (tightens spacing on board to 4-8px gap)
+# BOARD_BUS_TARGET_WIDTH is the target visible body WIDTH in board-local px.
+# Using the canonical visible body short-side width (48 V / 46 H) as the
+# reference dimension gives scale ~ 74/48 = 1.54 for UP/DOWN buses, so adjacent
+# parallel buses leave ~4 px on-screen clearance within the 78 px cell.
+# BOARD_ANCHOR_SHIFT reduced from 14→8 to prevent cross-cluster divergence gaps:
+# buses facing different directions (e.g. LEFT vs UP) would otherwise be pushed
+# ~23 px apart in screen space by their opposing anchor shifts.
 const BOARD_BUS_TARGET_WIDTH: float = 74.0
-const BOARD_ANCHOR_SHIFT: float = 14.0
+const BOARD_ANCHOR_SHIFT: float = 8.0
 
 var board_scale_factor: float = 1.0
 var board_anchor_offset: Vector2 = Vector2.ZERO
@@ -157,16 +164,23 @@ func _build_visuals() -> void:
 	boarding_layer.add_child(boarding_anchor)
 	boarding_anchor.position = Vector2(0, 0)
 
-## Computes uniform scale so the bus occupies ~74px in its 78px cell (leaves ~4px parallel gap)
-## and anchors the bus front towards the leading edge along its escape direction.
+## Computes uniform scale so the bus visible body occupies ~74px of the 78px cell
+## (leaves ~4px gap between parallel neighbors) and anchors the bus front towards
+## the leading edge along its escape direction.
+## Uses the canonical visible body width (not the canvas dimension, which includes
+## ~7px of transparent padding on each side) to avoid undersizing the bus on board.
 func _apply_bus_cell_fit() -> void:
 	if _base_sprite == null or _base_sprite.texture == null:
 		return
-	var tex_sz := _base_sprite.texture.get_size()
-	var shorter_dim: float = minf(tex_sz.x, tex_sz.y)
-	if shorter_dim <= 0.0:
+	# Use CANONICAL visible body short-side width as the reference dimension:
+	# UP / DOWN buses: visible width = CANONICAL_BODY_WIDTH_V (48 px)
+	# LEFT / RIGHT buses: visible width = CANONICAL_BODY_WIDTH_H (46 px)
+	var is_vertical: bool = (vehicle_dir == CarJamVehicleData.Direction.UP or
+			vehicle_dir == CarJamVehicleData.Direction.DOWN)
+	var visible_short_dim: float = CANONICAL_BODY_WIDTH_V if is_vertical else CANONICAL_BODY_WIDTH_H
+	if visible_short_dim <= 0.0:
 		return
-	board_scale_factor = BOARD_BUS_TARGET_WIDTH / shorter_dim
+	board_scale_factor = BOARD_BUS_TARGET_WIDTH / visible_short_dim
 	_base_sprite.scale = Vector2(board_scale_factor, board_scale_factor)
 
 	# Shift the bus sprite forward along its escape direction so its front
@@ -174,6 +188,7 @@ func _apply_bus_cell_fit() -> void:
 	var dir_vec := Vector2(CarJamVehicleData.dir_to_vector(vehicle_dir))
 	board_anchor_offset = dir_vec * BOARD_ANCHOR_SHIFT
 	_base_sprite.position = board_anchor_offset
+
 
 func _setup_touch_area() -> void:
 	if _touch_area != null: return
