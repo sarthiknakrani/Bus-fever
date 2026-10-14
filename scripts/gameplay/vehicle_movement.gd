@@ -187,10 +187,13 @@ static func animate_departure(
 	var reverse_pos: Vector2 = slot_pos + Vector2(0.0, 115.0).rotated(slot_rotation)
 
 	var curve := Curve2D.new()
-	var vp_rect := vehicle_node.get_viewport_rect()
-	var global_right_x := (vp_rect.size.x / 2.0) + 400.0
+	var vp_width: float = 720.0
+	if vehicle_node.is_inside_tree() and vehicle_node.get_viewport() != null:
+		vp_width = vehicle_node.get_viewport_rect().size.x
+	var global_right_x := (vp_width / 2.0) + 400.0
 	var exit_global := Vector2(global_right_x, 0.0)
-	var exit_local: Vector2 = vehicle_node.get_parent().get_global_transform().affine_inverse() * exit_global
+	var parent_node = vehicle_node.get_parent()
+	var exit_local: Vector2 = parent_node.get_global_transform().affine_inverse() * exit_global if parent_node != null else exit_global
 
 	var final_target := Vector2(exit_local.x, reverse_pos.y)
 	curve.add_point(reverse_pos, Vector2.ZERO, Vector2(80.0, 0.0))

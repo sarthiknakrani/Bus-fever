@@ -23,15 +23,18 @@ extern "C" {
 EOF
 fi
 
+xattr -cr "$PROJECT_DIR/build" 2>/dev/null || true
+
 echo "=== Building Xcode project for iPhone 18 Pro Simulator ==="
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild \
   -project "$PROJECT_DIR/build/ios/BusFeverParty.xcodeproj" \
   -scheme BusFeverParty \
   -destination "id=$SIM_ID" \
   -configuration Debug \
+  -derivedDataPath "$PROJECT_DIR/build/derived_data" \
   build
 
-APP_PATH="/Users/nakranisarthikashokbhai/Library/Developer/Xcode/DerivedData/BusFeverParty-fywsuvuvgfqlsgefeljhwxfaeyzr/Build/Products/Debug-iphonesimulator/BusFeverParty.app"
+APP_PATH="$PROJECT_DIR/build/derived_data/Build/Products/Debug-iphonesimulator/BusFeverParty.app"
 
 echo "=== Ensuring Simulator is Booted ==="
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcrun simctl boot "$SIM_ID" 2>/dev/null || true

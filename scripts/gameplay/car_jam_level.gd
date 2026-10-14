@@ -15,6 +15,7 @@ const FUNNEL_Y: float = 315.0
 
 # Colors
 const COLOR_WORLD_BG := Color("d2d5e4") # Authoritative background fill sampled directly from swatch 1 (#D2D5E4)
+const COLOR_GARDEN_BG := Color("69a827") # Lush vibrant green garden background matching track center opening
 
 # Hierarchy Nodes
 var world_root: Node2D
@@ -81,12 +82,12 @@ class PassengerRow extends RefCounted:
 	var is_feeder: bool = false
 	var passengers: Array[Dictionary] = [] # {"id": int, "color_id": String, "lane": int, "view": PassengerView, "state": String}
 
-const LANE_SPACING := 19.5
-const ROW_SPACING := 23.0
-const MIN_ROW_GAP := 19.0
+const LANE_SPACING := 25.0
+const ROW_SPACING := 37.0
+const MIN_ROW_GAP := 36.5
 const NUM_LANES := 4
-const PASSENGER_SPACING := 23.0
-const MAX_INITIAL_LOOP_PASSENGERS := 152
+const PASSENGER_SPACING := 25.0
+const MAX_INITIAL_LOOP_PASSENGERS := 124
 
 var passenger_track: Path2D
 var feeder_track: Path2D
@@ -97,6 +98,7 @@ var _pending_feeder_passengers: Array[Dictionary] = []
 var _circulating_rows: Array[PassengerRow] = []
 var _feeder_rows: Array[PassengerRow] = []
 var _pending_feeder_rows: Array[PassengerRow] = []
+var _lead_feeder_committed: bool = false
 var _speed_logged: bool = false
 var slot_boarding_points: Dictionary = {}
 var _platform_start_prog: float = 160.0
@@ -176,28 +178,34 @@ func _process(delta: float) -> void:
 				_feeder_rows.append(next_row)
 				
 		# B. Advance feeder rows forward towards stop line / row ahead
-		var feeder_stop_pos: float = f_len - 80.0
+		var feeder_stop_pos: float = f_len - 190.0
 		for j in range(_feeder_rows.size()):
 			var f_row = _feeder_rows[j]
 			var max_prog: float = feeder_stop_pos
 			if j == 0:
-				if f_row.progress < feeder_stop_pos:
-					if _oval_freed_capacity >= f_row.passengers.size():
-						var junction_clear := true
-						for cr in _circulating_rows:
-							var d = cr.progress - _merge_prog
-							if d < 0.0: d += track_len
-							if (track_len - d) < 160.0 or d < 50.0:
-								junction_clear = false
-								break
-						if junction_clear:
-							max_prog = f_len
+				if not _lead_feeder_committed:
+					if f_row.progress >= feeder_stop_pos - 0.5:
+						# Lead row is at the stop line; check if freed capacity exists and merge window is open
+						if _oval_freed_capacity >= f_row.passengers.size():
+							var junction_clear := true
+							for cr in _circulating_rows:
+								var d = cr.progress - _merge_prog
+								if d < 0.0: d += track_len
+								# Hold if an oncoming circulating row is within the approach window or merge buffer
+								if (track_len - d) < 190.0 or d < 45.0:
+									junction_clear = false
+									break
+							if junction_clear:
+								_lead_feeder_committed = true
+								max_prog = f_len
+							else:
+								max_prog = feeder_stop_pos
 						else:
 							max_prog = feeder_stop_pos
 					else:
 						max_prog = feeder_stop_pos
 				else:
-					# Once committed past feeder_stop_pos, continue smoothly to f_len without mid-junction pause
+					# Committed to merge: proceed continuously to f_len
 					max_prog = f_len
 				var dist_ahead: float = max_prog - f_row.progress
 				var dist_moved: float = passenger_normal_speed * delta
@@ -236,6 +244,7 @@ func _process(delta: float) -> void:
 						break
 				if merge_clear:
 					_feeder_rows.pop_front()
+					_lead_feeder_committed = false
 					lead_row.progress = _merge_prog
 					lead_row.is_feeder = false
 					for p in lead_row.passengers:
@@ -252,7 +261,7 @@ func _process(delta: float) -> void:
 		# D. Update positions of passengers in active feeder rows
 		for f_row in _feeder_rows:
 			var f_pt_info = _get_curve_point_and_normal(feeder_track.curve, f_row.progress, false)
-			var is_row_stopped: bool = f_row.progress >= feeder_stop_pos - 0.5 and _oval_freed_capacity < f_row.passengers.size()
+			var is_row_stopped: bool = f_row.progress >= feeder_stop_pos - 0.5 and not _lead_feeder_committed
 			for p in f_row.passengers:
 				if p["state"] == "FEEDER" and is_instance_valid(p.get("view")):
 					var lpos = _calc_lane_pos(f_pt_info["pos"], f_pt_info["normal"], p["lane"])
@@ -382,7 +391,7 @@ func _build_scene_hierarchy() -> void:
 	var bg_layer := CanvasLayer.new()
 	bg_layer.layer = -1
 	var bg := ColorRect.new()
-	bg.color = COLOR_WORLD_BG # Exact authoritative color sampled from swatch 1 (#D2D5E4)
+	bg.color = COLOR_GARDEN_BG # Lush vibrant green garden background matching track center opening
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bg_layer.add_child(bg)
@@ -562,6 +571,7 @@ func _setup_visuals(lvl: CarJamLevelData) -> void:
 	_circulating_rows.clear()
 	_feeder_rows.clear()
 	_pending_feeder_rows.clear()
+	_lead_feeder_committed = false
 	if is_instance_valid(passenger_track):
 		passenger_track.queue_free()
 		passenger_track = null
@@ -740,8 +750,8 @@ func _init_passenger_track() -> void:
 	feeder_track = Path2D.new()
 	feeder_track.name = "FeederTrack"
 	var f_curve := Curve2D.new()
-	# Point 0 (top-right offscreen): Vector2(265, -260), out = Vector2(-10, 90)
-	f_curve.add_point(Vector2(265, -260), Vector2.ZERO, Vector2(-10, 90))
+	# Point 0 (top-right offscreen): default -520 px well above screen top
+	f_curve.add_point(Vector2(335, -520), Vector2.ZERO, Vector2(-15, 120))
 	# Point 1 (upper-right behind pause button): Vector2(245, -110), in = Vector2(15, -65), out = Vector2(-20, 65)
 	f_curve.add_point(Vector2(245, -110), Vector2(15, -65), Vector2(-20, 65))
 	# Point 2 (approaching lower-right arc): Vector2(215, 25), in = Vector2(20, -45), out = Vector2(-25, 35)
@@ -804,6 +814,7 @@ func _init_passenger_track() -> void:
 	_circulating_rows.clear()
 	_feeder_rows.clear()
 	_pending_feeder_rows.clear()
+	_lead_feeder_committed = false
 
 	# Universal authoritative source: prefer the wave-plan-driven
 	# PassengerSequence. The legacy mixed RNG generator is only used as a
@@ -861,7 +872,7 @@ func _init_passenger_track() -> void:
 
 	# Remaining rows form a separate dense waiting queue on feeder cross-track
 	var f_len = feeder_track.curve.get_baked_length()
-	var feeder_stop_pos: float = f_len - 80.0 # Queue stop line rests 80px before junction, completely clear of oval
+	var feeder_stop_pos: float = f_len - 190.0 # Queue stop line rests 190px before junction, completely clear of oval
 	for r in range(initial_rows_count, all_rows.size()):
 		var row = all_rows[r]
 		var feeder_idx = r - initial_rows_count
@@ -2296,10 +2307,34 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 		var track_bottom_y = track_y + 197.0
 		platform_bg.setup_full(plat_top, local_bottom, full_w, partition_y, separator_y, deck_w, visible_w, track_bottom_y, parking_y, parking_h)
 
+	# Responsive Feeder Track Extension:
+	# Calculate the top-right offscreen coordinate in passenger_track_root's local space
+	var top_local_y: float = -half_h - track_y
+	var feeder_top_y: float = top_local_y - 120.0
+	var feeder_top_x: float = 245.0 + (-110.0 - feeder_top_y) * 0.22
+	_update_feeder_curve(Vector2(feeder_top_x, feeder_top_y))
+
 	if passenger_track_bg != null:
 		var tr = passenger_track_bg.get_node_or_null("TrackRenderer") as CarJamTrackRenderer
 		if tr != null:
 			tr.plat_top_local = 197.0
+			tr.queue_redraw()
+
+func _update_feeder_curve(p0: Vector2) -> void:
+	if feeder_track == null:
+		return
+	var f_curve := Curve2D.new()
+	var out_handle_len := (Vector2(245, -110) - p0).length() * 0.45
+	var out_dir := (Vector2(245, -110) - p0).normalized()
+	f_curve.add_point(p0, Vector2.ZERO, out_dir * out_handle_len)
+	f_curve.add_point(Vector2(245, -110), Vector2(15, -65), Vector2(-20, 65))
+	f_curve.add_point(Vector2(215, 25), Vector2(20, -45), Vector2(-25, 35))
+	f_curve.add_point(Vector2(185, 75), Vector2(25, -30), Vector2.ZERO)
+	feeder_track.curve = f_curve
+	if passenger_track_bg != null:
+		var tr = passenger_track_bg.get_node_or_null("TrackRenderer") as CarJamTrackRenderer
+		if tr != null:
+			tr.feeder_curve = f_curve
 			tr.queue_redraw()
 
 
