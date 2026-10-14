@@ -12,13 +12,16 @@ var p_visible_w: float = 0.0
 var p_track_bottom_y: float = -9999.0
 var p_parking_y: float = -9999.0
 var p_parking_h: float = 94.0
-var p_straight_x: float = 155.0
+var p_straight_x: float = 105.0
+
+const GATEWAY_HALF_WIDTH: float = 95.0
 
 # Authoritative source-of-truth track grey matching passenger track & connector
 const COLOR_TRACK_GREY := Color("767786")
 const COLOR_ROAD := Color("767786")
 const COLOR_CURB_HIGHLIGHT := Color("f8fafc")
 const COLOR_CURB_BEVEL := Color("a5abc2")
+const COLOR_CURB_BEVEL_OUTER := Color("949ab1")
 const COLOR_SHADOW := Color(0.0, 0.0, 0.0, 0.12)
 const COLOR_PLAYFIELD := Color("d2d5e4") # Swatch 1 light lavender playfield
 
@@ -90,6 +93,7 @@ func _draw() -> void:
 	var color_playfield := COLOR_PLAYFIELD
 	var curb_highlight := COLOR_CURB_HIGHLIGHT
 	var curb_bevel := COLOR_CURB_BEVEL
+	var curb_bevel_outer := COLOR_CURB_BEVEL_OUTER
 	var color_shadow := COLOR_SHADOW
 
 	var plat_btm: float = get_band_bottom_y()
@@ -106,51 +110,51 @@ func _draw() -> void:
 		])
 		draw_colored_polygon(playfield_poly, color_playfield)
 
-	# 2. Unified station road platform (#767786)
+	# 2. Flared Trapezoidal Parking Platform with flat top edge and rounded shoulder corners
 	var top_connect_y: float = p_track_bottom_y if p_track_bottom_y > -9000.0 else p_top
-	# 1px overlap upwards to eliminate any subpixel raster gap with TrackRenderer
-	var top_y: float = top_connect_y - 1.0
+	var top_y: float = top_connect_y
 
-	var straight_x: float = p_straight_x # 155.0
-	var shoulder_bottom_y: float = (p_parking_y + (p_parking_h * 0.25)) if p_parking_y > -9000.0 else (top_y + (plat_btm - top_y) * 0.5)
+	var gate_hw: float = GATEWAY_HALF_WIDTH # 95.0
+	var top_shoulder_x: float = hw * 0.76
+	var shoulder_bottom_y: float = (p_parking_y + (p_parking_h * 0.35)) if p_parking_y > -9000.0 else (top_y + (plat_btm - top_y) * 0.5)
+	shoulder_bottom_y = clampf(shoulder_bottom_y, top_y + 15.0, plat_btm - 10.0)
 
-	# Ensure shoulder_bottom_y is strictly between top_y and plat_btm
-	shoulder_bottom_y = clampf(shoulder_bottom_y, top_y + 10.0, plat_btm - 10.0)
-
-	var segments: int = 16
-
-	# Quadratic Bezier for right shoulder: P0=(straight_x, top_y), P1=(hw, top_y), P2=(hw, shoulder_bottom_y)
-	var p0_r := Vector2(straight_x, top_y)
-	var p1_r := Vector2(hw, top_y)
-	var p2_r := Vector2(hw, shoulder_bottom_y)
-	var right_shoulder := PackedVector2Array()
-	for i in range(segments + 1):
-		var t: float = float(i) / float(segments)
+	var segs: int = 8
+	# Right shoulder corner arc (corner_radius = 24.0, 8 segments)
+	# Connects flat top edge at (top_shoulder_x - 12.0, top_y) to straight diagonal wall at (top_shoulder_x, top_y + 12.0)
+	var p0_r := Vector2(top_shoulder_x - 12.0, top_y)
+	var p1_r := Vector2(top_shoulder_x, top_y)
+	var p2_r := Vector2(top_shoulder_x, top_y + 12.0)
+	var right_corner := PackedVector2Array()
+	for i in range(1, segs + 1):
+		var t: float = float(i) / float(segs)
 		var omt: float = 1.0 - t
-		right_shoulder.append(omt * omt * p0_r + 2.0 * omt * t * p1_r + t * t * p2_r)
+		right_corner.append(omt * omt * p0_r + 2.0 * omt * t * p1_r + t * t * p2_r)
 
-	# Quadratic Bezier for left shoulder: P0=(-straight_x, top_y), P1=(-hw, top_y), P2=(-hw, shoulder_bottom_y)
-	var p0_l := Vector2(-straight_x, top_y)
-	var p1_l := Vector2(-hw, top_y)
-	var p2_l := Vector2(-hw, shoulder_bottom_y)
-	var left_shoulder := PackedVector2Array()
-	for i in range(segments + 1):
-		var t: float = float(i) / float(segments)
+	# Left shoulder corner arc
+	var p0_l := Vector2(-top_shoulder_x + 12.0, top_y)
+	var p1_l := Vector2(-top_shoulder_x, top_y)
+	var p2_l := Vector2(-top_shoulder_x, top_y + 12.0)
+	var left_corner := PackedVector2Array()
+	for i in range(1, segs + 1):
+		var t: float = float(i) / float(segs)
 		var omt: float = 1.0 - t
-		left_shoulder.append(omt * omt * p0_l + 2.0 * omt * t * p1_l + t * t * p2_l)
+		left_corner.append(omt * omt * p0_l + 2.0 * omt * t * p1_l + t * t * p2_l)
 
-	# Build unified station polygon
+	# Build station polygon
 	var station_poly := PackedVector2Array()
-	station_poly.append(Vector2(-straight_x, top_y))
-	station_poly.append(Vector2(straight_x, top_y))
-	for i in range(1, segments + 1):
-		station_poly.append(right_shoulder[i])
+	station_poly.append(Vector2(-gate_hw, top_y))
+	station_poly.append(Vector2(gate_hw, top_y))
+	station_poly.append(Vector2(top_shoulder_x - 12.0, top_y))
+	for pt in right_corner:
+		station_poly.append(pt)
 	station_poly.append(Vector2(fill_hw, shoulder_bottom_y))
 	station_poly.append(Vector2(fill_hw, plat_btm))
 	station_poly.append(Vector2(-fill_hw, plat_btm))
 	station_poly.append(Vector2(-fill_hw, shoulder_bottom_y))
-	for i in range(segments, 0, -1):
-		station_poly.append(left_shoulder[i])
+	for i in range(left_corner.size() - 1, -1, -1):
+		station_poly.append(left_corner[i])
+	station_poly.append(Vector2(-top_shoulder_x + 12.0, top_y))
 
 	draw_colored_polygon(station_poly, color_track_grey)
 
@@ -164,12 +168,32 @@ func _draw() -> void:
 	draw_line(btm_left, btm_right, curb_bevel, 3.5)
 	draw_line(btm_left, btm_right, curb_highlight, 2.0)
 
-	# 4. Top curved shoulders: 2-layer curb (bevel 3.5 px + highlight 2.0 px)
-	draw_polyline(left_shoulder, curb_bevel, 3.5, true)
-	draw_polyline(left_shoulder, curb_highlight, 2.0, true)
+	# 4. 3D outer curbs along flat top edges, rounded corners, and diagonal side walls
+	# Right outer curb: from throat opening (+gate_hw, top_y) outward and down to (fill_hw, shoulder_bottom_y)
+	var right_curb := PackedVector2Array()
+	right_curb.append(Vector2(gate_hw, top_y))
+	right_curb.append(Vector2(top_shoulder_x - 12.0, top_y))
+	for pt in right_corner:
+		right_curb.append(pt)
+	right_curb.append(Vector2(fill_hw, shoulder_bottom_y))
 
-	draw_polyline(right_shoulder, curb_bevel, 3.5, true)
-	draw_polyline(right_shoulder, curb_highlight, 2.0, true)
+	# Left outer curb: from throat opening (-gate_hw, top_y) outward and down to (-fill_hw, shoulder_bottom_y)
+	var left_curb := PackedVector2Array()
+	left_curb.append(Vector2(-gate_hw, top_y))
+	left_curb.append(Vector2(-top_shoulder_x + 12.0, top_y))
+	for pt in left_corner:
+		left_curb.append(pt)
+	left_curb.append(Vector2(-fill_hw, shoulder_bottom_y))
+
+	# 3D outer curb: 6.0px outer bevel (#949AB1), 3.5px inner bevel (#A5ABC2), 2.2px crisp white top highlight (#F8FAFC)
+	# (Does NOT draw across the [-GATEWAY_HALF_WIDTH, +GATEWAY_HALF_WIDTH] throat opening)
+	draw_polyline(right_curb, curb_bevel_outer, 6.0, true)
+	draw_polyline(right_curb, curb_bevel, 3.5, true)
+	draw_polyline(right_curb, curb_highlight, 2.2, true)
+
+	draw_polyline(left_curb, curb_bevel_outer, 6.0, true)
+	draw_polyline(left_curb, curb_bevel, 3.5, true)
+	draw_polyline(left_curb, curb_highlight, 2.2, true)
 
 func draw_parking_strip(_top_y: float, _bottom_y: float, _w: float) -> void:
 	pass

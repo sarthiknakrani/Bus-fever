@@ -10,8 +10,8 @@ var feeder_curve: Curve2D
 var plat_top_local: float = 245.0
 
 # Authoritative geometry constants
-const ROAD_HALF_WIDTH: float = 65.0
-const GATEWAY_HALF_WIDTH: float = 110.0 # ~220px gateway opening (~33% of 670px outer track width)
+const ROAD_HALF_WIDTH: float = 62.0
+const GATEWAY_HALF_WIDTH: float = 95.0 # ±95px gateway throat opening
 
 # Authoritative reference colors
 const COLOR_ROAD := Color("767786") # Muted slate grey matching reference (#767786 / #747584)
@@ -24,16 +24,16 @@ func _draw() -> void:
 		return
 
 	# Oval dimensions derived from authoritative curve geometry
-	# Centerline: left arc center (-155, 0), right arc center (155, 0), radius R=115
-	var straight_x: float = 155.0
+	# Centerline: left arc center (-105, 0), right arc center (105, 0), radius R=115
+	var straight_x: float = 105.0
 	var r_center: float = 115.0
 	var c_left := Vector2(-straight_x, 0.0)
 	var c_right := Vector2(straight_x, 0.0)
-	var r_outer: float = r_center + ROAD_HALF_WIDTH # 180.0
-	var r_inner: float = r_center - ROAD_HALF_WIDTH # 50.0
+	var r_outer: float = r_center + ROAD_HALF_WIDTH # 177.0
+	var r_inner: float = r_center - ROAD_HALF_WIDTH # 53.0
 	var w: float = ROAD_HALF_WIDTH
 	var x_gate: float = GATEWAY_HALF_WIDTH
-	var plat_y: float = maxf(plat_top_local, r_outer + 20.0)
+	var plat_y: float = r_outer + 20.0 # 197.0 in track-local coordinates
 
 	var n_arc: int = 48
 
@@ -94,6 +94,17 @@ func _draw() -> void:
 		curb_inner.append(c_right + Vector2(cos(ang), sin(ang)) * r_inner)
 	curb_inner.append(Vector2(straight_x, -r_inner)) # Closed
 
+	# Inner hole top-arch 3D depth bevel lip (casts downward inside the hole)
+	var inner_top_lip = PackedVector2Array()
+	for i in range(1, n_arc / 2):
+		var ang = 0.0 - (float(i) / float(n_arc / 2)) * (PI / 2.0)
+		inner_top_lip.append(c_right + Vector2(cos(ang), sin(ang)) * r_inner + Vector2(0, 4.0))
+	inner_top_lip.append(Vector2(straight_x, -r_inner + 4.0))
+	inner_top_lip.append(Vector2(-straight_x, -r_inner + 4.0))
+	for i in range(1, n_arc / 2):
+		var ang = -PI / 2.0 - (float(i) / float(n_arc / 2)) * (PI / 2.0)
+		inner_top_lip.append(c_left + Vector2(cos(ang), sin(ang)) * r_inner + Vector2(0, 4.0))
+
 	# Inner hole top-arch shadow (casts downward onto sky blue)
 	var s_inner_top = PackedVector2Array()
 	for i in range(1, n_arc / 2):
@@ -106,12 +117,14 @@ func _draw() -> void:
 		s_inner_top.append(c_right + Vector2(cos(ang), sin(ang)) * r_inner + Vector2(0, 3))
 
 	# -----------------------------------------------------------------
-	# 3. OUTER CURBS (Left side & Right side, with Gateway opening)
+	# 3. OUTER CURBS (Left side & Right side, with Gateway throat opening)
 	# -----------------------------------------------------------------
 	var steps_to_inner = max(1, int(abs(inner_meet_ang - (-PI / 2.0)) / (PI / float(n_arc))))
 
-	# Left outer curb: from left bottom straight end around to feeder inner
+	# Left outer curb: from gateway throat (-x_gate, plat_y) up to (-x_gate, r_outer), then out to (-straight_x, r_outer), around to feeder inner
 	var curb_left = PackedVector2Array()
+	curb_left.append(Vector2(-x_gate, plat_y))
+	curb_left.append(Vector2(-x_gate, r_outer))
 	curb_left.append(Vector2(-straight_x, r_outer))
 	for i in range(1, n_arc):
 		var ang = PI / 2.0 + (float(i) / float(n_arc)) * PI
@@ -127,7 +140,7 @@ func _draw() -> void:
 		for i in range(inner_meet_idx - 1, -1, -1):
 			curb_left.append(f_inner[i])
 
-	# Right outer curb: from feeder outer down around right arc to right bottom straight end
+	# Right outer curb: from feeder outer down around right arc, through (straight_x, r_outer), into (x_gate, r_outer), down 90 deg to (x_gate, plat_y)
 	var steps_from_outer = max(1, int(abs(PI / 2.0 - outer_meet_ang) / (PI / float(n_arc))))
 	var curb_right = PackedVector2Array()
 
@@ -140,6 +153,8 @@ func _draw() -> void:
 		var ang = outer_meet_ang + (float(i) / float(steps_from_outer)) * (PI / 2.0 - outer_meet_ang)
 		curb_right.append(c_right + Vector2(cos(ang), sin(ang)) * r_outer)
 	curb_right.append(Vector2(straight_x, r_outer))
+	curb_right.append(Vector2(x_gate, r_outer))
+	curb_right.append(Vector2(x_gate, plat_y))
 
 	# -----------------------------------------------------------------
 	# 4. ROAD SURFACE POLYGONS (Top & Bottom halves, perfectly seamless)
@@ -179,7 +194,7 @@ func _draw() -> void:
 		top_poly.append(c_left + Vector2(cos(ang), sin(ang)) * r_inner)
 	top_poly.append(Vector2(-straight_x - r_inner, 0.0))
 
-	# Bottom half polygon (y >= 0, includes connecting gateway neck into parking apron)
+	# Bottom half polygon (y >= 0, includes connecting gateway throat into parking platform)
 	var btm_poly = PackedVector2Array()
 	if outer_meet_idx >= 0:
 		btm_poly.append(outer_meet_pt)
@@ -190,6 +205,10 @@ func _draw() -> void:
 		var ang = outer_meet_ang + (float(i) / float(steps_from_outer)) * (PI / 2.0 - outer_meet_ang)
 		btm_poly.append(c_right + Vector2(cos(ang), sin(ang)) * r_outer)
 	btm_poly.append(Vector2(straight_x, r_outer))
+	btm_poly.append(Vector2(x_gate, r_outer))
+	btm_poly.append(Vector2(x_gate, plat_y + 4.0))
+	btm_poly.append(Vector2(-x_gate, plat_y + 4.0))
+	btm_poly.append(Vector2(-x_gate, r_outer))
 	btm_poly.append(Vector2(-straight_x, r_outer))
 	for i in range(1, n_arc / 2):
 		var ang = PI / 2.0 + (float(i) / float(n_arc / 2)) * (PI / 2.0)
@@ -225,7 +244,10 @@ func _draw() -> void:
 	draw_colored_polygon(top_poly, COLOR_ROAD)
 	draw_colored_polygon(btm_poly, COLOR_ROAD)
 
-	# Step C: Curbs with bevel & crisp highlight (3.0px total appearance)
+	# Step C: Inner hole 3D vertical depth bevel band
+	draw_polyline(inner_top_lip, Color("949ab1"), 6.0, true)
+
+	# Step D: Curbs with bevel & crisp highlight (3.0px total appearance)
 	draw_polyline(curb_left, COLOR_CURB_BEVEL, 3.5, true)
 	draw_polyline(curb_left, COLOR_CURB_HIGHLIGHT, 2.0, true)
 

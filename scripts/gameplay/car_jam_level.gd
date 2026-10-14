@@ -81,11 +81,11 @@ class PassengerRow extends RefCounted:
 	var is_feeder: bool = false
 	var passengers: Array[Dictionary] = [] # {"id": int, "color_id": String, "lane": int, "view": PassengerView, "state": String}
 
-const LANE_SPACING := 24.2
-const ROW_SPACING := 35.33
-const MIN_ROW_GAP := 22.0
+const LANE_SPACING := 19.5
+const ROW_SPACING := 23.0
+const MIN_ROW_GAP := 19.0
 const NUM_LANES := 4
-const PASSENGER_SPACING := 35.33
+const PASSENGER_SPACING := 23.0
 const MAX_INITIAL_LOOP_PASSENGERS := 152
 
 var passenger_track: Path2D
@@ -101,6 +101,7 @@ var _speed_logged: bool = false
 var slot_boarding_points: Dictionary = {}
 var _platform_start_prog: float = 160.0
 var _platform_end_prog: float = 510.0
+var _merge_prog: float = 0.0
 var _waiting_label: Label
 var track_time: float = 0.0
 var _last_board_landing_time: float = 0.0
@@ -175,7 +176,7 @@ func _process(delta: float) -> void:
 				_feeder_rows.append(next_row)
 				
 		# B. Advance feeder rows forward towards stop line / row ahead
-		var feeder_stop_pos: float = f_len - 110.0
+		var feeder_stop_pos: float = f_len - 80.0
 		for j in range(_feeder_rows.size()):
 			var f_row = _feeder_rows[j]
 			var max_prog: float = feeder_stop_pos
@@ -184,7 +185,9 @@ func _process(delta: float) -> void:
 					if _oval_freed_capacity >= f_row.passengers.size():
 						var junction_clear := true
 						for cr in _circulating_rows:
-							if cr.progress > (track_len - 160.0) or cr.progress < 50.0:
+							var d = cr.progress - _merge_prog
+							if d < 0.0: d += track_len
+							if (track_len - d) < 160.0 or d < 50.0:
 								junction_clear = false
 								break
 						if junction_clear:
@@ -225,12 +228,15 @@ func _process(delta: float) -> void:
 				var merge_clear := true
 				var clearance_buffer := MIN_ROW_GAP * 1.15
 				for cr in _circulating_rows:
-					if cr.progress < clearance_buffer or cr.progress > (track_len - clearance_buffer):
+					var d = absf(cr.progress - _merge_prog)
+					if d > track_len * 0.5:
+						d = track_len - d
+					if d < clearance_buffer:
 						merge_clear = false
 						break
 				if merge_clear:
 					_feeder_rows.pop_front()
-					lead_row.progress = 0.0
+					lead_row.progress = _merge_prog
 					lead_row.is_feeder = false
 					for p in lead_row.passengers:
 						p["state"] = "CIRCULATING"
@@ -575,14 +581,13 @@ func _setup_visuals(lvl: CarJamLevelData) -> void:
 	board_bg.setup(lvl.board_size)
 
 	# 2. Parking Slots
-	var slot_spacing := 65.0
+	var slot_spacing := 58.0
 	var total_span: float = float(lvl.parking_slots_count - 1) * slot_spacing
-	
-	# ParkingBase removed — slots sit directly on the playfield
 
 	for i in lvl.parking_slots_count:
 		var slot_view := ParkingSlotView.new()
 		slot_view.setup(i)
+		slot_view.rotation_degrees = -22.0
 		slot_view.position = Vector2(-total_span / 2.0 + float(i) * slot_spacing, 0)
 		parking_slots_node.add_child(slot_view)
 		slot_views.append(slot_view)
@@ -713,20 +718,20 @@ func _init_passenger_track() -> void:
 	passenger_track = Path2D.new()
 	var curve := Curve2D.new()
 	var h := 63.51 # R=115.0 * 0.552285
-	# Start at merge point (270, 0)
-	curve.add_point(Vector2(270, 0), Vector2(0, -h), Vector2(0, h))
+	# Start at right apex (220, 0)
+	curve.add_point(Vector2(220, 0), Vector2(0, -h), Vector2(0, h))
 	# Bottom right arc into bottom straight
-	curve.add_point(Vector2(155, 115), Vector2(h, 0), Vector2.ZERO)
+	curve.add_point(Vector2(105, 115), Vector2(h, 0), Vector2.ZERO)
 	# Bottom straight (above parking)
-	curve.add_point(Vector2(-155, 115), Vector2.ZERO, Vector2(-h, 0))
+	curve.add_point(Vector2(-105, 115), Vector2.ZERO, Vector2(-h, 0))
 	# Left semicircle apex
-	curve.add_point(Vector2(-270, 0), Vector2(0, h), Vector2(0, -h))
+	curve.add_point(Vector2(-220, 0), Vector2(0, h), Vector2(0, -h))
 	# Top left arc into top straight
-	curve.add_point(Vector2(-155, -115), Vector2(-h, 0), Vector2.ZERO)
+	curve.add_point(Vector2(-105, -115), Vector2(-h, 0), Vector2.ZERO)
 	# Top straight
-	curve.add_point(Vector2(155, -115), Vector2.ZERO, Vector2(h, 0))
-	# Close loop back to (270, 0)
-	curve.add_point(Vector2(270, 0), Vector2(0, -h), Vector2(0, h))
+	curve.add_point(Vector2(105, -115), Vector2.ZERO, Vector2(h, 0))
+	# Close loop back to (220, 0)
+	curve.add_point(Vector2(220, 0), Vector2(0, -h), Vector2(0, h))
 	passenger_track.curve = curve
 	_platform_start_prog = curve.get_closest_offset(curve.get_point_position(1))
 	_platform_end_prog = curve.get_closest_offset(curve.get_point_position(2))
@@ -735,13 +740,17 @@ func _init_passenger_track() -> void:
 	feeder_track = Path2D.new()
 	feeder_track.name = "FeederTrack"
 	var f_curve := Curve2D.new()
-	# Smooth, continuous curve from deep offscreen entrance merging into loop tangentially at (270, 0)
-	# Stays well clear of the main oval until the intentional merge approach
-	f_curve.add_point(Vector2(650, -420), Vector2.ZERO, Vector2(-80, 80))
-	f_curve.add_point(Vector2(440, -180), Vector2(60, -70), Vector2(-50, 60))
-	f_curve.add_point(Vector2(350, -70), Vector2(30, -45), Vector2(-25, 35))
-	f_curve.add_point(Vector2(270, 0), Vector2(-15, -45), Vector2.ZERO)
+	# Point 0 (top-right offscreen): Vector2(265, -260), out = Vector2(-10, 90)
+	f_curve.add_point(Vector2(265, -260), Vector2.ZERO, Vector2(-10, 90))
+	# Point 1 (upper-right behind pause button): Vector2(245, -110), in = Vector2(15, -65), out = Vector2(-20, 65)
+	f_curve.add_point(Vector2(245, -110), Vector2(15, -65), Vector2(-20, 65))
+	# Point 2 (approaching lower-right arc): Vector2(215, 25), in = Vector2(20, -45), out = Vector2(-25, 35)
+	f_curve.add_point(Vector2(215, 25), Vector2(20, -45), Vector2(-25, 35))
+	# Point 3 (tangential merge on right arc): Vector2(185, 75), in = Vector2(25, -30), out = Vector2.ZERO
+	f_curve.add_point(Vector2(185, 75), Vector2(25, -30), Vector2.ZERO)
 	feeder_track.curve = f_curve
+
+	_merge_prog = passenger_track.curve.get_closest_offset(Vector2(185, 75))
 
 	# PREMIUM PLAZA INTEGRATION
 	var plaza = preload("res://scripts/gameplay/plaza_environment.gd").new()
@@ -770,7 +779,7 @@ func _init_passenger_track() -> void:
 	
 	# Precalculate boarding crossing points for ALL parking slots
 	slot_boarding_points.clear()
-	var slot_spacing := 65.0
+	var slot_spacing := 58.0
 	var total_span: float = float(controller.level_data.parking_slots_count - 1) * slot_spacing
 	var min_trig: float = 999999.0
 	var max_trig: float = -999999.0
@@ -852,7 +861,7 @@ func _init_passenger_track() -> void:
 
 	# Remaining rows form a separate dense waiting queue on feeder cross-track
 	var f_len = feeder_track.curve.get_baked_length()
-	var feeder_stop_pos: float = f_len - 110.0 # Queue stop line rests 110px before junction, completely clear of oval (41.5px clearance)
+	var feeder_stop_pos: float = f_len - 80.0 # Queue stop line rests 80px before junction, completely clear of oval
 	for r in range(initial_rows_count, all_rows.size()):
 		var row = all_rows[r]
 		var feeder_idx = r - initial_rows_count
@@ -1021,6 +1030,7 @@ func _on_vehicle_dispatch_started(vehicle_id: int, slot_id: int, corridor: Array
 		final_scale = minf(scale_w, scale_h)
 	var final_scale_vec := Vector2(final_scale, final_scale)
 
+	var slot_rot: float = slot_views[slot_id].rotation if slot_id < slot_views.size() else 0.0
 	VehicleMovement.animate_dispatch(
 		vv,
 		vv.position,
@@ -1031,7 +1041,9 @@ func _on_vehicle_dispatch_started(vehicle_id: int, slot_id: int, corridor: Array
 		controller,
 		vehicle_id,
 		slot_id,
-		final_scale_vec
+		final_scale_vec,
+		bus_movement_duration_multiplier,
+		slot_rot
 	)
 
 func _on_vehicle_parked(vehicle_id: int, slot_id: int) -> void:
@@ -1119,13 +1131,16 @@ func _on_vehicle_filled(vehicle_id: int, slot_id: int) -> void:
 
 	_play_sfx("depart")
 	var slot_pos := _get_slot_world_pos(slot_id)
+	var slot_rot: float = slot_views[slot_id].rotation if slot_id < slot_views.size() else 0.0
 	VehicleMovement.animate_departure(
 		vv,
 		slot_pos,
 		controller.session_token,
 		controller,
 		vehicle_id,
-		slot_id
+		slot_id,
+		bus_movement_duration_multiplier,
+		slot_rot
 	)
 
 func _on_vehicle_departed(_vehicle_id: int, slot_id: int) -> void:
@@ -2197,11 +2212,11 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 	var safe_lower_screen_h = (vp_size.y / 2.0) - 140.0
 
 	# Ensure we fit parking strip, board clearance, and track system with feeder
-	var slot_spacing = 65.0 # MATCHES what we set earlier
+	var slot_spacing = 58.0
 	var slots_count: int = controller.level_data.parking_slots_count if controller != null and controller.level_data != null else 4
 	var parking_w = float(max(1, slots_count - 1)) * slot_spacing + 35.0
 	var board_padded_w = board_pixel_w + 100.0
-	var track_system_w = 702.0 # Full track system span (R=115, apex=270, border 162px)
+	var track_system_w = 640.0 # Compact track system span (apex=220, outer=282px, total 564px + side margins)
 	var required_w = maxf(maxf(parking_w, board_padded_w), track_system_w)
 	
 	# Minimum essential dimensions for upper and lower screen halves
@@ -2278,13 +2293,13 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 		var visible_w = vp_size.x / scale_factor
 		var full_w = visible_w + 200.0
 		
-		var track_bottom_y = track_y + 180.0
+		var track_bottom_y = track_y + 197.0
 		platform_bg.setup_full(plat_top, local_bottom, full_w, partition_y, separator_y, deck_w, visible_w, track_bottom_y, parking_y, parking_h)
 
 	if passenger_track_bg != null:
 		var tr = passenger_track_bg.get_node_or_null("TrackRenderer") as CarJamTrackRenderer
 		if tr != null:
-			tr.plat_top_local = plat_top - track_y
+			tr.plat_top_local = 197.0
 			tr.queue_redraw()
 
 

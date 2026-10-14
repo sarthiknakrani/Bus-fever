@@ -240,46 +240,43 @@ func play_badge_pulse() -> void:
 func _setup_capacity_badge() -> void:
 	if _badge_node != null: return
 	
-	# The professional directional arrow is integrated directly into the glossy bus roof art.
-	# We only create the parking capacity badge here.
+	# Bottom-anchored capacity pill at the rear bumper of the parked bus (matching reference '40' badge).
 	_badge_node = Node2D.new()
 	_badge_node.name = "CapacityBadge"
-	_badge_node.position = Vector2.ZERO # Centered perfectly on the geometric center of the bus footprint
+	_badge_node.position = Vector2(0, 42.0)
 	_badge_node.visible = false
-	_badge_node.z_index = 10 
+	_badge_node.z_index = 10
 
 	var badge_draw := Node2D.new()
 	badge_draw.draw.connect(func():
-		var bw: float = 46.0
-		var bh: float = 28.0
+		var bw: float = 42.0
+		var bh: float = 24.0
 		var rect := Rect2(-bw / 2.0, -bh / 2.0, bw, bh)
 		var ci = badge_draw.get_canvas_item()
 
 		var sb_shadow = StyleBoxFlat.new()
-		sb_shadow.bg_color = Color(0,0,0,0.5)
-		sb_shadow.set_corner_radius_all(14)
-		sb_shadow.draw(ci, Rect2(-bw/2.0, -bh/2.0 + 4, bw, bh))
+		sb_shadow.bg_color = Color(0, 0, 0, 0.35)
+		sb_shadow.set_corner_radius_all(8)
+		sb_shadow.draw(ci, Rect2(-bw / 2.0, -bh / 2.0 + 3, bw, bh))
 		
 		var sb_face = StyleBoxFlat.new()
 		sb_face.bg_color = vehicle_color
-		sb_face.set_corner_radius_all(14)
-		sb_face.border_width_top = 2
-		sb_face.border_color = Color.WHITE
+		sb_face.set_corner_radius_all(8)
 		sb_face.draw(ci, rect)
 	)
 	_badge_node.add_child(badge_draw)
 
 	_badge_label = Label.new()
 	_badge_label.text = str(vehicle_capacity)
-	_badge_label.add_theme_font_size_override("font_size", 18)
+	_badge_label.add_theme_font_size_override("font_size", 16)
 	_badge_label.add_theme_color_override("font_color", Color.WHITE)
 	_badge_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.7))
 	_badge_label.add_theme_constant_override("shadow_offset_x", 0)
 	_badge_label.add_theme_constant_override("shadow_offset_y", 2)
 	_badge_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_badge_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_badge_label.position = Vector2(-23, -14)
-	_badge_label.size = Vector2(46, 28)
+	_badge_label.position = Vector2(-21, -12)
+	_badge_label.size = Vector2(42, 24)
 	_badge_node.add_child(_badge_label)
 
 	add_child(_badge_node)
@@ -311,4 +308,3 @@ func get_unscaled_parked_size() -> Vector2:
 ## Returns the rendered pixel dimensions of the bus when rotated into parking (facing UP) at BUS_VISUAL_SCALE
 func get_rendered_parked_size() -> Vector2:
 	return get_unscaled_parked_size() * BUS_VISUAL_SCALE
-

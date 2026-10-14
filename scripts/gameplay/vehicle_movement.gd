@@ -20,7 +20,8 @@ static func animate_dispatch(
 	vehicle_id: int,
 	slot_id: int,
 	target_scale: Vector2,
-	duration_mult: float = 1.0
+	duration_mult: float = 1.0,
+	slot_rotation: float = 0.0
 ) -> void:
 	if vehicle_node == null or not is_instance_valid(vehicle_node):
 		return
@@ -36,15 +37,9 @@ static func animate_dispatch(
 	# Stage B: Curve through the explicit corridor waypoint, sitting
 	#          BELOW the parking strip, until the bus is directly under
 	#          its target slot. The turn is gradual, not a snap.
-	# Stage C: From the corridor waypoint, drive STRAIGHT VERTICALLY UP
-	#          into the bay. Front faces passengers.
-	# Stage D: Settle exactly on slot_pos, no further rotation.
-	#
-	# Implemented as a 4-point Curve2D driven by a single tween_method
-	# that updates BOTH position and rotation. No competing tweens, no
-	# forced rotation blend — the curve geometry itself produces three
-	# distinct phases (drive, turn, dock) with smooth tangents between
-	# them.
+	# Stage C: From the corridor waypoint, drive into the bay along its
+	#          aligned parking axis (matching slot_rotation).
+	# Stage D: Settle exactly on slot_pos with final rotation matching slot.
 	# -----------------------------------------------------------------
 	var tw := vehicle_node.create_tween()
 
@@ -64,43 +59,26 @@ static func animate_dispatch(
 	#   P0 = bus on the board (start)
 	#   P1 = 130 px ALONG the puzzle arrow past P0 (Stage A exit)
 	#   P2 = corridor waypoint, BELOW the parking strip and under slot
-	#   P3 = slot center (final destination, tangent = vertical UP)
-	#
-	# Tangent strategy:
-	#   - Segment P0 -> P1: both endpoints tangent to forward_world so
-	#     this segment is essentially a straight line along the puzzle
-	#     arrow (bus drives the way the puzzle intended).
-	#   - Segment P1 -> P2: enter at forward_world, leave at forward_world
-	#     so the bus continues straight until the corridor. Tangent
-	#     transition to vertical happens in segment P2 -> P3.
-	#   - Segment P2 -> P3: enter at vertical UP, leave at vertical UP
-	#     so this segment is a straight vertical dock into the bay.
+	#   P3 = slot center (final destination, tangent aligned with slot_rotation)
 	# -------------------------------------------------------------------------
 	var P1: Vector2 = start_pos + forward_world * 130.0
-	# corridor_pos is the waypoint supplied by the caller; if it is too
-	# close to start_pos (degenerate), fall back to a synthetic corridor.
 	var P2: Vector2 = corridor_pos
 	if P2.distance_to(start_pos) < 80.0:
-		# Caller did not supply a corridor we trust — synthesize one
-		# directly under the slot, well clear of the parking rect.
 		P2 = Vector2(slot_pos.x, slot_pos.y + 85.0)
 
-	# Ensure upward-moving buses do not overshoot above the corridor waypoint
-	# into the parking bays prior to docking through P2.
 	if forward_world.y < -0.5:
 		P1.y = maxf(P1.y, P2.y + 10.0)
 
+	var in_tangent := Vector2(0.0, 32.0).rotated(slot_rotation)
 	var curve := Curve2D.new()
 	# P0 - bus on the board; out tangent = puzzle direction.
 	curve.add_point(start_pos, Vector2.ZERO, forward_world * 120.0)
 	# P1 - driven-out waypoint; smooth continuation of puzzle direction.
 	curve.add_point(P1, -forward_world * 100.0, forward_world * 100.0)
-	# P2 - corridor below parking strip; in tangent = vertical UP, out
-	# tangent = vertical UP, so segment P2->P3 is straight.
-	curve.add_point(P2, Vector2(0.0, 50.0), Vector2(0.0, -32.0))
-	# P3 - slot center; in tangent = vertical UP, so the bus enters the
-	# bay driving straight up with its front facing passengers.
-	curve.add_point(slot_pos, Vector2(0.0, 32.0), Vector2.ZERO)
+	# P2 - corridor below parking strip; tangent towards slot entry
+	curve.add_point(P2, Vector2(0.0, 50.0).rotated(slot_rotation), -in_tangent)
+	# P3 - slot center; in tangent aligned with slot angle
+	curve.add_point(slot_pos, in_tangent, Vector2.ZERO)
 
 	# Derive front vector (the bus sprite's "front" in its NATIVE puzzle orientation).
 	var v_dir: int = vehicle_node.get("vehicle_dir") if vehicle_node.get("vehicle_dir") != null else CarJamVehicleData.Direction.UP
@@ -111,15 +89,13 @@ static func animate_dispatch(
 		CarJamVehicleData.Direction.LEFT: front_native = Vector2(-1, 0)
 		CarJamVehicleData.Direction.RIGHT: front_native = Vector2(1, 0)
 
-	# Final rotation the bus should be in when parked vertical-front-UP.
-	# When the tangent at curve end is (0, -1), the rotation that aligns
-	# front_native onto (0, -1) is exactly this:
-	var final_rot_target := 0.0
+	# Final rotation the bus should be in when parked aligned with slot_rotation.
+	var final_rot_target := slot_rotation
 	match v_dir:
-		CarJamVehicleData.Direction.DOWN: final_rot_target = PI
-		CarJamVehicleData.Direction.UP: final_rot_target = 0.0
-		CarJamVehicleData.Direction.LEFT: final_rot_target = PI / 2.0
-		CarJamVehicleData.Direction.RIGHT: final_rot_target = -PI / 2.0
+		CarJamVehicleData.Direction.DOWN: final_rot_target = PI + slot_rotation
+		CarJamVehicleData.Direction.UP: final_rot_target = 0.0 + slot_rotation
+		CarJamVehicleData.Direction.LEFT: final_rot_target = PI / 2.0 + slot_rotation
+		CarJamVehicleData.Direction.RIGHT: final_rot_target = -PI / 2.0 + slot_rotation
 
 	var start_scale: Vector2 = vehicle_node.scale
 	var duration: float = BUS_ARRIVAL_DURATION * duration_mult
@@ -194,7 +170,8 @@ static func animate_departure(
 	controller: Node,
 	vehicle_id: int,
 	slot_id: int,
-	duration_mult: float = 1.0
+	duration_mult: float = 1.0,
+	slot_rotation: float = 0.0
 ) -> void:
 	if vehicle_node == null or not is_instance_valid(vehicle_node):
 		return
@@ -207,7 +184,7 @@ static func animate_departure(
 	var total_duration: float = BUS_DEPARTURE_DURATION * duration_mult
 	print("[QA] Bus %d DEPARTURE START at %.3f (Target: %.2fs)" % [vehicle_id, t_dep_start, total_duration])
 
-	var reverse_pos: Vector2 = slot_pos + Vector2(0.0, 115.0)
+	var reverse_pos: Vector2 = slot_pos + Vector2(0.0, 115.0).rotated(slot_rotation)
 
 	var curve := Curve2D.new()
 	var vp_rect := vehicle_node.get_viewport_rect()
@@ -248,8 +225,8 @@ static func animate_departure(
 	# Main movement tween: Reverse (0.25s) -> Exit curve (0.55s) = 0.80s total
 	var tw := vehicle_node.create_tween()
 
-	# Phase 1: Reverse straight down out of slot
-	tw.tween_property(vehicle_node, "position:y", reverse_pos.y, t_reverse) \
+	# Phase 1: Reverse along bay axis out of slot
+	tw.tween_property(vehicle_node, "position", reverse_pos, t_reverse) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 
 	# Ensure bay is cleared by the end of reverse if not already
