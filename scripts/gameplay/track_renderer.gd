@@ -110,10 +110,8 @@ func _draw() -> void:
 	# -----------------------------------------------------------------
 	var steps_to_inner = max(1, int(abs(inner_meet_ang - (-PI / 2.0)) / (PI / float(n_arc))))
 
-	# Left outer curb: from gateway bottom-left around to feeder inner
+	# Left outer curb: from left bottom straight end around to feeder inner
 	var curb_left = PackedVector2Array()
-	curb_left.append(Vector2(-x_gate, plat_y))
-	curb_left.append(Vector2(-x_gate, r_outer))
 	curb_left.append(Vector2(-straight_x, r_outer))
 	for i in range(1, n_arc):
 		var ang = PI / 2.0 + (float(i) / float(n_arc)) * PI
@@ -129,7 +127,7 @@ func _draw() -> void:
 		for i in range(inner_meet_idx - 1, -1, -1):
 			curb_left.append(f_inner[i])
 
-	# Right outer curb: from feeder outer down around right arc into gateway bottom-right
+	# Right outer curb: from feeder outer down around right arc to right bottom straight end
 	var steps_from_outer = max(1, int(abs(PI / 2.0 - outer_meet_ang) / (PI / float(n_arc))))
 	var curb_right = PackedVector2Array()
 
@@ -142,8 +140,6 @@ func _draw() -> void:
 		var ang = outer_meet_ang + (float(i) / float(steps_from_outer)) * (PI / 2.0 - outer_meet_ang)
 		curb_right.append(c_right + Vector2(cos(ang), sin(ang)) * r_outer)
 	curb_right.append(Vector2(straight_x, r_outer))
-	curb_right.append(Vector2(x_gate, r_outer))
-	curb_right.append(Vector2(x_gate, plat_y))
 
 	# -----------------------------------------------------------------
 	# 4. ROAD SURFACE POLYGONS (Top & Bottom halves, perfectly seamless)
@@ -194,11 +190,6 @@ func _draw() -> void:
 		var ang = outer_meet_ang + (float(i) / float(steps_from_outer)) * (PI / 2.0 - outer_meet_ang)
 		btm_poly.append(c_right + Vector2(cos(ang), sin(ang)) * r_outer)
 	btm_poly.append(Vector2(straight_x, r_outer))
-	btm_poly.append(Vector2(x_gate, r_outer))
-	# Gateway neck down to platform apron (tucking under ParkingBase to integrate naturally)
-	btm_poly.append(Vector2(x_gate, plat_y + 16.0))
-	btm_poly.append(Vector2(-x_gate, plat_y + 16.0))
-	btm_poly.append(Vector2(-x_gate, r_outer))
 	btm_poly.append(Vector2(-straight_x, r_outer))
 	for i in range(1, n_arc / 2):
 		var ang = PI / 2.0 + (float(i) / float(n_arc / 2)) * (PI / 2.0)

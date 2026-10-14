@@ -401,13 +401,8 @@ func _build_scene_hierarchy() -> void:
 
 	platform_bg = load("res://scripts/gameplay/platform_view.gd").new()
 	platform_bg.name = "PlatformBackground"
-	platform_bg.z_index = -5
+	platform_bg.z_index = -3
 	world_root.add_child(platform_bg)
-
-	parking_strip = load("res://scripts/gameplay/parking_strip_view.gd").new()
-	parking_strip.name = "ParkingStrip"
-	parking_strip.z_index = -3
-	world_root.add_child(parking_strip)
 
 	board_bg = BoardView.new()
 	board_bg.name = "BoardBackground"
@@ -430,6 +425,7 @@ func _build_scene_hierarchy() -> void:
 
 	parking_slots_node = Node2D.new()
 	parking_slots_node.name = "ParkingSlots"
+	parking_slots_node.z_index = -1
 	parking_root.add_child(parking_slots_node)
 
 	parked_vehicles_node = Node2D.new()
@@ -2282,15 +2278,8 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 		var visible_w = vp_size.x / scale_factor
 		var full_w = visible_w + 200.0
 		
-		platform_bg.setup_full(plat_top, local_bottom, full_w, partition_y, separator_y, deck_w, visible_w)
-
-	if parking_strip != null:
-		parking_strip.position = Vector2.ZERO # drawn relative to world_root
-		var strip_top: float = parking_bottom - 6.0
-		var strip_bottom: float = separator_y - 2.0
-		var strip_w: float = parking_w + 100.0
-		if parking_strip.has_method("draw_parking_strip"):
-			parking_strip.draw_parking_strip(strip_top, strip_bottom, strip_w)
+		var track_bottom_y = track_y + 180.0
+		platform_bg.setup_full(plat_top, local_bottom, full_w, partition_y, separator_y, deck_w, visible_w, track_bottom_y, parking_y, parking_h)
 
 	if passenger_track_bg != null:
 		var tr = passenger_track_bg.get_node_or_null("TrackRenderer") as CarJamTrackRenderer
