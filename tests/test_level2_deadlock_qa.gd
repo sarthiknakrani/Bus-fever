@@ -83,37 +83,20 @@ func test_recorded_level2_deadlock_reproduction() -> void:
 	var lvl2 = load("res://levels/level_002.tres") as CarJamLevelData
 	ctrl.load_level(lvl2)
 	
-	# Find Blue and Yellow buses
-	var blue_buses := []
-	var yellow_buses := []
+	var non_red_buses: Array[int] = []
 	for vid in ctrl.vehicles:
-		if ctrl.vehicles[vid].color_id == "blue":
-			blue_buses.append(vid)
-		elif ctrl.vehicles[vid].color_id == "yellow":
-			yellow_buses.append(vid)
+		if ctrl.vehicles[vid].color_id != "red":
+			non_red_buses.append(vid)
+			if non_red_buses.size() == 6: break
 			
-	check(blue_buses.size() >= 2 and yellow_buses.size() >= 1, "Level 2 has required buses")
+	check(non_red_buses.size() == 6, "Level 2 has 6 non-red buses")
 	
-	var b1 = blue_buses[0]
-	var y1 = yellow_buses[0]
-	var b2 = blue_buses[1]
+	for vid in non_red_buses:
+		var sid = ctrl.parking.reserve_slot(vid)
+		ctrl.parking.confirm_arrival(sid, vid)
+		ctrl.vehicles[vid].state = VehicleModel.VehicleState.PARKED
 	
-	# Park b1 in slot 1
-	var s1 = ctrl.parking.reserve_slot(b1)
-	ctrl.parking.confirm_arrival(s1, b1)
-	ctrl.vehicles[b1].state = VehicleModel.VehicleState.PARKED
-	
-	# Park y1 in slot 2
-	var s2 = ctrl.parking.reserve_slot(y1)
-	ctrl.parking.confirm_arrival(s2, y1)
-	ctrl.vehicles[y1].state = VehicleModel.VehicleState.PARKED
-	
-	# Park b2 in slot 3
-	var s3 = ctrl.parking.reserve_slot(b2)
-	ctrl.parking.confirm_arrival(s3, b2)
-	ctrl.vehicles[b2].state = VehicleModel.VehicleState.PARKED
-	
-	check(ctrl.parking.is_full(), "Parking is completely full (3 occupied bays)")
+	check(ctrl.parking.is_full(), "Parking is completely full (6 occupied bays)")
 	
 	# Mock snapshot representing the recorded state:
 	# All circulating rows on loop are RED
@@ -153,15 +136,14 @@ func test_suppressed_toast_on_deadlock_tap() -> void:
 	var toast_triggered := false
 	l.controller.parking_full_warning.connect(func(): toast_triggered = true)
 	
-	# Find 3 yellow buses and park them to fill parking
-	var yellow_vids: Array[int] = []
+	# Find 6 non-red buses and park them to fill parking
+	var non_red_vids: Array[int] = []
 	for vid in l.controller.vehicles:
-		if l.controller.vehicles[vid].color_id == "yellow":
-			yellow_vids.append(vid)
-			if yellow_vids.size() == 3: break
+		if l.controller.vehicles[vid].color_id != "red":
+			non_red_vids.append(vid)
+			if non_red_vids.size() == 6: break
 			
-	for i in 3:
-		var vid = yellow_vids[i]
+	for vid in non_red_vids:
 		var sid = l.controller.parking.reserve_slot(vid)
 		l.controller.parking.confirm_arrival(sid, vid)
 		l.controller.vehicles[vid].state = VehicleModel.VehicleState.PARKED
@@ -201,8 +183,8 @@ func test_feeder_reachability_cases() -> void:
 	var lvl1 = load("res://levels/level_001.tres") as CarJamLevelData
 	ctrl.load_level(lvl1)
 	
-	# Fill slots with 3 Red buses
-	for i in 3:
+	# Fill slots with 6 Red buses
+	for i in 6:
 		var vid = i + 1
 		ctrl.vehicles[vid].color_id = "red"
 		var sid = ctrl.parking.reserve_slot(vid)
@@ -251,14 +233,12 @@ func test_in_flight_operations_guard() -> void:
 	var lvl1 = load("res://levels/level_001.tres") as CarJamLevelData
 	ctrl.load_level(lvl1)
 	
-	# Reserve slot 1, occupy slots 2 and 3
+	# Reserve slot 1, occupy slots 2..6
 	var s1 = ctrl.parking.reserve_slot(1) # state == RESERVED
-	var s2 = ctrl.parking.reserve_slot(2)
-	ctrl.parking.confirm_arrival(s2, 2)
-	ctrl.vehicles[2].state = VehicleModel.VehicleState.PARKED
-	var s3 = ctrl.parking.reserve_slot(3)
-	ctrl.parking.confirm_arrival(s3, 3)
-	ctrl.vehicles[3].state = VehicleModel.VehicleState.PARKED
+	for vid in range(2, 7):
+		var s = ctrl.parking.reserve_slot(vid)
+		ctrl.parking.confirm_arrival(s, vid)
+		ctrl.vehicles[vid].state = VehicleModel.VehicleState.PARKED
 	
 	ctrl.track_snapshot_provider = func(): return {"oval_freed_capacity": 0, "circulating_rows": [], "feeder_rows": [], "pending_rows": []}
 	ctrl._check_terminal_states()

@@ -86,23 +86,22 @@ func _test_2_level_2_deadlock_reproduction() -> void:
 	var lvl2 = load("res://levels/level_002.tres") as CarJamLevelData
 	ctrl.load_level(lvl2)
 
-	# Find 3 yellow buses in Level 2
-	var yellow_vids: Array[int] = []
+	# Find 6 non-red buses in Level 2
+	var non_red_vids: Array[int] = []
 	for vid in ctrl.vehicles:
-		if ctrl.vehicles[vid].color_id == "yellow":
-			yellow_vids.append(vid)
-			if yellow_vids.size() == 3: break
+		if ctrl.vehicles[vid].color_id != "red":
+			non_red_vids.append(vid)
+			if non_red_vids.size() == 6: break
 
-	_expect(yellow_vids.size() == 3, "Found 3 yellow buses in Level 2")
+	_expect(non_red_vids.size() == 6, "Found 6 non-red buses in Level 2")
 
-	# Park all 3 yellow buses into unlocked slots 1, 2, 3
-	for i in 3:
-		var vid = yellow_vids[i]
+	# Park all 6 non-red buses into unlocked slots 1..6
+	for vid in non_red_vids:
 		var slot_id = ctrl.parking.reserve_slot(vid)
 		ctrl.parking.confirm_arrival(slot_id, vid)
 		ctrl.vehicles[vid].state = VehicleModel.VehicleState.PARKED
 
-	_expect(ctrl.parking.is_full(), "Parking is full with 3 yellow buses")
+	_expect(ctrl.parking.is_full(), "Parking is full with 6 non-red buses")
 
 	# Provide a snapshot where:
 	# - Oval has only Red and Blue passengers (mismatched)
@@ -111,8 +110,8 @@ func _test_2_level_2_deadlock_reproduction() -> void:
 	var mock_snapshot = {
 		"oval_freed_capacity": 0,
 		"circulating_rows": [
-			{"progress": 100.0, "passengers": [{"id": 1, "color_id": "red", "state": "CIRCULATING"}, {"id": 2, "color_id": "blue", "state": "CIRCULATING"}]},
-			{"progress": 200.0, "passengers": [{"id": 3, "color_id": "red", "state": "CIRCULATING"}, {"id": 4, "color_id": "blue", "state": "CIRCULATING"}]}
+			{"progress": 100.0, "passengers": [{"id": 1, "color_id": "red", "state": "CIRCULATING"}, {"id": 2, "color_id": "red", "state": "CIRCULATING"}]},
+			{"progress": 200.0, "passengers": [{"id": 3, "color_id": "red", "state": "CIRCULATING"}, {"id": 4, "color_id": "red", "state": "CIRCULATING"}]}
 		],
 		"feeder_rows": [
 			{"progress": 50.0, "passengers": [{"id": 10, "color_id": "red", "state": "FEEDER"}, {"id": 11, "color_id": "red", "state": "FEEDER"}, {"id": 12, "color_id": "red", "state": "FEEDER"}, {"id": 13, "color_id": "red", "state": "FEEDER"}]},
@@ -135,8 +134,8 @@ func _test_3_four_wide_row_insufficient_credits() -> void:
 	var lvl1 = CarJamLevelFactory.create_level_1()
 	ctrl.load_level(lvl1)
 
-	# Fill slots with yellow bus (v1), red bus (v3), blue bus (v5)
-	for vid in [1, 3, 5]:
+	# Fill all 6 slots with buses 1..6
+	for vid in range(1, 7):
 		var s = ctrl.parking.reserve_slot(vid)
 		ctrl.parking.confirm_arrival(s, vid)
 		ctrl.vehicles[vid].state = VehicleModel.VehicleState.PARKED
@@ -177,7 +176,7 @@ func _test_4_four_wide_row_sufficient_credits() -> void:
 	var lvl1 = CarJamLevelFactory.create_level_1()
 	ctrl.load_level(lvl1)
 
-	for vid in [1, 3, 5]:
+	for vid in range(1, 7):
 		var s = ctrl.parking.reserve_slot(vid)
 		ctrl.parking.confirm_arrival(s, vid)
 		ctrl.vehicles[vid].state = VehicleModel.VehicleState.PARKED
@@ -213,8 +212,8 @@ func _test_5_multi_row_feeder_insufficient_credits() -> void:
 	var lvl1 = CarJamLevelFactory.create_level_1()
 	ctrl.load_level(lvl1)
 
-	# Park yellow bus (v1), red bus (v3), blue bus (v5)
-	for vid in [1, 3, 5]:
+	# Park yellow bus (v1), red bus (v3), blue bus (v5), plus 2, 4, 6
+	for vid in range(1, 7):
 		var s = ctrl.parking.reserve_slot(vid)
 		ctrl.parking.confirm_arrival(s, vid)
 		ctrl.vehicles[vid].state = VehicleModel.VehicleState.PARKED
@@ -256,7 +255,7 @@ func _test_6_multi_row_feeder_sufficient_credits() -> void:
 	var lvl1 = CarJamLevelFactory.create_level_1()
 	ctrl.load_level(lvl1)
 
-	for vid in [1, 3, 5]:
+	for vid in range(1, 7):
 		var s = ctrl.parking.reserve_slot(vid)
 		ctrl.parking.confirm_arrival(s, vid)
 		ctrl.vehicles[vid].state = VehicleModel.VehicleState.PARKED
@@ -304,10 +303,10 @@ func _test_7_in_flight_operations_protection() -> void:
 	var lvl1 = CarJamLevelFactory.create_level_1()
 	ctrl1.load_level(lvl1)
 	var s1 = ctrl1.parking.reserve_slot(1)
-	var s2 = ctrl1.parking.reserve_slot(2)
-	var s3 = ctrl1.parking.reserve_slot(3) # Slot 3 is RESERVED (not yet arrived)
-	ctrl1.parking.confirm_arrival(s1, 1)
-	ctrl1.parking.confirm_arrival(s2, 2)
+	for vid in range(2, 7):
+		var s = ctrl1.parking.reserve_slot(vid)
+		ctrl1.parking.confirm_arrival(s, vid)
+		ctrl1.vehicles[vid].state = VehicleModel.VehicleState.PARKED
 	ctrl1.track_snapshot_provider = func(): return empty_snapshot
 	ctrl1._check_terminal_states()
 	_expect(ctrl1.state == CarJamController.GameState.PLAYING, "7A: Bus en route (RESERVED slot) prevents deadlock failure")
@@ -315,10 +314,11 @@ func _test_7_in_flight_operations_protection() -> void:
 	# Subtest 7B: Departing slot (bus clearing slot)
 	var ctrl2 := CarJamController.new()
 	ctrl2.load_level(lvl1)
-	var sa = ctrl2.parking.reserve_slot(1); ctrl2.parking.confirm_arrival(sa, 1)
-	var sb = ctrl2.parking.reserve_slot(2); ctrl2.parking.confirm_arrival(sb, 2)
-	var sc = ctrl2.parking.reserve_slot(3); ctrl2.parking.confirm_arrival(sc, 3)
-	ctrl2.parking.mark_departing(sc, 3) # Slot 3 is DEPARTING
+	for vid in range(1, 7):
+		var s = ctrl2.parking.reserve_slot(vid)
+		ctrl2.parking.confirm_arrival(s, vid)
+		ctrl2.vehicles[vid].state = VehicleModel.VehicleState.PARKED
+	ctrl2.parking.mark_departing(1, 1) # Slot 1 is DEPARTING
 	ctrl2.track_snapshot_provider = func(): return empty_snapshot
 	ctrl2._check_terminal_states()
 	_expect(ctrl2.state == CarJamController.GameState.PLAYING, "7B: Departing bus prevents deadlock failure")
@@ -326,10 +326,11 @@ func _test_7_in_flight_operations_protection() -> void:
 	# Subtest 7C: Full bus (COMPLETED)
 	var ctrl3 := CarJamController.new()
 	ctrl3.load_level(lvl1)
-	var s_a = ctrl3.parking.reserve_slot(1); ctrl3.parking.confirm_arrival(s_a, 1)
-	var s_b = ctrl3.parking.reserve_slot(2); ctrl3.parking.confirm_arrival(s_b, 2)
-	var s_c = ctrl3.parking.reserve_slot(3); ctrl3.parking.confirm_arrival(s_c, 3)
-	ctrl3.vehicles[3].state = VehicleModel.VehicleState.FULL
+	for vid in range(1, 7):
+		var s = ctrl3.parking.reserve_slot(vid)
+		ctrl3.parking.confirm_arrival(s, vid)
+		ctrl3.vehicles[vid].state = VehicleModel.VehicleState.PARKED
+	ctrl3.vehicles[1].state = VehicleModel.VehicleState.FULL
 	ctrl3.track_snapshot_provider = func(): return empty_snapshot
 	ctrl3._check_terminal_states()
 	_expect(ctrl3.state == CarJamController.GameState.PLAYING, "7C: FULL bus prevents deadlock failure")
@@ -337,9 +338,10 @@ func _test_7_in_flight_operations_protection() -> void:
 	# Subtest 7D: Active boarding reservation
 	var ctrl4 := CarJamController.new()
 	ctrl4.load_level(lvl1)
-	var sx = ctrl4.parking.reserve_slot(1); ctrl4.parking.confirm_arrival(sx, 1); ctrl4.vehicles[1].state = VehicleModel.VehicleState.PARKED
-	var sy = ctrl4.parking.reserve_slot(2); ctrl4.parking.confirm_arrival(sy, 2); ctrl4.vehicles[2].state = VehicleModel.VehicleState.PARKED
-	var sz = ctrl4.parking.reserve_slot(3); ctrl4.parking.confirm_arrival(sz, 3); ctrl4.vehicles[3].state = VehicleModel.VehicleState.PARKED
+	for vid in range(1, 7):
+		var s = ctrl4.parking.reserve_slot(vid)
+		ctrl4.parking.confirm_arrival(s, vid)
+		ctrl4.vehicles[vid].state = VehicleModel.VehicleState.PARKED
 	ctrl4.authoritative_passengers[0]["state"] = "CIRCULATING"
 	var res_ok = ctrl4.try_reserve_boarding(0, 3, "red", 0) # Active boarding in flight
 	_expect(res_ok, "7D: Reservation succeeded")

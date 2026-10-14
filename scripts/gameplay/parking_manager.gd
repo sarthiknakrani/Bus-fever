@@ -28,8 +28,8 @@ class ParkingSlot:
 		slot_id = id
 		state = SlotState.FREE
 		vehicle_id = -1
-		# Default unlock rule: Slot 0 is VIP (locked), Slots 1-3 are normal (unlocked), Slots 4+ are locked
-		if id >= 1 and id <= 3:
+		# Default unlock rule: Slot 0 is VIP (locked for regular buses), Slots 1+ are normal working bays (unlocked)
+		if id >= 1:
 			is_unlocked = true
 		else:
 			is_unlocked = false
@@ -42,13 +42,16 @@ class ParkingSlot:
 		return {
 			"slot_id": slot_id,
 			"state": state,
-			"vehicle_id": vehicle_id
+			"vehicle_id": vehicle_id,
+			"is_unlocked": is_unlocked
 		}
 
 	func restore(d: Dictionary) -> void:
 		slot_id = int(d["slot_id"])
 		state = int(d["state"])
 		vehicle_id = int(d["vehicle_id"])
+		if d.has("is_unlocked"):
+			is_unlocked = bool(d["is_unlocked"])
 
 var _slots: Array[ParkingSlot] = []
 
@@ -86,6 +89,10 @@ func is_slot_unlocked(slot_id: int) -> bool:
 	if slot_id >= 0 and slot_id < _slots.size():
 		return _slots[slot_id].is_unlocked
 	return false
+
+func unlock_slot(slot_id: int) -> void:
+	if slot_id >= 0 and slot_id < _slots.size():
+		_slots[slot_id].is_unlocked = true
 
 func get_available_slot_count() -> int:
 	var count := 0

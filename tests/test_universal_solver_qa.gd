@@ -72,50 +72,52 @@ func _init() -> void:
 # 1. Level 1 Full Solve
 # -----------------------------------------------------------------
 func _test_1_level_1_full_solve() -> void:
-	_section("1. Level 1 Full Solve (3 Unlocked Slots)")
+	_section("1. Level 1 Full Solve (6 Unlocked Slots)")
 	var lvl1 = CarJamLevelFactory.create_level_1()
 	var res = CarJamPuzzleSolver.solve(lvl1)
 	_expect(res["solvable"], "Level 1 is solvable in CarJamPuzzleSolver")
 	_expect(res["moves"].size() == 6, "Level 1 solved in exactly 6 moves (got %d)" % res["moves"].size())
-	_expect(res["unlocked_slots"] == [1, 2, 3], "Level 1 used authoritative unlocked slots [1, 2, 3]")
+	_expect(res["unlocked_slots"] == [1, 2, 3, 4, 5, 6], "Level 1 used authoritative unlocked slots [1, 2, 3, 4, 5, 6]")
 	print("    Winning Move Order: %s | Iterations: %d" % [str(res["moves"]), res["iterations"]])
 
 # -----------------------------------------------------------------
 # 2. Level 2 Full Solve
 # -----------------------------------------------------------------
 func _test_2_level_2_full_solve() -> void:
-	_section("2. Level 2 Full Solve (3 Unlocked Slots)")
+	_section("2. Level 2 Full Solve (6 Unlocked Slots)")
 	var lvl2 = load("res://levels/level_002.tres") as CarJamLevelData
 	_expect(lvl2 != null, "Level 2 resource loaded successfully")
 	var res = CarJamPuzzleSolver.solve(lvl2)
 	_expect(res["solvable"], "Level 2 is solvable in CarJamPuzzleSolver")
 	_expect(res["moves"].size() == 12, "Level 2 solved in exactly 12 moves (got %d)" % res["moves"].size())
-	_expect(res["unlocked_slots"] == [1, 2, 3], "Level 2 used authoritative unlocked slots [1, 2, 3]")
+	_expect(res["unlocked_slots"] == [1, 2, 3, 4, 5, 6], "Level 2 used authoritative unlocked slots [1, 2, 3, 4, 5, 6]")
 	print("    Winning Move Order: %s | Iterations: %d" % [str(res["moves"]), res["iterations"]])
 
 # -----------------------------------------------------------------
-# 3. Three Unlocked Parking Slots
+# 3. Six Unlocked Parking Slots (Slots 1..6 Working, Slot 0 VIP Only)
 # -----------------------------------------------------------------
 func _test_3_three_unlocked_parking_slots() -> void:
-	_section("3. Three Unlocked Parking Slots (Slots 1, 2, 3)")
+	_section("3. Six Unlocked Parking Slots (Slots 1..6 Working, Slot 0 VIP Only)")
 	var pm := CarJamParkingManager.new()
 	pm.setup(7)
 	_expect(pm.get_slot_count() == 7, "Total slot count is 7")
-	_expect(pm.get_unlocked_slot_count() == 3, "Initially unlocked slot count is exactly 3")
-	_expect(pm.get_unlocked_slot_ids() == [1, 2, 3], "Unlocked slot IDs are exactly [1, 2, 3]")
+	_expect(pm.get_unlocked_slot_count() == 6, "Initially unlocked slot count is exactly 6")
+	_expect(pm.get_unlocked_slot_ids() == [1, 2, 3, 4, 5, 6], "Unlocked slot IDs are exactly [1, 2, 3, 4, 5, 6]")
 	_expect(not pm.is_slot_unlocked(0), "Slot 0 (VIP) is locked")
-	_expect(not pm.is_slot_unlocked(4), "Slot 4 (padlocked) is locked")
-	_expect(not pm.is_slot_unlocked(5), "Slot 5 (padlocked) is locked")
-	_expect(not pm.is_slot_unlocked(6), "Slot 6 (padlocked) is locked")
+	_expect(pm.is_slot_unlocked(1), "Slot 1 is unlocked")
+	_expect(pm.is_slot_unlocked(2), "Slot 2 is unlocked")
+	_expect(pm.is_slot_unlocked(3), "Slot 3 is unlocked")
+	_expect(pm.is_slot_unlocked(4), "Slot 4 is unlocked")
+	_expect(pm.is_slot_unlocked(5), "Slot 5 is unlocked")
+	_expect(pm.is_slot_unlocked(6), "Slot 6 is unlocked")
 
-	# Reserve all 3 slots
-	var s1 = pm.reserve_slot(101)
-	var s2 = pm.reserve_slot(102)
-	var s3 = pm.reserve_slot(103)
-	_expect(s1 == 1 and s2 == 2 and s3 == 3, "Reserved slots are 1, 2, 3 in order")
-	_expect(pm.is_full(), "Parking is full after 3 reservations")
-	var s4 = pm.reserve_slot(104)
-	_expect(s4 == -1, "4th reservation rejected when all 3 normal slots full")
+	# Reserve all 6 slots
+	for vid in range(101, 107):
+		var s = pm.reserve_slot(vid)
+		_expect(s == vid - 100, "Reserved slot %d in order" % s)
+	_expect(pm.is_full(), "Parking is full after 6 reservations")
+	var s7 = pm.reserve_slot(107)
+	_expect(s7 == -1, "7th reservation rejected when all 6 normal slots full")
 
 # -----------------------------------------------------------------
 # 4. Full Parking with One Bus Still Boarding
@@ -129,20 +131,13 @@ func _test_4_full_parking_with_one_bus_boarding() -> void:
 	# Mark first passenger as CIRCULATING (Red, matches bus 3)
 	ctrl.authoritative_passengers[0]["state"] = "CIRCULATING"
 
-	# Fill all 3 normal slots
-	var s1 = ctrl.parking.reserve_slot(3) # v3_red
-	ctrl.parking.confirm_arrival(s1, 3)
-	ctrl.vehicles[3].state = VehicleModel.VehicleState.PARKED
+	# Fill all 6 normal slots (Level 1 has 6 buses: 1, 2, 3, 4, 5, 6)
+	for vid in [3, 5, 1, 2, 4, 6]:
+		var s = ctrl.parking.reserve_slot(vid)
+		ctrl.parking.confirm_arrival(s, vid)
+		ctrl.vehicles[vid].state = VehicleModel.VehicleState.PARKED
 
-	var s2 = ctrl.parking.reserve_slot(5) # v5_blue
-	ctrl.parking.confirm_arrival(s2, 5)
-	ctrl.vehicles[5].state = VehicleModel.VehicleState.PARKED
-
-	var s3 = ctrl.parking.reserve_slot(1) # v1_yellow
-	ctrl.parking.confirm_arrival(s3, 1)
-	ctrl.vehicles[1].state = VehicleModel.VehicleState.PARKED
-
-	_expect(ctrl.parking.is_full(), "Parking is full with 3 parked buses")
+	_expect(ctrl.parking.is_full(), "Parking is full with 6 parked buses")
 
 	ctrl._check_terminal_states()
 	_expect(ctrl.state == CarJamController.GameState.PLAYING, "Game is still PLAYING because parked buses match circulating passengers")
@@ -152,17 +147,20 @@ func _test_4_full_parking_with_one_bus_boarding() -> void:
 # -----------------------------------------------------------------
 func _test_5_full_parking_deadlock_detection() -> void:
 	_section("5. Full Parking with No Achievable Progress (Deadlock Detection)")
-	# Build a balanced level: 3 Yellow buses (cap 4 = 12), 1 Red bus (cap 152) = 164 total
+	# Build a balanced level: 6 Yellow buses (cap 2 = 12), 1 Red bus (cap 152) = 164 total
 	# Queue: Group 0 (Red 152), Group 1 (Yellow 12) = 164 total demand
 	var lvl_deadlock := CarJamLevelData.new()
 	lvl_deadlock.board_size = Vector2i(5, 5)
 	lvl_deadlock.parking_slots_count = 7
 
 	var configs = [
-		{"id": 1, "color": "yellow", "pos": Vector2i(0, 0), "cap": 4,   "dir": CarJamVehicleData.Direction.DOWN},
-		{"id": 2, "color": "yellow", "pos": Vector2i(2, 0), "cap": 4,   "dir": CarJamVehicleData.Direction.DOWN},
-		{"id": 3, "color": "yellow", "pos": Vector2i(4, 0), "cap": 4,   "dir": CarJamVehicleData.Direction.DOWN},
-		{"id": 4, "color": "red",    "pos": Vector2i(0, 4), "cap": 152, "dir": CarJamVehicleData.Direction.UP}
+		{"id": 1, "color": "yellow", "pos": Vector2i(0, 0), "cap": 2,   "dir": CarJamVehicleData.Direction.DOWN},
+		{"id": 2, "color": "yellow", "pos": Vector2i(1, 0), "cap": 2,   "dir": CarJamVehicleData.Direction.DOWN},
+		{"id": 3, "color": "yellow", "pos": Vector2i(2, 0), "cap": 2,   "dir": CarJamVehicleData.Direction.DOWN},
+		{"id": 4, "color": "yellow", "pos": Vector2i(3, 0), "cap": 2,   "dir": CarJamVehicleData.Direction.DOWN},
+		{"id": 5, "color": "yellow", "pos": Vector2i(4, 0), "cap": 2,   "dir": CarJamVehicleData.Direction.DOWN},
+		{"id": 6, "color": "yellow", "pos": Vector2i(0, 1), "cap": 2,   "dir": CarJamVehicleData.Direction.DOWN},
+		{"id": 7, "color": "red",    "pos": Vector2i(0, 4), "cap": 152, "dir": CarJamVehicleData.Direction.UP}
 	]
 	for cfg in configs:
 		var v = CarJamVehicleData.new()
@@ -177,18 +175,18 @@ func _test_5_full_parking_deadlock_detection() -> void:
 	lvl_deadlock.passenger_groups.append(g_red)
 	lvl_deadlock.passenger_groups.append(g_yellow)
 
-	# Verify in solver: if the 3 Yellow buses are parked first, level is deadlocked
+	# Verify in solver: if the 6 Yellow buses are parked first, level is deadlocked
 	var s := CarJamPuzzleSolver.SimState.new()
-	s.unlocked_slots = [1, 2, 3]
+	s.unlocked_slots = [1, 2, 3, 4, 5, 6]
 	s.slots = [-1, -1, -1, -1, -1, -1, -1]
-	for vid in [1, 2, 3]:
+	for vid in [1, 2, 3, 4, 5, 6]:
 		var sv := CarJamPuzzleSolver.SimVehicle.new()
-		sv.id = vid; sv.color_id = "yellow"; sv.capacity = 4; sv.occupancy = 0; sv.state = 1
+		sv.id = vid; sv.color_id = "yellow"; sv.capacity = 2; sv.occupancy = 0; sv.state = 1
 		s.vehicles[vid] = sv
 		s.slots[vid] = vid
-	var sv4 := CarJamPuzzleSolver.SimVehicle.new()
-	sv4.id = 4; sv4.color_id = "red"; sv4.capacity = 152; sv4.occupancy = 0; sv4.state = 0
-	s.vehicles[4] = sv4
+	var sv7 := CarJamPuzzleSolver.SimVehicle.new()
+	sv7.id = 7; sv7.color_id = "red"; sv7.capacity = 152; sv7.occupancy = 0; sv7.state = 0
+	s.vehicles[7] = sv7
 
 	# Oval holds 152 Red passengers. Feeder holds 12 Yellow passengers.
 	s.oval_counts = {"red": 152}
@@ -205,20 +203,13 @@ func _test_5_full_parking_deadlock_detection() -> void:
 	var ctrl := CarJamController.new()
 	ctrl.load_level(lvl_deadlock)
 
-	# Park the 3 Yellow buses in slots 1, 2, 3
-	var s1 = ctrl.parking.reserve_slot(1)
-	ctrl.parking.confirm_arrival(s1, 1)
-	ctrl.vehicles[1].state = VehicleModel.VehicleState.PARKED
+	# Park the 6 Yellow buses in slots 1..6
+	for vid in range(1, 7):
+		var sid = ctrl.parking.reserve_slot(vid)
+		ctrl.parking.confirm_arrival(sid, vid)
+		ctrl.vehicles[vid].state = VehicleModel.VehicleState.PARKED
 
-	var s2 = ctrl.parking.reserve_slot(2)
-	ctrl.parking.confirm_arrival(s2, 2)
-	ctrl.vehicles[2].state = VehicleModel.VehicleState.PARKED
-
-	var s3 = ctrl.parking.reserve_slot(3)
-	ctrl.parking.confirm_arrival(s3, 3)
-	ctrl.vehicles[3].state = VehicleModel.VehicleState.PARKED
-
-	_expect(ctrl.parking.is_full(), "Parking is full with 3 parked yellow buses")
+	_expect(ctrl.parking.is_full(), "Parking is full with 6 parked yellow buses")
 
 	# All 152 initial circulating passengers are RED (mismatched with Yellow buses)
 	for i in 152:
