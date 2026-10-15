@@ -13,10 +13,10 @@ func _init() -> void:
 	var SLOT_W = 53.0
 	var SLOT_H = 94.0
 
-	var BOARD_SCALE = VehicleView.BOARD_BUS_TARGET_WIDTH / VehicleView.CANONICAL_CANVAS_WIDTH # 74.0 / 62.0 ≈ 1.1935
-	var RENDERED_L = CANONICAL_L * BOARD_SCALE # 121.7
-	var RENDERED_W_V = CANONICAL_W_V * BOARD_SCALE # 57.3
-	var RENDERED_W_H = CANONICAL_W_H * BOARD_SCALE # 54.9
+	var BOARD_SCALE = 1.0 # Canonical 1.0x scale on board eliminates body overlap and size popping
+	var RENDERED_L = CANONICAL_L * BOARD_SCALE # 102.0
+	var RENDERED_W_V = CANONICAL_W_V * BOARD_SCALE # 48.0
+	var RENDERED_W_H = CANONICAL_W_H * BOARD_SCALE # 46.0
 
 	# SECTION 1: Source PNG Texture Asset Bounds & Proportional Aspect Ratios
 	print("\n--- 1. PROPORTIONAL TEXTURE ASSET & ASPECT RATIO QA (28 VARIANTS) ---")

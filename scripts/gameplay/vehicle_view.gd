@@ -25,16 +25,13 @@ const CANONICAL_CANVAS_HEIGHT: float = 110.0
 # Authoritative visual scale factor (~15% reduction across all short buses in parking)
 const BUS_VISUAL_SCALE: float = 0.85
 
-# Board bus cell-fit parameters (tightens spacing on board to 4-8px gap)
+# Board bus cell-fit parameters (tightens spacing on board to 3-5px gap)
 # BOARD_BUS_TARGET_WIDTH is the target visible body WIDTH in board-local px.
-# Using the canonical visible body short-side width (48 V / 46 H) as the
-# reference dimension gives scale ~ 74/48 = 1.54 for UP/DOWN buses, so adjacent
-# parallel buses leave ~4 px on-screen clearance within the 78 px cell.
-# BOARD_ANCHOR_SHIFT reduced from 14→8 to prevent cross-cluster divergence gaps:
-# buses facing different directions (e.g. LEFT vs UP) would otherwise be pushed
-# ~23 px apart in screen space by their opposing anchor shifts.
-const BOARD_BUS_TARGET_WIDTH: float = 74.0
-const BOARD_ANCHOR_SHIFT: float = 8.0
+# At 48.0 px, the canonical visible body short-side width matches 1.0x native scale,
+# leaving ~3-4 px on-screen clearance between adjacent parallel buses without intersecting.
+# BOARD_ANCHOR_SHIFT is 0.0 to prevent cross-cluster divergence and frontal overlaps.
+const BOARD_BUS_TARGET_WIDTH: float = 48.0
+const BOARD_ANCHOR_SHIFT: float = 0.0
 
 var board_scale_factor: float = 1.0
 var board_anchor_offset: Vector2 = Vector2.ZERO
@@ -98,6 +95,8 @@ func set_parking_mode(in_parking: bool) -> void:
 func _process(_delta: float) -> void:
 	if _badge_node != null and _badge_node.visible:
 		_badge_node.global_rotation = 0.0
+		if is_in_parking:
+			_badge_node.global_position = global_position + Vector2(0.0, 38.0)
 
 func _build_visuals() -> void:
 	# Clear existing interim visuals
@@ -172,19 +171,10 @@ func _build_visuals() -> void:
 func _apply_bus_cell_fit() -> void:
 	if _base_sprite == null or _base_sprite.texture == null:
 		return
-	# Use CANONICAL visible body short-side width as the reference dimension:
-	# UP / DOWN buses: visible width = CANONICAL_BODY_WIDTH_V (48 px)
-	# LEFT / RIGHT buses: visible width = CANONICAL_BODY_WIDTH_H (46 px)
-	var is_vertical: bool = (vehicle_dir == CarJamVehicleData.Direction.UP or
-			vehicle_dir == CarJamVehicleData.Direction.DOWN)
-	var visible_short_dim: float = CANONICAL_BODY_WIDTH_V if is_vertical else CANONICAL_BODY_WIDTH_H
-	if visible_short_dim <= 0.0:
-		return
-	board_scale_factor = BOARD_BUS_TARGET_WIDTH / visible_short_dim
+	board_scale_factor = 1.0
 	_base_sprite.scale = Vector2(board_scale_factor, board_scale_factor)
 
-	# Shift the bus sprite forward along its escape direction so its front
-	# sits close to the cell's exit edge, while the tail extends backward into the cell
+	# Keep bus centered in its cell without anchor distortion
 	var dir_vec := Vector2(CarJamVehicleData.dir_to_vector(vehicle_dir))
 	board_anchor_offset = dir_vec * BOARD_ANCHOR_SHIFT
 	_base_sprite.position = board_anchor_offset
@@ -264,34 +254,34 @@ func _setup_capacity_badge() -> void:
 
 	var badge_draw := Node2D.new()
 	badge_draw.draw.connect(func():
-		var bw: float = 42.0
-		var bh: float = 24.0
+		var bw: float = 38.0
+		var bh: float = 22.0
 		var rect := Rect2(-bw / 2.0, -bh / 2.0, bw, bh)
 		var ci = badge_draw.get_canvas_item()
 
 		var sb_shadow = StyleBoxFlat.new()
 		sb_shadow.bg_color = Color(0, 0, 0, 0.35)
-		sb_shadow.set_corner_radius_all(8)
+		sb_shadow.set_corner_radius_all(7)
 		sb_shadow.draw(ci, Rect2(-bw / 2.0, -bh / 2.0 + 3, bw, bh))
 		
 		var sb_face = StyleBoxFlat.new()
 		sb_face.bg_color = vehicle_color
-		sb_face.set_corner_radius_all(8)
+		sb_face.set_corner_radius_all(7)
 		sb_face.draw(ci, rect)
 	)
 	_badge_node.add_child(badge_draw)
 
 	_badge_label = Label.new()
 	_badge_label.text = str(vehicle_capacity)
-	_badge_label.add_theme_font_size_override("font_size", 16)
+	_badge_label.add_theme_font_size_override("font_size", 15)
 	_badge_label.add_theme_color_override("font_color", Color.WHITE)
 	_badge_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.7))
 	_badge_label.add_theme_constant_override("shadow_offset_x", 0)
 	_badge_label.add_theme_constant_override("shadow_offset_y", 2)
 	_badge_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_badge_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_badge_label.position = Vector2(-21, -12)
-	_badge_label.size = Vector2(42, 24)
+	_badge_label.position = Vector2(-19, -11)
+	_badge_label.size = Vector2(38, 22)
 	_badge_node.add_child(_badge_label)
 
 	add_child(_badge_node)

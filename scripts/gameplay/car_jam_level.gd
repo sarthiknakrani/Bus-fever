@@ -87,7 +87,7 @@ const ROW_SPACING := 37.0
 const MIN_ROW_GAP := 36.5
 const NUM_LANES := 4
 const PASSENGER_SPACING := 25.0
-const MAX_INITIAL_LOOP_PASSENGERS := 124
+const MAX_INITIAL_LOOP_PASSENGERS := 112
 
 var passenger_track: Path2D
 var feeder_track: Path2D
@@ -130,7 +130,9 @@ func _get_curve_point_and_normal(c: Curve2D, offset: float, is_loop: bool = fals
 	return {"pos": p0, "tangent": tangent, "normal": normal}
 
 func _calc_lane_pos(center_pos: Vector2, normal: Vector2, lane: int) -> Vector2:
-	var lane_offset: float = (float(lane) - 1.5) * LANE_SPACING
+	var curve_fac: float = clampf((absf(center_pos.x) - 75.0) / 30.0, 0.0, 1.0)
+	var dynamic_spacing: float = lerpf(LANE_SPACING, 22.0, curve_fac)
+	var lane_offset: float = (float(lane) - 1.5) * dynamic_spacing
 	return center_pos + normal * lane_offset
 
 func _process(delta: float) -> void:
@@ -192,9 +194,19 @@ func _process(delta: float) -> void:
 								var d = cr.progress - _merge_prog
 								if d < 0.0: d += track_len
 								# Hold if an oncoming circulating row is within the approach window or merge buffer
-								if (track_len - d) < 190.0 or d < 45.0:
+								if (track_len - d) < 220.0 or d < 55.0:
 									junction_clear = false
 									break
+								if not cr.passengers.is_empty():
+									for fp in f_row.passengers:
+										if not is_instance_valid(fp.get("view")): continue
+										for cp in cr.passengers:
+											if not is_instance_valid(cp.get("view")): continue
+											if fp["view"].global_position.distance_to(cp["view"].global_position) < 36.0:
+												junction_clear = false
+												break
+										if not junction_clear: break
+								if not junction_clear: break
 							if junction_clear:
 								_lead_feeder_committed = true
 								max_prog = f_len
@@ -234,7 +246,7 @@ func _process(delta: float) -> void:
 			var needed_cap: int = lead_row.passengers.size()
 			if _oval_freed_capacity >= needed_cap and lead_row.progress >= f_len - 2.0:
 				var merge_clear := true
-				var clearance_buffer := MIN_ROW_GAP * 1.15
+				var clearance_buffer := MIN_ROW_GAP * 1.25
 				for cr in _circulating_rows:
 					var d = absf(cr.progress - _merge_prog)
 					if d > track_len * 0.5:
@@ -242,6 +254,16 @@ func _process(delta: float) -> void:
 					if d < clearance_buffer:
 						merge_clear = false
 						break
+					if not cr.passengers.is_empty():
+						for fp in lead_row.passengers:
+							if not is_instance_valid(fp.get("view")): continue
+							for cp in cr.passengers:
+								if not is_instance_valid(cp.get("view")): continue
+								if fp["view"].global_position.distance_to(cp["view"].global_position) < 36.0:
+									merge_clear = false
+									break
+							if not merge_clear: break
+					if not merge_clear: break
 				if merge_clear:
 					_feeder_rows.pop_front()
 					_lead_feeder_committed = false
@@ -303,7 +325,9 @@ func _process(delta: float) -> void:
 
 		var old_prog = row.progress
 		var dist_moved = speed * delta
-		var min_gap: float = MIN_ROW_GAP
+		var pt_sample = passenger_track.curve.sample_baked(old_prog)
+		var curve_fac: float = clampf((absf(pt_sample.x) - 75.0) / 30.0, 0.0, 1.0)
+		var min_gap: float = lerpf(MIN_ROW_GAP, 48.0, curve_fac)
 		if _circulating_rows.size() > 1:
 			if dist_ahead <= min_gap:
 				dist_moved = 0.0
@@ -796,15 +820,15 @@ func _init_passenger_track() -> void:
 	var max_trig: float = -999999.0
 	for i in controller.level_data.parking_slots_count:
 		var slot_x: float = slot_views[i].position.x if i < slot_views.size() else (-total_span / 2.0 + float(i) * slot_spacing)
-		var trig_x: float = clampf(slot_x, -75.0, 75.0)
+		var trig_x: float = clampf(slot_x * 0.35, -55.0, 55.0)
 		var closest: float = passenger_track.curve.get_closest_offset(Vector2(trig_x, 115.0))
 		slot_boarding_points[i] = closest
 		min_trig = minf(min_trig, closest)
 		max_trig = maxf(max_trig, closest)
 
 	if not slot_boarding_points.is_empty():
-		_platform_start_prog = min_trig - 25.0
-		_platform_end_prog = max_trig + 25.0
+		_platform_start_prog = min_trig - 15.0
+		_platform_end_prog = max_trig + 15.0
 
 	_last_board_landing_time = 0.0
 	_oval_freed_capacity = 0
@@ -847,14 +871,37 @@ func _init_passenger_track() -> void:
 
 	controller.register_passengers(all_queue_p)
 
-	# Main oval starts densely packed (38 rows = 152 passengers)
+	# Main oval starts densely packed (28 rows = 112 passengers)
 	var track_len = passenger_track.curve.get_baked_length()
 	var initial_rows_count = mini(all_rows.size(), int(MAX_INITIAL_LOOP_PASSENGERS / NUM_LANES))
-	var loop_pitch: float = (track_len / float(initial_rows_count)) if initial_rows_count > 0 else ROW_SPACING
+	
+	# Pre-bake curve-aware cumulative weights for initial placement
+	var sample_step := 2.0
+	var num_samples := int(ceil(track_len / sample_step))
+	var cum_weights: Array[float] = [0.0]
+	var total_w := 0.0
+	for s_i in range(1, num_samples + 1):
+		var s_prog := minf(float(s_i) * sample_step, track_len)
+		var pt_s = passenger_track.curve.sample_baked(s_prog)
+		var c_fac = clampf((absf(pt_s.x) - 75.0) / 30.0, 0.0, 1.0)
+		var w_val = lerpf(1.0, 1.0 / 1.42, c_fac)
+		total_w += w_val * sample_step
+		cum_weights.append(total_w)
+
 	for r in initial_rows_count:
 		var row = all_rows[r]
 		row.is_feeder = false
-		row.progress = fmod(track_len - float(r) * loop_pitch, track_len)
+		var frac = float(r) / float(initial_rows_count) if initial_rows_count > 0 else 0.0
+		var target_w = (1.0 - frac) * total_w
+		var low := 0
+		var high := cum_weights.size() - 1
+		while low < high:
+			var mid = (low + high) / 2
+			if cum_weights[mid] < target_w:
+				low = mid + 1
+			else:
+				high = mid
+		row.progress = fmod(float(low) * sample_step, track_len)
 		if row.progress < 0.0: row.progress += track_len
 		
 		var pt_info = _get_curve_point_and_normal(passenger_track.curve, row.progress, true)
@@ -1100,7 +1147,7 @@ func _recover_boarding_for_slot(slot_id: int) -> void:
 		# Only board rows physically AT the slot's boarding trigger zone
 		var dist_to_trig = trigger_prog - row.progress
 		if dist_to_trig < 0: dist_to_trig += track_len
-		var is_at_boarding_exit: bool = (dist_to_trig <= 25.0 or abs(row.progress - trigger_prog) <= 25.0)
+		var is_at_boarding_exit: bool = (dist_to_trig <= 18.0 or abs(row.progress - trigger_prog) <= 18.0)
 		if not is_at_boarding_exit:
 			continue
 
@@ -2678,46 +2725,48 @@ func _animate_individual_boarding(p: Dictionary, vehicle_id: int, slot_id: int, 
 	# Funnel through gateway opening into parking apron with zero curb clipping
 	#
 	# In passenger_track_root space:
-	# - Oval track road surface is at y in [50, 180].
-	# - Gateway neck opening into parking is between x = -110 and +110.
-	# - At y >= 245, the wide platform apron covers all bays (x in [-172, 172]).
-	#
-	# Waypoints:
-	#   W0: Current position on track (gpos)
-	#   W1: Gateway neck mouth (y = 190, x clamped to [-85, 85])
-	#   W2: Platform apron entry (y = 245, x moving towards slot_x)
-	#   W3: Final doorway target (target_pos)
+	# - Oval track road surface is at y in [50, 177].
+	# - Gateway throat opening is between x in [-95, 95] down to y = 197.
+	# - Safe corridor with 27px margin: x in [-68, 68].
+	# - Platform apron expands below y = 215.
 	# -----------------------------------------------------------------
 	var p0_local: Vector2 = passenger_track_root.to_local(gpos)
 	var tgt_local: Vector2 = passenger_track_root.to_local(target_pos)
-	var lane_offset: float = (float(lane_idx) - 1.5) * 20.0
+	var lane_offset: float = (float(lane_idx) - 1.5) * 10.0
 
-	# W1: Gateway neck mouth (well inside the [-110, 110] neck opening)
-	var w1_x: float = clampf(lerpf(p0_local.x, tgt_local.x * 0.3, 0.3) + lane_offset, -85.0, 85.0)
-	var w1_local := Vector2(w1_x, 185.0)
-	var w1_global: Vector2 = passenger_track_root.to_global(w1_local)
-
-	# W2: Gateway neck exit onto platform apron (still strictly within gateway corridor)
-	var plat_y_local: float = 240.0
+	var plat_y_local: float = 197.0
 	if passenger_track_bg != null:
 		var tr = passenger_track_bg.get_node_or_null("TrackRenderer") as CarJamTrackRenderer
 		if tr != null and tr.plat_top_local > 150.0:
 			plat_y_local = tr.plat_top_local
-	var w2_x: float = clampf(lerpf(p0_local.x, tgt_local.x * 0.5, 0.5) + lane_offset, -85.0, 85.0)
+
+	# W1: Gateway neck mouth (y = 165, x safely inside [-60, 60])
+	var w1_x: float = clampf(lerpf(p0_local.x, tgt_local.x * 0.25, 0.4) + lane_offset, -60.0, 60.0)
+	var w1_local := Vector2(w1_x, 165.0)
+	var w1_global: Vector2 = passenger_track_root.to_global(w1_local)
+
+	# W2: Gateway throat center (y = plat_y_local = 197, x safely inside [-60, 60])
+	var w2_x: float = clampf(lerpf(w1_x, tgt_local.x * 0.35, 0.3), -60.0, 60.0)
 	var w2_local := Vector2(w2_x, plat_y_local)
 	var w2_global: Vector2 = passenger_track_root.to_global(w2_local)
 
-	# W3: Platform apron fan-out (wide grey apron comfortably covers all bays x in [-172, 172])
-	var w3_y: float = maxf(plat_y_local + 15.0, tgt_local.y - 15.0)
-	var w3_local := Vector2(tgt_local.x + (float(lane_idx) - 1.5) * 12.0, w3_y)
+	# W3: Gateway throat exit into platform apron (y = 215, safely past top horizontal curb)
+	var w3_x: float = clampf(lerpf(w2_x, tgt_local.x * 0.5, 0.4), -68.0, 68.0)
+	var w3_local := Vector2(w3_x, plat_y_local + 18.0)
 	var w3_global: Vector2 = passenger_track_root.to_global(w3_local)
 
-	# Build smooth Curve2D along the waypoints
+	# W4: Apron fan-out towards parking slot
+	var w4_y: float = maxf(plat_y_local + 35.0, tgt_local.y - 15.0)
+	var w4_local := Vector2(tgt_local.x + (float(lane_idx) - 1.5) * 8.0, w4_y)
+	var w4_global: Vector2 = passenger_track_root.to_global(w4_local)
+
+	# Smooth curve strictly confined to grey road surfaces
 	var board_curve := Curve2D.new()
-	board_curve.add_point(gpos, Vector2.ZERO, (w1_global - gpos).normalized() * 25.0)
-	board_curve.add_point(w1_global, Vector2(0.0, -20.0), Vector2(0.0, 20.0))
-	board_curve.add_point(w2_global, Vector2(0.0, -20.0), (w3_global - w2_global).normalized() * 20.0)
-	board_curve.add_point(w3_global, Vector2(0.0, -15.0), (target_pos - w3_global).normalized() * 15.0)
+	board_curve.add_point(gpos, Vector2.ZERO, (w1_global - gpos).normalized() * 18.0)
+	board_curve.add_point(w1_global, Vector2(0.0, -15.0), Vector2(0.0, 15.0))
+	board_curve.add_point(w2_global, Vector2(0.0, -15.0), Vector2(0.0, 15.0))
+	board_curve.add_point(w3_global, Vector2(0.0, -12.0), (w4_global - w3_global).normalized() * 15.0)
+	board_curve.add_point(w4_global, Vector2(0.0, -12.0), (target_pos - w4_global).normalized() * 12.0)
 	board_curve.add_point(target_pos, Vector2(0.0, -10.0), Vector2.ZERO)
 
 	var travel_dist = board_curve.get_baked_length()

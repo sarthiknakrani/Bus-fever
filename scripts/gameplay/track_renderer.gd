@@ -9,6 +9,13 @@ var curve: Curve2D
 var feeder_curve: Curve2D
 var plat_top_local: float = 245.0
 
+var inner_meet_idx: int = -1
+var inner_meet_pt := Vector2.ZERO
+var outer_meet_idx: int = -1
+var outer_meet_pt := Vector2.ZERO
+var inner_meet_ang: float = -0.65
+var outer_meet_ang: float = 0.09
+
 # Authoritative geometry constants
 const ROAD_HALF_WIDTH: float = 62.0
 const GATEWAY_HALF_WIDTH: float = 95.0 # ±95px gateway throat opening
@@ -19,6 +26,81 @@ const COLOR_CURB_HIGHLIGHT := Color("f8fafc") # Thin crisp near-white highlight
 const COLOR_CURB_BEVEL := Color("a5abc2") # Subtle cool slate bevel shadow
 const COLOR_SHADOW := Color(0.0, 0.0, 0.0, 0.12) # Soft contact shadow
 const COLOR_GARDEN := Color("69a827") # Lush vibrant garden green matching plaza artwork
+
+func compute_intersections(f_outer: Array[Vector2] = [], f_inner: Array[Vector2] = []) -> void:
+	if curve == null or feeder_curve == null:
+		return
+	var straight_x: float = 105.0
+	var r_center: float = 115.0
+	var c_right := Vector2(straight_x, 0.0)
+	var r_outer: float = r_center + ROAD_HALF_WIDTH
+	var w: float = ROAD_HALF_WIDTH
+
+	if f_outer.is_empty() or f_inner.is_empty():
+		f_outer.clear()
+		f_inner.clear()
+		var f_pts = feeder_curve.get_baked_points()
+		for i in range(f_pts.size()):
+			var pt = f_pts[i]
+			var t: Vector2
+			if i < f_pts.size() - 1:
+				t = (f_pts[i + 1] - pt).normalized()
+			else:
+				t = (pt - f_pts[i - 1]).normalized()
+			var n = Vector2(-t.y, t.x)
+			f_outer.append(pt - n * w)
+			f_inner.append(pt + n * w)
+
+	inner_meet_idx = -1
+	inner_meet_pt = Vector2.ZERO
+	for i in range(1, f_inner.size()):
+		var d_prev = f_inner[i - 1].distance_to(c_right)
+		var d_curr = f_inner[i].distance_to(c_right)
+		if (d_prev > r_outer and d_curr <= r_outer) or (d_prev <= r_outer and d_curr > r_outer):
+			inner_meet_idx = i
+			var pA = f_inner[i - 1]
+			var pB = f_inner[i]
+			var dAB = pB - pA
+			var vA = pA - c_right
+			var a_quad = dAB.dot(dAB)
+			var b_quad = 2.0 * vA.dot(dAB)
+			var c_quad = vA.dot(vA) - r_outer * r_outer
+			var disc = b_quad * b_quad - 4.0 * a_quad * c_quad
+			if disc >= 0.0 and a_quad > 0.0001:
+				var t_val = (-b_quad - sqrt(disc)) / (2.0 * a_quad)
+				if t_val < 0.0 or t_val > 1.0:
+					t_val = (-b_quad + sqrt(disc)) / (2.0 * a_quad)
+				inner_meet_pt = pA + dAB * clampf(t_val, 0.0, 1.0)
+			else:
+				inner_meet_pt = pB
+			break
+
+	outer_meet_idx = -1
+	outer_meet_pt = Vector2.ZERO
+	for i in range(1, f_outer.size()):
+		var d_prev = f_outer[i - 1].distance_to(c_right)
+		var d_curr = f_outer[i].distance_to(c_right)
+		if (d_prev > r_outer and d_curr <= r_outer) or (d_prev <= r_outer and d_curr > r_outer):
+			outer_meet_idx = i
+			var pA = f_outer[i - 1]
+			var pB = f_outer[i]
+			var dAB = pB - pA
+			var vA = pA - c_right
+			var a_quad = dAB.dot(dAB)
+			var b_quad = 2.0 * vA.dot(dAB)
+			var c_quad = vA.dot(vA) - r_outer * r_outer
+			var disc = b_quad * b_quad - 4.0 * a_quad * c_quad
+			if disc >= 0.0 and a_quad > 0.0001:
+				var t_val = (-b_quad - sqrt(disc)) / (2.0 * a_quad)
+				if t_val < 0.0 or t_val > 1.0:
+					t_val = (-b_quad + sqrt(disc)) / (2.0 * a_quad)
+				outer_meet_pt = pA + dAB * clampf(t_val, 0.0, 1.0)
+			else:
+				outer_meet_pt = pB
+			break
+
+	inner_meet_ang = (inner_meet_pt - c_right).angle() if inner_meet_idx >= 0 else -0.65
+	outer_meet_ang = (outer_meet_pt - c_right).angle() if outer_meet_idx >= 0 else 0.09
 
 func _draw() -> void:
 	if curve == null:
@@ -54,11 +136,6 @@ func _draw() -> void:
 	var f_outer: Array[Vector2] = []
 	var f_inner: Array[Vector2] = []
 
-	var inner_meet_idx: int = -1
-	var inner_meet_pt := Vector2.ZERO
-	var outer_meet_idx: int = -1
-	var outer_meet_pt := Vector2.ZERO
-
 	if feeder_curve != null:
 		var f_pts = feeder_curve.get_baked_points()
 		for i in range(f_pts.size()):
@@ -71,23 +148,7 @@ func _draw() -> void:
 			var n = Vector2(-t.y, t.x) # Normal pointing towards oval center
 			f_outer.append(pt - n * w)
 			f_inner.append(pt + n * w)
-
-		# Find where feeder inner boundary intersects the oval outer boundary
-		for i in range(f_inner.size()):
-			if f_inner[i].distance_to(c_right) <= r_outer:
-				inner_meet_idx = i
-				inner_meet_pt = f_inner[i]
-				break
-
-		# Find where feeder outer boundary intersects the oval outer boundary
-		for i in range(f_outer.size()):
-			if f_outer[i].distance_to(c_right) <= r_outer:
-				outer_meet_idx = i
-				outer_meet_pt = f_outer[i]
-				break
-
-	var inner_meet_ang: float = (inner_meet_pt - c_right).angle() if inner_meet_idx >= 0 else -0.65
-	var outer_meet_ang: float = (outer_meet_pt - c_right).angle() if outer_meet_idx >= 0 else 0.09
+		compute_intersections(f_outer, f_inner)
 
 	# -----------------------------------------------------------------
 	# 2. INNER HOLE RACETRACK CURB (Exposes green garden background)
