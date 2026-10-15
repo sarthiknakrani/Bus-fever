@@ -85,12 +85,13 @@ class PassengerRow extends RefCounted:
 	var is_feeder: bool = false
 	var passengers: Array[Dictionary] = [] # {"id": int, "color_id": String, "lane": int, "view": PassengerView, "state": String}
 
-const LANE_SPACING := 25.0
-const ROW_SPACING := 37.0
-const MIN_ROW_GAP := 36.5
+const LANE_SPACING := 23.5
+const ROW_SPACING := 38.5
+const MIN_ROW_GAP := 38.0
 const NUM_LANES := 4
-const PASSENGER_SPACING := 25.0
+const PASSENGER_SPACING := 23.5
 const MAX_INITIAL_LOOP_PASSENGERS := 112
+const SLOT_SPACING := 72.0
 
 var passenger_track: Path2D
 var feeder_track: Path2D
@@ -111,6 +112,8 @@ var _waiting_label: Label
 var track_time: float = 0.0
 var _last_board_landing_time: float = 0.0
 var _oval_freed_capacity: int = 0
+var _feeder_starvation_timer: float = 0.0
+var _last_starvation_diagnostic: Dictionary = {}
 
 @export var passenger_normal_speed: float = 335.0
 @export var passenger_sprint_speed: float = 380.0
@@ -134,7 +137,7 @@ func _get_curve_point_and_normal(c: Curve2D, offset: float, is_loop: bool = fals
 
 func _calc_lane_pos(center_pos: Vector2, normal: Vector2, lane: int) -> Vector2:
 	var curve_fac: float = clampf((absf(center_pos.x) - 75.0) / 30.0, 0.0, 1.0)
-	var dynamic_spacing: float = lerpf(LANE_SPACING, 22.0, curve_fac)
+	var dynamic_spacing: float = lerpf(LANE_SPACING, 20.5, curve_fac)
 	var lane_offset: float = (float(lane) - 1.5) * dynamic_spacing
 	return center_pos + normal * lane_offset
 
@@ -182,65 +185,89 @@ func _process(delta: float) -> void:
 					_pending_feeder_passengers.erase(p)
 				_feeder_rows.append(next_row)
 				
-		# B. Advance feeder rows forward towards stop line / row ahead
+		# B. Dynamic Continuous Feeder Admission Scheduler
 		var feeder_stop_pos: float = f_len - 240.0
+		
+		# 1. Determine how many feeder rows are authorized by freed loop capacity
+		var running_cap: int = _oval_freed_capacity
+		var authorized_count: int = 0
+		for r in _feeder_rows:
+			var req: int = r.passengers.size()
+			if running_cap >= req:
+				authorized_count += 1
+				running_cap -= req
+			else:
+				break
+				
+		# 2. Advance active feeder rows
+		var lead_row_stopped: bool = false
 		for j in range(_feeder_rows.size()):
 			var f_row = _feeder_rows[j]
-			var max_prog: float = feeder_stop_pos
-			if j == 0:
-				if not _lead_feeder_committed:
-					if f_row.progress >= feeder_stop_pos - 0.5:
-						# Lead row is at the stop line; check if freed capacity exists
-						if _oval_freed_capacity >= f_row.passengers.size():
-							# Check if conflict zone is clear of oncoming traffic before committing
-							var conflict_clear := true
-							for cr in _circulating_rows:
-								var d = cr.progress - _merge_prog
-								if d < 0.0: d += track_len
-								var dist_to_merge = track_len - d
-								if dist_to_merge < 85.0 or d < 30.0:
-									conflict_clear = false
-									break
-							if conflict_clear:
-								_lead_feeder_committed = true
-								max_prog = f_len
-							else:
-								max_prog = feeder_stop_pos
-						else:
-							max_prog = feeder_stop_pos
-					else:
-						max_prog = feeder_stop_pos
-				else:
-					# Committed to merge: proceed towards f_len
-					max_prog = f_len
-				var dist_ahead: float = max_prog - f_row.progress
-				var dist_moved: float = passenger_normal_speed * delta
-				dist_moved = minf(dist_moved, maxf(dist_ahead, 0.0))
-				f_row.progress += dist_moved
-			else:
-				var max_queue_prog = feeder_stop_pos - float(j) * ROW_SPACING
-				var target_prog = minf(_feeder_rows[j - 1].progress - ROW_SPACING, max_queue_prog)
-				var actual_gap: float = _feeder_rows[j - 1].progress - f_row.progress
-				var speed: float = passenger_normal_speed
-				if actual_gap > ROW_SPACING * 1.25:
-					speed = passenger_sprint_speed
-				elif actual_gap < ROW_SPACING * 0.90:
-					speed = passenger_normal_speed * 0.85
-				var dist_moved: float = speed * delta
-				if f_row.progress + dist_moved > target_prog:
-					dist_moved = maxf(0.0, target_prog - f_row.progress)
-				f_row.progress += dist_moved
+			var is_authorized: bool = (j < authorized_count)
+			var target_prog: float = feeder_stop_pos
 			
+			if is_authorized:
+				if j == 0:
+					target_prog = f_len
+					# Signal intent to oncoming traffic when within merge approach zone (45px)
+					_lead_feeder_committed = (f_row.progress >= f_len - 45.0)
+				else:
+					target_prog = _feeder_rows[j - 1].progress - ROW_SPACING
+			else:
+				var queue_slot: float = feeder_stop_pos - float(j - authorized_count) * ROW_SPACING
+				if j == 0:
+					target_prog = feeder_stop_pos
+				else:
+					target_prog = minf(_feeder_rows[j - 1].progress - ROW_SPACING, queue_slot)
+			
+			var dist_ahead: float = maxf(0.0, target_prog - f_row.progress)
+			var speed: float = passenger_normal_speed
+			if j > 0:
+				var gap_to_prev: float = _feeder_rows[j - 1].progress - f_row.progress
+				if gap_to_prev > ROW_SPACING * 1.25:
+					speed = passenger_sprint_speed
+				elif gap_to_prev < ROW_SPACING * 0.90:
+					speed = passenger_normal_speed * 0.85
+					
+			var dist_moved: float = speed * delta
+			dist_moved = minf(dist_moved, dist_ahead)
+			f_row.progress += dist_moved
+			
+			if j == 0 and dist_moved < 0.1 and dist_ahead < 0.5:
+				lead_row_stopped = true
+
 		# C. Merge lead feeder row onto main loop if:
-		#    1. Enough capacity has been freed on the loop by boarded passengers (_oval_freed_capacity >= row.size)
-		#    2. Lead row has arrived at or past merge threshold (f_len - 2.0)
-		#    3. Merge zone on the oval is clear
+		#    1. Lead row is authorized (_oval_freed_capacity >= needed_cap)
+		#    2. Lead row has arrived at merge threshold (f_len - 2.0)
+		#    3. Merge zone on the oval is clear of conflicting oncoming traffic
+		# Bounded-wait starvation tracking
+		if authorized_count > 0 and not _feeder_rows.is_empty():
+			_feeder_starvation_timer += delta
+			if _feeder_starvation_timer >= 5.0:
+				var lead_r = _feeder_rows.front()
+				var wait_reason = "Advancing to merge threshold"
+				if lead_r.progress >= f_len - 2.0:
+					wait_reason = "Waiting for merge clearance gap in oncoming traffic"
+				_last_starvation_diagnostic = {
+					"timestamp": track_time,
+					"wait_duration": _feeder_starvation_timer,
+					"lead_progress": lead_r.progress,
+					"dist_to_merge": f_len - lead_r.progress,
+					"authorized_count": authorized_count,
+					"freed_capacity": _oval_freed_capacity,
+					"reason": wait_reason
+				}
+				print("[QA FEEDER WAIT DIAGNOSTIC] Duration: %.2fs | Reason: %s | Prog: %.1f/%.1f" % [
+					_feeder_starvation_timer, wait_reason, lead_r.progress, f_len
+				])
+				_feeder_starvation_timer = 0.0
+
 		if not _feeder_rows.is_empty():
 			var lead_row = _feeder_rows.front()
 			var needed_cap: int = lead_row.passengers.size()
 			if _oval_freed_capacity >= needed_cap and lead_row.progress >= f_len - 2.0:
 				var merge_clear := true
-				var clearance_buffer: float = 30.0
+				var clearance_buffer: float = 32.0
 				for cr in _circulating_rows:
 					var d = absf(cr.progress - _merge_prog)
 					if d > track_len * 0.5:
@@ -251,6 +278,8 @@ func _process(delta: float) -> void:
 				if merge_clear:
 					_feeder_rows.pop_front()
 					_lead_feeder_committed = false
+					_feeder_starvation_timer = 0.0
+					_last_starvation_diagnostic.clear()
 					lead_row.progress = _merge_prog
 					lead_row.is_feeder = false
 					for p in lead_row.passengers:
@@ -264,15 +293,21 @@ func _process(delta: float) -> void:
 					_oval_freed_capacity -= needed_cap
 					controller.check_terminal_states()
 
-		# D. Update positions of passengers in active feeder rows
-		for f_row in _feeder_rows:
+		# D. Update positions and animation states of passengers in active feeder rows
+		for j in range(_feeder_rows.size()):
+			var f_row = _feeder_rows[j]
 			var f_pt_info = _get_curve_point_and_normal(feeder_track.curve, f_row.progress, false)
-			var is_row_stopped: bool = f_row.progress >= feeder_stop_pos - 0.5 and not _lead_feeder_committed
+			var is_row_waiting: bool = false
+			if j >= authorized_count:
+				is_row_waiting = (f_row.progress >= (feeder_stop_pos - float(j - authorized_count) * ROW_SPACING) - 1.0)
+			else:
+				if j == 0:
+					is_row_waiting = lead_row_stopped
 			for p in f_row.passengers:
 				if p["state"] == "FEEDER" and is_instance_valid(p.get("view")):
 					var lpos = _calc_lane_pos(f_pt_info["pos"], f_pt_info["normal"], p["lane"])
 					p["view"].position = lpos
-					p["view"].set_waiting(is_row_stopped)
+					p["view"].set_waiting(is_row_waiting)
 
 	# ---------------------------------------------
 	# 2. CIRCULATING ROWS ON MAIN TRACK
@@ -312,15 +347,13 @@ func _process(delta: float) -> void:
 			var d_merge = row.progress - _merge_prog
 			if d_merge < 0.0: d_merge += track_len
 			var dist_to_merge = track_len - d_merge
-			if dist_to_merge > 0.0 and dist_to_merge <= 160.0:
-				var yield_dist = maxf(0.0, dist_to_merge - ROW_SPACING)
+			if dist_to_merge >= ROW_SPACING and dist_to_merge <= 85.0:
+				var yield_dist = dist_to_merge - ROW_SPACING
 				dist_ahead = minf(dist_ahead, yield_dist)
 
 		var old_prog = row.progress
 		var dist_moved = speed * delta
-		var pt_sample = passenger_track.curve.sample_baked(old_prog)
-		var curve_fac: float = clampf((absf(pt_sample.x) - 75.0) / 30.0, 0.0, 1.0)
-		var min_gap: float = lerpf(MIN_ROW_GAP, 48.0, curve_fac)
+		var min_gap: float = MIN_ROW_GAP
 		if _circulating_rows.size() > 1:
 			if dist_ahead <= min_gap:
 				dist_moved = 0.0
@@ -606,7 +639,7 @@ func _setup_visuals(lvl: CarJamLevelData) -> void:
 	board_bg.setup(lvl.board_size)
 
 	# 2. Parking Slots
-	var slot_spacing := 58.0
+	var slot_spacing := SLOT_SPACING
 	var total_span: float = float(lvl.parking_slots_count - 1) * slot_spacing
 
 	for i in lvl.parking_slots_count:
@@ -805,7 +838,7 @@ func _init_passenger_track() -> void:
 	
 	# Precalculate boarding crossing points for ALL parking slots
 	slot_boarding_points.clear()
-	var slot_spacing := 58.0
+	var slot_spacing := SLOT_SPACING
 	var total_span: float = float(controller.level_data.parking_slots_count - 1) * slot_spacing
 	var min_trig: float = 999999.0
 	var max_trig: float = -999999.0
@@ -994,7 +1027,9 @@ func get_runtime_track_snapshot() -> Dictionary:
 		"circulating_rows": circ_rows,
 		"feeder_rows": f_rows,
 		"pending_rows": p_rows,
-		"oval_freed_capacity": _oval_freed_capacity
+		"oval_freed_capacity": _oval_freed_capacity,
+		"lead_feeder_committed": _lead_feeder_committed,
+		"starvation_diagnostic": _last_starvation_diagnostic.duplicate()
 	}
 
 func _board_circulating_passenger(p: Dictionary, vehicle_id: int, slot_idx: int, trigger_prog: float) -> void:
@@ -1034,6 +1069,9 @@ func _on_vehicle_dispatch_started(vehicle_id: int, slot_id: int, corridor: Array
 	var vv: VehicleView = vehicle_views.get(vehicle_id, null)
 	if vv == null:
 		return
+	vv.is_dispatched = true
+	if vv._touch_area != null:
+		vv._touch_area.input_pickable = false
 
 	# Reparent to TransitLayer preserving global position
 	var global_start := vv.global_position
@@ -2256,28 +2294,28 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 	var board_pixel_w = board_local_size * sqrt(2.0)
 	var board_pixel_h = board_pixel_w * 0.72
 	
-	# 2. Determine 40% / 60% Vertical Screen Space Allocation
-	# Top gameplay block: 40% of total screen height (top buttons, title, track, parking platform)
-	# Bottom puzzle block: 60% of total screen height (puzzle board, booster bar)
+	# 2. Determine Screen Space Allocation
+	# User request: Lower horizontal divider line to create ample clearance below slots/buses,
+	# and shift upper section upward.
 	var screen_safe_w = vp_size.x * 0.94
-	var total_top_screen_h = vp_size.y * 0.40
-	var total_btm_screen_h = vp_size.y * 0.60
+	var total_top_screen_h = vp_size.y * 0.44
+	var total_btm_screen_h = vp_size.y * 0.56
 
 	# Top safe margin (~75px for TopBar), bottom safe margin (~115px for BoosterBar)
 	var safe_upper_screen_h = total_top_screen_h - 75.0
 	var safe_lower_screen_h = total_btm_screen_h - 115.0
 
 	# Ensure we fit parking strip, board clearance, and track system with feeder
-	var slot_spacing = 58.0
+	var slot_spacing = SLOT_SPACING
 	var slots_count: int = controller.level_data.parking_slots_count if controller != null and controller.level_data != null else 4
 	var parking_w = float(max(1, slots_count - 1)) * slot_spacing + 35.0
 	var board_padded_w = board_pixel_w + 60.0
 	var track_system_w = 640.0
 	var required_w = maxf(maxf(parking_w, board_padded_w), track_system_w)
 
-	# Essential heights
-	var min_gap_tp = 20.0 # Platform throat gap to passenger track
-	var min_band_h = 36.0 # Platform grey band below parking slots
+	# Essential heights: generous grey platform apron (105px) below parking slots
+	var min_gap_tp = 22.0 # Platform throat gap to passenger track
+	var min_band_h = 105.0 # Platform grey band below parking slots (generous margin beneath buses)
 	var essential_upper_h = track_h + min_gap_tp + parking_h + min_band_h + 10.0
 	var min_sep_to_board = 40.0
 	var min_btm_pad = 20.0
@@ -2297,16 +2335,16 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 	var btm_safe_y = half_h - (115.0 / scale_factor)
 
 	# In world_root coordinates, local Y = 0.0 corresponds to vertical screen center (50%).
-	# 40% from top of screen means global Y = 0.40 * H.
+	# 44% from top of screen means global Y = 0.44 * H.
 	# Converting global Y to world_root local Y:
-	# Y_local = (0.40 * H - 0.50 * H) / scale_factor = -0.10 * (H / scale_factor)
-	var divider_y: float = -0.10 * (vp_size.y / scale_factor)
+	# Y_local = (0.44 * H - 0.50 * H) / scale_factor = -0.06 * (H / scale_factor)
+	var divider_y: float = -0.06 * (vp_size.y / scale_factor)
 
-	# Upper elements: strictly occupy the top 40% (between top_safe_y and divider_y)
-	# Platform band bottom rests cleanly at divider_y (the 40% line):
+	# Upper elements: occupy the top 44% (between top_safe_y and divider_y)
+	# Platform band bottom rests cleanly at divider_y (the 44% line):
 	var band_h = min_band_h
 	var partition_y = divider_y - band_h
-	var parking_bottom = partition_y - 6.0
+	var parking_bottom = partition_y - 12.0
 	var parking_y = parking_bottom - (parking_h / 2.0)
 	var track_bottom = parking_y - (parking_h / 2.0) - min_gap_tp
 	var track_y = track_bottom - (track_h / 2.0)
@@ -2359,7 +2397,7 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 			tr.queue_redraw()
 
 	if garden_bg != null:
-		var divider_screen_y = 0.40 * vp_size.y
+		var divider_screen_y = 0.44 * vp_size.y
 		var track_screen_y = (vp_size.y / 2.0) + (track_y * scale_factor)
 		garden_bg.update_layout(vp_size, track_screen_y, scale_factor, divider_screen_y)
 

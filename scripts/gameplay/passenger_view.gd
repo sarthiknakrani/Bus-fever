@@ -19,7 +19,7 @@ var _is_waiting: bool = false
 var _last_pos: Vector2 = Vector2.ZERO
 var _facing_right: bool = true
 
-const BASE_SCALE := 0.20
+const BASE_SCALE := 0.282
 
 func set_waiting(waiting: bool) -> void:
 	_is_waiting = waiting
@@ -39,7 +39,7 @@ func setup(p_col_id: String, p_id: int = 0, p_lane: int = 0) -> void:
 		_shadow.texture = t_shadow
 	_shadow.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	_shadow.position = Vector2(0, 0)
-	_shadow.scale = Vector2(0.26, 0.14)
+	_shadow.scale = Vector2(0.36, 0.19)
 	_shadow.modulate = Color(0, 0, 0, 0.45)
 	_shadow.z_index = -1
 	add_child(_shadow)
@@ -115,7 +115,7 @@ func _process(delta: float) -> void:
 			_char_sprite.rotation = 0.0
 			_char_sprite.scale = Vector2(facing_sign, 1.0)
 			if _shadow != null:
-				_shadow.scale = Vector2(0.26, 0.14)
+				_shadow.scale = Vector2(0.36, 0.19)
 				_shadow.modulate.a = 0.45
 		else:
 			# Real Running Cycle synchronized directly with movement distance
@@ -131,7 +131,7 @@ func _process(delta: float) -> void:
 			_char_sprite.scale = Vector2(facing_sign, 1.0)
 			
 			if _shadow != null:
-				_shadow.scale = Vector2(0.26, 0.14)
+				_shadow.scale = Vector2(0.36, 0.19)
 				_shadow.modulate.a = 0.45
 
 func animate_jump(delay: float) -> void:
@@ -163,8 +163,8 @@ func animate_jump(delay: float) -> void:
 		var tw_s := create_tween()
 		if delay > 0.0:
 			tw_s.tween_interval(delay)
-		tw_s.tween_property(_shadow, "scale", Vector2(0.13, 0.07), 0.08)
-		tw_s.tween_property(_shadow, "scale", Vector2(0.26, 0.14), 0.08)
+		tw_s.tween_property(_shadow, "scale", Vector2(0.18, 0.095), 0.08)
+		tw_s.tween_property(_shadow, "scale", Vector2(0.36, 0.19), 0.08)
 
 func _load_interim_sprite(path: String) -> Texture2D:
 	if ResourceLoader.exists(path):

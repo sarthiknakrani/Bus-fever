@@ -6,19 +6,28 @@ func _init() -> void:
 	_run()
 
 func _run() -> void:
+	var gc_node = root.get_node_or_null("GameController")
+	if gc_node == null:
+		var gc_script = GDScript.new()
+		gc_script.source_code = "extends Node\nvar current_level_number: int = 1\nfunc has_level(n: int) -> bool: return n <= 2\n"
+		gc_script.reload()
+		gc_node = Node.new()
+		gc_node.set_script(gc_script)
+		gc_node.name = "GameController"
+		root.add_child(gc_node)
+
 	for lvl_num in [1, 2]:
 		print("\n==================================================")
 		print("=== RUNNING FULL LEVEL %d PLAYTHROUGH SIMULATION ===" % lvl_num)
 		print("==================================================")
 		
+		gc_node.current_level_number = lvl_num
+		
 		var lvl = CarJamLevelScene.instantiate()
 		root.add_child(lvl)
-		lvl._ready()
-		var res_path = "res://levels/level_%03d.tres" % lvl_num
-		var ld = ResourceLoader.load(res_path) as CarJamLevelData
-		lvl.controller.load_level(ld)
-		lvl._setup_visuals(ld)
+		await process_frame
 		
+		var ld = lvl.controller.level_data
 		var solver = CarJamPuzzleSolver.new()
 		var solve_res = solver.solve(ld)
 		print("Solver result: solvable=", solve_res["solvable"], " moves count=", solve_res["moves"].size())
@@ -32,20 +41,33 @@ func _run() -> void:
 		
 		var move_idx := 0
 		var sim_frames := 0
-		var max_frames := 6000 if lvl_num == 1 else 14000
+		var max_frames := 6000 if lvl_num == 1 else 10000
 		
 		while sim_frames < max_frames:
 			await process_frame
 			sim_frames += 1
 			
-			if move_idx < moves.size() and lvl.controller.parking.find_available_slot() != -1:
+			var free_unlocked = lvl.controller.parking.get_available_slot_count()
+					
+			# Check colors on oval
+			var oval_colors = {}
+			for r in lvl._circulating_rows:
+				for p in r.passengers:
+					if p["state"] == "CIRCULATING":
+						oval_colors[p["color_id"]] = true
+						
+			if free_unlocked > 0 and move_idx < moves.size():
 				var next_vid = moves[move_idx]
 				var v = lvl.controller.vehicles.get(next_vid)
 				if v != null and v.state == VehicleModel.VehicleState.ON_BOARD:
-					var ok = lvl.controller.tap_vehicle(next_vid)
-					if ok:
-						print("Frame %d: Dispatched vehicle %d (color=%s)" % [sim_frames, next_vid, v.color_id])
-						move_idx += 1
+					# In Level 1, all 6 normal slots are unlocked and match all 6 buses, so we can dispatch freely.
+					# In Level 2, 4 slots are unlocked and 2 locked. We preserve 1 free slot unless color matches oval.
+					var safe_to_dispatch: bool = (lvl_num == 1) or (free_unlocked >= 2) or oval_colors.has(v.color_id)
+					if safe_to_dispatch:
+						var ok = lvl.controller.tap_vehicle(next_vid)
+						if ok:
+							print("Frame %d: Dispatched vehicle %d (color=%s, free_after=%d)" % [sim_frames, next_vid, v.color_id, free_unlocked - 1])
+							move_idx += 1
 							
 			if lvl.controller.state == CarJamController.GameState.WIN:
 				print(">>> SUCCESS! Level %d reached WIN in frame %d <<<" % [lvl_num, sim_frames])

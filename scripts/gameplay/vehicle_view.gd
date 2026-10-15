@@ -178,6 +178,11 @@ func _apply_bus_cell_fit() -> void:
 	board_anchor_offset = dir_vec * BOARD_ANCHOR_SHIFT
 	_base_sprite.position = board_anchor_offset
 
+	# Keep touch area collision shape synchronized with sprite scale and offset
+	if _touch_area != null and _touch_area.get_child_count() > 0:
+		var cs = _touch_area.get_child(0) as CollisionShape2D
+		if cs != null and cs.shape is RectangleShape2D:
+			_update_touch_shape(cs.shape as RectangleShape2D, cs)
 
 func _setup_touch_area() -> void:
 	if _touch_area != null: return
@@ -186,23 +191,23 @@ func _setup_touch_area() -> void:
 	var col_shape := CollisionShape2D.new()
 	var rect_shape := RectangleShape2D.new()
 	
-	var min_x = 0; var max_x = 0; var min_y = 0; var max_y = 0
-	for p in vehicle_footprint:
-		if p.x < min_x: min_x = p.x
-		if p.x > max_x: max_x = p.x
-		if p.y < min_y: min_y = p.y
-		if p.y > max_y: max_y = p.y
-	
-	var cells_w = max_x - min_x + 1
-	var cells_h = max_y - min_y + 1
-	rect_shape.size = Vector2(cells_w * CELL_SIZE * 0.92, cells_h * CELL_SIZE * 0.92)
+	_update_touch_shape(rect_shape, col_shape)
 	
 	col_shape.shape = rect_shape
-	if _base_sprite != null:
-		col_shape.position = _base_sprite.position
 	_touch_area.add_child(col_shape)
 	_touch_area.input_event.connect(_on_touch_input)
 	add_child(_touch_area)
+
+func _update_touch_shape(rect_shape: RectangleShape2D, col_shape: CollisionShape2D) -> void:
+	var is_vert: bool = (vehicle_dir == CarJamVehicleData.Direction.UP or
+			vehicle_dir == CarJamVehicleData.Direction.DOWN)
+	var body_w: float = (CANONICAL_BODY_WIDTH_V if is_vert else CANONICAL_BODY_LENGTH) * board_scale_factor
+	var body_h: float = (CANONICAL_BODY_LENGTH if is_vert else CANONICAL_BODY_WIDTH_H) * board_scale_factor
+	# Silhouette-matched hitbox with 0.95 factor guarantees tight containment inside rendered bus sprite,
+	# completely eliminating hitbox protrusion and neighbor overlaps
+	rect_shape.size = Vector2(body_w * 0.95, body_h * 0.95)
+	if _base_sprite != null:
+		col_shape.position = _base_sprite.position
 
 var is_dispatched: bool = false
 
