@@ -149,8 +149,11 @@ func _test_responsive_resolutions_and_captures() -> void:
 			var play_y: float = float(win_size.y) * 0.85 - 80.0
 			_assert(logo.position.y + logo.size.y < play_y - 15.0, "[%s] Logo clears play button with ample breathing room (bottom=%.1f < play_y=%.1f)" % [tag, logo.position.y + logo.size.y, play_y])
 
-		# Wait for entrance animation to settle
+		# Wait for entrance animation to settle and rendering frames to draw
 		await create_timer(0.85).timeout
+		for i in range(5):
+			await process_frame
+			await RenderingServer.frame_post_draw
 
 		# Save full-screen capture
 		var img = vp.get_texture().get_image()

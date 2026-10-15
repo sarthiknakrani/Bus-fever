@@ -444,15 +444,15 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 		if tex_size.y > 0.0:
 			logo_aspect = tex_size.x / tex_size.y
 
-	# Responsive width: fit up to 88% of screen, capped at 640px
-	var max_w: float = minf(vp_size.x * 0.88, 640.0)
+	# Responsive width (75% scale of base design): fit up to 66% of screen, capped at 480px
+	var max_w: float = minf(vp_size.x * 0.66, 480.0)
 	var logo_w: float = max_w
 	var logo_h: float = logo_w / logo_aspect
 
-	# Responsive 3D Orange Play Button sizing & position (Bold, prominent, AAA casual size)
-	var btn_w: float = minf(vp_size.x * 0.70, 420.0)
-	var btn_h: float = btn_w * (600.0 / 1160.0) # aspect ~0.5172
-	var btn_y: float = (vp_size.y * 0.86) - (btn_h * 0.5)
+	# Responsive 3D Orange Play Button (75% scale of base design): 52.5% width, capped at 315px
+	var btn_w: float = minf(vp_size.x * 0.525, 315.0)
+	var btn_h: float = btn_w * (590.0 / 1160.0) # aspect ~0.5086
+	var btn_y: float = (vp_size.y * 0.87) - (btn_h * 0.5)
 	if _play_btn != null and is_instance_valid(_play_btn):
 		_play_btn.size = Vector2(btn_w, btn_h)
 		_play_btn.position = Vector2((vp_size.x - btn_w) * 0.5, btn_y)
@@ -463,9 +463,9 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 	var btm_clearance: float = btn_y - 20.0
 	var available_h: float = maxf(100.0, btm_clearance - top_clearance)
 
-	# If logo height exceeds 55% of available vertical height, scale down proportionately
-	if logo_h > available_h * 0.55:
-		logo_h = available_h * 0.55
+	# If logo height exceeds 42% of available vertical height (75% scale), scale down proportionately
+	if logo_h > available_h * 0.42:
+		logo_h = available_h * 0.42
 		logo_w = logo_h * logo_aspect
 
 	# Perfectly center horizontally, and place vertically at 0.35 of available space (sky zone)
