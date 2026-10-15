@@ -51,22 +51,11 @@ func _build_ui() -> void:
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(bg)
 
-	# SafeArea for buttons
-	var safe := MarginContainer.new()
-	safe.name = "SafeArea"
-	safe.set_anchors_preset(Control.PRESET_FULL_RECT)
-	safe.add_theme_constant_override("margin_top", 40)
-	safe.add_theme_constant_override("margin_bottom", 40)
-	safe.add_theme_constant_override("margin_left", 40)
-	safe.add_theme_constant_override("margin_right", 40)
-	safe.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.add_child(safe)
-
 	var hud := Control.new()
 	hud.name = "HUD"
 	hud.set_anchors_preset(Control.PRESET_FULL_RECT)
 	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	safe.add_child(hud)
+	root.add_child(hud)
 
 	# B. Premium 3D Game Title Logo ("BUS FEVER PARTY!")
 	_logo_wrapper = Control.new()
@@ -98,10 +87,10 @@ func _build_ui() -> void:
 	settings_btn.anchor_right = 1.0
 	settings_btn.anchor_top = 0.0
 	settings_btn.anchor_bottom = 0.0
-	settings_btn.offset_left = -64.0
-	settings_btn.offset_right = 0.0
-	settings_btn.offset_top = 0.0
-	settings_btn.offset_bottom = 64.0
+	settings_btn.offset_left = -88.0
+	settings_btn.offset_right = -24.0
+	settings_btn.offset_top = 28.0
+	settings_btn.offset_bottom = 92.0
 	settings_btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	settings_btn.pivot_offset = Vector2(32, 32)
 	
