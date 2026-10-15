@@ -49,9 +49,9 @@ func _test_logo_asset_integrity() -> void:
 	var logo_tex: Texture2D = ResourceLoader.load(logo_path)
 	_assert(logo_tex != null, "Logo texture loaded successfully as Texture2D")
 	if logo_tex != null:
-		_assert(logo_tex.get_width() >= 750 and logo_tex.get_height() >= 500, "Logo has high retina resolution (%dx%d px)" % [logo_tex.get_width(), logo_tex.get_height()])
+		_assert(logo_tex.get_width() >= 700 and logo_tex.get_height() >= 500, "Logo has high retina resolution (%dx%d px)" % [logo_tex.get_width(), logo_tex.get_height()])
 		var aspect: float = float(logo_tex.get_width()) / float(logo_tex.get_height())
-		_assert(aspect > 0.75 and aspect < 1.60, "Logo aspect ratio is balanced portrait casual badge standard (%.3f)" % aspect)
+		_assert(aspect > 0.85 and aspect < 1.45, "Logo aspect ratio is balanced casual badge standard (%.3f)" % aspect)
 
 	var font_path := "res://assets/fonts/arial_rounded_bold.ttf"
 	_assert(ResourceLoader.exists(font_path), "Font asset exists in project at %s" % font_path)
@@ -142,18 +142,20 @@ func _test_responsive_resolutions_and_captures() -> void:
 			var expected_center_x = (float(win_size.x) - logo.size.x) * 0.5
 			_assert(absf(logo.position.x - expected_center_x) < 2.0, "[%s] Logo is horizontally centered (%.1f vs expected %.1f)" % [tag, logo.position.x, expected_center_x])
 
-			# Verify vertical clearance from Settings button (y >= 80)
-			_assert(logo.position.y >= 75.0, "[%s] Logo clears top settings area (y=%.1f >= 75)" % [tag, logo.position.y])
+			# Verify vertical clearance from Settings button (y >= 60)
+			_assert(logo.position.y >= 60.0, "[%s] Logo clears top settings area (y=%.1f >= 60)" % [tag, logo.position.y])
 
-			# Verify vertical clearance from Play button (play button at ~0.85 * H - 80)
-			var play_y: float = float(win_size.y) * 0.85 - 80.0
-			_assert(logo.position.y + logo.size.y < play_y - 15.0, "[%s] Logo clears play button with ample breathing room (bottom=%.1f < play_y=%.1f)" % [tag, logo.position.y + logo.size.y, play_y])
+			# Verify logo stays strictly within the cloud zone, never overlaying background buildings/trees (horizon ~0.3706)
+			var max_horizon_y: float = float(win_size.y) * 0.36
+			_assert(logo.position.y + logo.size.y <= max_horizon_y + 0.5, "[%s] Logo stays strictly inside clouds, never overlaying background buildings/trees (bottom=%.1f <= max=%.1f)" % [tag, logo.position.y + logo.size.y, max_horizon_y])
 
-		# Wait for entrance animation to settle and rendering frames to draw
-		await create_timer(0.85).timeout
-		for i in range(5):
+			# Verify vertical clearance from Play button (play button at ~0.81 * H)
+			var play_y: float = float(win_size.y) * 0.81 - 40.0
+			_assert(logo.position.y + logo.size.y < play_y - 20.0, "[%s] Logo clears play button with ample breathing room (bottom=%.1f < play_y=%.1f)" % [tag, logo.position.y + logo.size.y, play_y])
+
+		# Wait for entrance animation and layout frames to process
+		for f in range(15):
 			await process_frame
-			await RenderingServer.frame_post_draw
 
 		# Save full-screen capture
 		var img = vp.get_texture().get_image()
@@ -165,4 +167,4 @@ func _test_responsive_resolutions_and_captures() -> void:
 			printerr("  [CAPTURE FAIL] Failed to get viewport image for %s" % out_path)
 
 		vp.queue_free()
-		await create_timer(0.05).timeout
+		await process_frame

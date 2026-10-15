@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120" width="240" height="120">
+  <defs>
+    <linearGradient id="cGrad1" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95"/>
+      <stop offset="65%" stop-color="#ffffff" stop-opacity="0.90"/>
+      <stop offset="100%" stop-color="#e0f2fe" stop-opacity="0.80"/>
+    </linearGradient>
+    <filter id="softBlur" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur stdDeviation="1.5"/>
+    </filter>
+  </defs>
+  <!-- Fluffy cartoon cloud shape -->
+  <path d="M 40 90 
+           Q 20 90 20 70 
+           Q 20 52 35 48 
+           Q 30 25 55 20 
+           Q 75 15 90 32 
+           Q 110 10 145 15 
+           Q 175 18 185 45 
+           Q 210 42 220 62 
+           Q 225 82 205 90 
+           Z" 
+        fill="url(#cGrad1)" 
+        filter="url(#softBlur)"/>
+</svg>

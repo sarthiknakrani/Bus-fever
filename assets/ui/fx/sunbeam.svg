@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <defs>
+    <radialGradient id="sunGlow" cx="0%" cy="0%" r="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.6"/>
+      <stop offset="25%" stop-color="#fef08a" stop-opacity="0.35"/>
+      <stop offset="60%" stop-color="#f59e0b" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.0"/>
+    </radialGradient>
+  </defs>
+  <!-- Main radial sunburst glow -->
+  <polygon points="0,0 400,0 400,400 0,400" fill="url(#sunGlow)"/>
+  <!-- Radiating sun rays -->
+  <polygon points="0,0 220,400 280,400" fill="#ffffff" opacity="0.12"/>
+  <polygon points="0,0 350,320 400,280" fill="#fef08a" opacity="0.10"/>
+  <polygon points="0,0 400,120 400,180" fill="#ffffff" opacity="0.14"/>
+  <polygon points="0,0 120,400 160,400" fill="#fde047" opacity="0.09"/>
+</svg>

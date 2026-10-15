@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 130" width="280" height="130">
+  <defs>
+    <linearGradient id="cGrad2" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95"/>
+      <stop offset="60%" stop-color="#f8fafc" stop-opacity="0.90"/>
+      <stop offset="100%" stop-color="#bae6fd" stop-opacity="0.75"/>
+    </linearGradient>
+    <filter id="softBlur2" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur stdDeviation="1.5"/>
+    </filter>
+  </defs>
+  <path d="M 50 100 
+           Q 25 100 25 78 
+           Q 25 58 45 54 
+           Q 40 28 70 22 
+           Q 95 18 115 36 
+           Q 140 12 180 18 
+           Q 215 22 225 50 
+           Q 245 48 255 68 
+           Q 260 92 235 100 
+           Z" 
+        fill="url(#cGrad2)" 
+        filter="url(#softBlur2)"/>
+</svg>
