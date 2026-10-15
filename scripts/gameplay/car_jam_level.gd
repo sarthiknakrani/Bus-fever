@@ -32,6 +32,7 @@ var garden_bg: GardenBackgroundView
 var parking_root: Node2D
 var parking_slots_node: Node2D
 var parked_vehicles_node: Node2D
+var departure_road_y: float = 0.0
 
 var passenger_track_root: Node2D
 var passenger_track_bg: Node2D
@@ -1223,8 +1224,24 @@ func _on_vehicle_filled(vehicle_id: int, slot_id: int) -> void:
 		return
 
 	_play_sfx("depart")
+
+	# Reparent to transit_layer preserving exact global transform so vehicle operates
+	# in world_root space (same coordinate frame as dispatch) with zero coordinate jump
+	if transit_layer != null and vv.get_parent() != transit_layer:
+		var gx := vv.global_transform
+		if vv.get_parent() != null:
+			vv.get_parent().remove_child(vv)
+		transit_layer.add_child(vv)
+		vv.global_transform = gx
+
+	vv.z_index = 200
+
 	var slot_pos := _get_slot_world_pos(slot_id)
 	var slot_rot: float = slot_views[slot_id].rotation if slot_id < slot_views.size() else 0.0
+	var road_y: float = departure_road_y
+	if is_zero_approx(road_y):
+		road_y = slot_pos.y + 110.0
+
 	VehicleMovement.animate_departure(
 		vv,
 		slot_pos,
@@ -1233,7 +1250,8 @@ func _on_vehicle_filled(vehicle_id: int, slot_id: int) -> void:
 		vehicle_id,
 		slot_id,
 		bus_movement_duration_multiplier,
-		slot_rot
+		slot_rot,
+		road_y
 	)
 
 func _on_vehicle_departed(_vehicle_id: int, slot_id: int) -> void:
@@ -2355,6 +2373,7 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 	var track_y = track_bottom - (track_h / 2.0)
 	var plat_top = parking_y - (parking_h / 2.0) - 18.0
 	var separator_y = divider_y
+	departure_road_y = divider_y - 58.5 # Centerline of the grey platform roadway apron
 
 	# Lower elements: centered inside the 60% bottom space (between divider_y and btm_safe_y)
 	var avail_lower_h = btm_safe_y - divider_y

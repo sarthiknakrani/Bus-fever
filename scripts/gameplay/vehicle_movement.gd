@@ -171,34 +171,21 @@ static func animate_departure(
 	vehicle_id: int,
 	slot_id: int,
 	duration_mult: float = 1.0,
-	slot_rotation: float = 0.0
+	slot_rotation: float = 0.0,
+	target_road_y: float = 0.0
 ) -> void:
 	if vehicle_node == null or not is_instance_valid(vehicle_node):
 		return
 
 	if vehicle_node.has_method("set_parking_mode"):
 		vehicle_node.set_parking_mode(false)
-	vehicle_node.z_index = 200 # Ensure it renders above other elements while exiting
+	vehicle_node.z_index = 200 # Ensure it renders above parking slots and grey platform apron
 
 	var t_dep_start: float = Time.get_ticks_msec() / 1000.0
 	var total_duration: float = BUS_DEPARTURE_DURATION * duration_mult
 	print("[QA] Bus %d DEPARTURE START at %.3f (Target: %.2fs)" % [vehicle_id, t_dep_start, total_duration])
 
-	var reverse_pos: Vector2 = slot_pos + Vector2(0.0, 115.0).rotated(slot_rotation)
-
-	var curve := Curve2D.new()
-	var vp_width: float = 720.0
-	if vehicle_node.is_inside_tree() and vehicle_node.get_viewport() != null:
-		vp_width = vehicle_node.get_viewport_rect().size.x
-	var global_right_x := (vp_width / 2.0) + 400.0
-	var exit_global := Vector2(global_right_x, 0.0)
-	var parent_node = vehicle_node.get_parent()
-	var exit_local: Vector2 = parent_node.get_global_transform().affine_inverse() * exit_global if parent_node != null else exit_global
-
-	var final_target := Vector2(exit_local.x, reverse_pos.y)
-	curve.add_point(reverse_pos, Vector2.ZERO, Vector2(80.0, 0.0))
-	curve.add_point(final_target, Vector2(-160.0, 0.0), Vector2.ZERO)
-
+	# 1. Native orientation
 	var v_dir: int = vehicle_node.get("vehicle_dir") if vehicle_node.get("vehicle_dir") != null else CarJamVehicleData.Direction.UP
 	var front_native := Vector2(0, -1)
 	match v_dir:
@@ -207,11 +194,56 @@ static func animate_departure(
 		CarJamVehicleData.Direction.LEFT: front_native = Vector2(-1, 0)
 		CarJamVehicleData.Direction.RIGHT: front_native = Vector2(1, 0)
 
-	var t_reverse: float = 0.25 * duration_mult
-	var t_exit: float = total_duration - t_reverse
-	var t_clear: float = t_reverse * 0.60
+	var start_pos: Vector2 = vehicle_node.position
+	# Fallback if slot_pos is provided and vehicle was not yet positioned
+	if start_pos.distance_squared_to(Vector2.ZERO) < 1.0 and slot_pos.length_squared() > 1.0:
+		start_pos = slot_pos
+		vehicle_node.position = slot_pos
 
-	# 1. Slot release tracker (runs when bus has physically cleared the slot footprint)
+	var parked_rot: float = vehicle_node.rotation
+	# When driving forward along the grey road towards screen-right (+X):
+	var rot_target: float = Vector2(1.0, 0.0).angle() - front_native.angle()
+
+	var bay_reverse: Vector2 = Vector2(0.0, 1.0).rotated(slot_rotation)
+
+	# Determine grey road centerline Y
+	var road_y: float = target_road_y
+	if is_zero_approx(road_y):
+		road_y = start_pos.y + 110.0
+
+	# Reverse position: bus moves straight backward along the bay's longitudinal axis
+	# until its center sits cleanly on the grey roadway centerline
+	var dy: float = road_y - start_pos.y
+	var cos_rot: float = cos(slot_rotation)
+	var reverse_dist: float = (dy / cos_rot) if absf(cos_rot) > 0.01 else dy
+	var reverse_pos: Vector2 = start_pos + bay_reverse * reverse_dist
+	reverse_pos.y = road_y
+
+	# Calculate offscreen exit target X past the right border of viewport
+	var vp_width: float = 720.0
+	if vehicle_node.is_inside_tree() and vehicle_node.get_viewport() != null:
+		var vp_rect = vehicle_node.get_viewport().get_visible_rect()
+		if vp_rect.size.x > 0.0:
+			vp_width = vp_rect.size.x
+
+	var parent_node = vehicle_node.get_parent()
+	var global_right_x: float = (vp_width / 2.0) + 400.0
+	var exit_global := Vector2(global_right_x, 0.0)
+	var exit_local: Vector2 = parent_node.get_global_transform().affine_inverse() * exit_global if parent_node != null else exit_global
+	var exit_x: float = maxf(exit_local.x, reverse_pos.x + 350.0)
+	var exit_pos := Vector2(exit_x, road_y)
+
+	# Intermediate position where the bus completes turning onto the horizontal grey roadway
+	var turn_end_pos := Vector2(minf(reverse_pos.x + 70.0, exit_x - 100.0), road_y)
+
+	# Timing allocation (total = total_duration)
+	# Phase 1 (Reverse straight out of slot): 35% of total time
+	# Phase 2 (Turn onto grey road): 25% of total time
+	# Phase 3 (Drive forward to off-screen exit): 40% of total time
+	var t_reverse: float = total_duration * 0.35
+	var t_turn: float = total_duration * 0.25
+	var t_drive: float = total_duration - t_reverse - t_turn
+
 	var bay_cleared := false
 	var lambda_clear := func():
 		if not bay_cleared and is_instance_valid(controller):
@@ -220,30 +252,36 @@ static func animate_departure(
 			print("[QA] Bus %d BAY CLEARED at %.3f (After: %.3fs)" % [vehicle_id, t_c, t_c - t_dep_start])
 			controller.on_vehicle_cleared_slot(vehicle_id, slot_id, token)
 
-	# Parallel trigger for early slot release at ~0.15s
-	var clear_tw := vehicle_node.create_tween()
-	clear_tw.tween_interval(t_clear)
-	clear_tw.tween_callback(lambda_clear)
-
-	# Main movement tween: Reverse (0.25s) -> Exit curve (0.55s) = 0.80s total
 	var tw := vehicle_node.create_tween()
 
-	# Phase 1: Reverse along bay axis out of slot
+	# Phase 1: Reversing backward along bay axis out of slot onto grey road
 	tw.tween_property(vehicle_node, "position", reverse_pos, t_reverse) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 
-	# Ensure bay is cleared by the end of reverse if not already
+	# At end of reverse, bay is 100% physically cleared
 	tw.tween_callback(lambda_clear)
 
-	# Phase 2: Forward curve turning right and exiting offscreen
-	var start_scale: Vector2 = vehicle_node.scale
-	var curve_callable := Callable(VehicleMovement, "_update_curve").bind(
-		curve, vehicle_node, start_scale, start_scale, true, front_native
-	)
-	tw.tween_method(curve_callable, 0.0, 1.0, t_exit) \
+	# Phase 2: Smooth turn onto the horizontal grey roadway
+	var turn_method := func(p: float):
+		if not is_instance_valid(vehicle_node):
+			return
+		vehicle_node.position = reverse_pos.lerp(turn_end_pos, p)
+		vehicle_node.rotation = lerp_angle(parked_rot, rot_target, p)
+
+	tw.tween_method(turn_method, 0.0, 1.0, t_turn) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+	# Phase 3: Driving forward along grey roadway to complete off-screen exit
+	var drive_method := func(p: float):
+		if not is_instance_valid(vehicle_node):
+			return
+		vehicle_node.position = turn_end_pos.lerp(exit_pos, p)
+		vehicle_node.rotation = rot_target
+
+	tw.tween_method(drive_method, 0.0, 1.0, t_drive) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 
-	# Phase 3: Departure complete (completely offscreen and disappeared at exactly 0.80s)
+	# Phase 4: Final exit completed off-screen
 	tw.tween_callback(func():
 		var t_dep_end: float = Time.get_ticks_msec() / 1000.0
 		print("[QA] Bus %d DEPARTURE COMPLETE at %.3f (Actual: %.3fs | Target: %.2fs)" % [

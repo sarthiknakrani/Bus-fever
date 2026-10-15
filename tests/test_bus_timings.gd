@@ -302,7 +302,8 @@ func _run_all_timing_tests() -> void:
 	# Test 7: Parking Concurrency Protection (Atomic Reservation & No Double Booking)
 	print("\n--- TEST 7: Parking Concurrency Protection ---")
 	var parking_mgr = load("res://scripts/gameplay/parking_manager.gd").new()
-	parking_mgr.setup(7)
+	var unlocked_slots: Array[int] = [1, 2, 3]
+	parking_mgr.setup(7, unlocked_slots)
 	# Unlocked slots are 1, 2, 3
 	var r1 = parking_mgr.reserve_slot(101)
 	var r2 = parking_mgr.reserve_slot(102)
