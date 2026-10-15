@@ -25,12 +25,11 @@ const CANONICAL_CANVAS_HEIGHT: float = 110.0
 # Authoritative visual scale factor (~15% reduction across all short buses in parking)
 const BUS_VISUAL_SCALE: float = 0.85
 
-# Board bus cell-fit parameters (tightens spacing on board to 3-5px gap)
+# Board bus cell-fit parameters (tightens spacing on board to compact 7.6px gap matching reference)
 # BOARD_BUS_TARGET_WIDTH is the target visible body WIDTH in board-local px.
-# At 48.0 px, the canonical visible body short-side width matches 1.0x native scale,
-# leaving ~3-4 px on-screen clearance between adjacent parallel buses without intersecting.
+# At 68.0 px, adjacent parallel buses leave 7.6-8.0 px on-screen clearance without intersecting.
 # BOARD_ANCHOR_SHIFT is 0.0 to prevent cross-cluster divergence and frontal overlaps.
-const BOARD_BUS_TARGET_WIDTH: float = 48.0
+const BOARD_BUS_TARGET_WIDTH: float = 68.0
 const BOARD_ANCHOR_SHIFT: float = 0.0
 
 var board_scale_factor: float = 1.0
@@ -171,7 +170,7 @@ func _build_visuals() -> void:
 func _apply_bus_cell_fit() -> void:
 	if _base_sprite == null or _base_sprite.texture == null:
 		return
-	board_scale_factor = 1.0
+	board_scale_factor = BOARD_BUS_TARGET_WIDTH / CANONICAL_BODY_WIDTH_V
 	_base_sprite.scale = Vector2(board_scale_factor, board_scale_factor)
 
 	# Keep bus centered in its cell without anchor distortion

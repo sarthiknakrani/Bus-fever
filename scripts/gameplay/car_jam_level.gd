@@ -187,37 +187,16 @@ func _process(delta: float) -> void:
 			if j == 0:
 				if not _lead_feeder_committed:
 					if f_row.progress >= feeder_stop_pos - 0.5:
-						# Lead row is at the stop line; check if freed capacity exists and merge window is open
+						# Lead row is at the stop line; check if freed capacity exists
 						if _oval_freed_capacity >= f_row.passengers.size():
-							var junction_clear := true
-							for cr in _circulating_rows:
-								var d = cr.progress - _merge_prog
-								if d < 0.0: d += track_len
-								# Hold if an oncoming circulating row is within the approach window or merge buffer
-								if (track_len - d) < 220.0 or d < 55.0:
-									junction_clear = false
-									break
-								if not cr.passengers.is_empty():
-									for fp in f_row.passengers:
-										if not is_instance_valid(fp.get("view")): continue
-										for cp in cr.passengers:
-											if not is_instance_valid(cp.get("view")): continue
-											if fp["view"].global_position.distance_to(cp["view"].global_position) < 36.0:
-												junction_clear = false
-												break
-										if not junction_clear: break
-								if not junction_clear: break
-							if junction_clear:
-								_lead_feeder_committed = true
-								max_prog = f_len
-							else:
-								max_prog = feeder_stop_pos
+							_lead_feeder_committed = true
+							max_prog = f_len
 						else:
 							max_prog = feeder_stop_pos
 					else:
 						max_prog = feeder_stop_pos
 				else:
-					# Committed to merge: proceed continuously to f_len
+					# Committed to merge: proceed towards f_len
 					max_prog = f_len
 				var dist_ahead: float = max_prog - f_row.progress
 				var dist_moved: float = passenger_normal_speed * delta
@@ -246,7 +225,7 @@ func _process(delta: float) -> void:
 			var needed_cap: int = lead_row.passengers.size()
 			if _oval_freed_capacity >= needed_cap and lead_row.progress >= f_len - 2.0:
 				var merge_clear := true
-				var clearance_buffer := MIN_ROW_GAP * 1.25
+				var clearance_buffer: float = 30.0
 				for cr in _circulating_rows:
 					var d = absf(cr.progress - _merge_prog)
 					if d > track_len * 0.5:
@@ -254,16 +233,6 @@ func _process(delta: float) -> void:
 					if d < clearance_buffer:
 						merge_clear = false
 						break
-					if not cr.passengers.is_empty():
-						for fp in lead_row.passengers:
-							if not is_instance_valid(fp.get("view")): continue
-							for cp in cr.passengers:
-								if not is_instance_valid(cp.get("view")): continue
-								if fp["view"].global_position.distance_to(cp["view"].global_position) < 36.0:
-									merge_clear = false
-									break
-							if not merge_clear: break
-					if not merge_clear: break
 				if merge_clear:
 					_feeder_rows.pop_front()
 					_lead_feeder_committed = false
