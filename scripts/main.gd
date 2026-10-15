@@ -546,6 +546,11 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 	if vp_size.x <= 0 or vp_size.y <= 0:
 		vp_size = Vector2(720, 1280)
 
+	# Background wallpaper remains static and rock-solid (no screen-wide motion)
+	if _bg_rect != null and is_instance_valid(_bg_rect):
+		_bg_rect.position = Vector2.ZERO
+		_bg_rect.size = vp_size
+
 	# Aspect ratio of the master 3D logo
 	var logo_aspect: float = 732.0 / 664.0
 	if _logo_rect != null and is_instance_valid(_logo_rect) and _logo_rect.texture != null:
@@ -621,13 +626,7 @@ func _process(delta: float) -> void:
 	var vp := get_viewport()
 	var vp_size: Vector2 = vp.get_visible_rect().size if vp != null else Vector2(720, 1280)
 
-	# 1. Subtle 3D ambient camera breathing on background (handheld organic feel)
-	if _bg_rect != null and is_instance_valid(_bg_rect):
-		var bg_offset := Vector2(sin(_anim_time * 0.45) * 6.0, cos(_anim_time * 0.35) * 4.0)
-		_bg_rect.position = bg_offset - Vector2(12.0, 12.0)
-		_bg_rect.size = vp_size + Vector2(24.0, 24.0)
-
-	# 2. Atmospheric Sunbeam pulse
+	# 1. Atmospheric Sunbeam pulse
 	if _sunbeam != null and is_instance_valid(_sunbeam):
 		_sunbeam.modulate.a = 0.22 + sin(_anim_time * 1.2) * 0.08
 
