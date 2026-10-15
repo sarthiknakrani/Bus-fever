@@ -10,6 +10,7 @@ static func create_level_1() -> CarJamLevelData:
 	lvl.title = "Level 1"
 	lvl.board_size = Vector2i(5, 5)
 	lvl.parking_slots_count = 7
+	lvl.unlocked_slot_ids = [1, 2, 3, 4, 5, 6]
 
 	# Vehicles: 6 buses with capacity 40 (2 Yellow, 2 Blue, 2 Red = 240 seats)
 	var configs := [

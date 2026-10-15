@@ -3,6 +3,7 @@ class_name ParkingSlotView
 
 var slot_id: int = 0
 var slot_state: int = CarJamParkingManager.SlotState.EMPTY
+var is_unlocked: bool = true
 
 const SLOT_WIDTH: float = 46.0
 const SLOT_HEIGHT: float = 88.0
@@ -10,14 +11,19 @@ const SLOT_HEIGHT: float = 88.0
 var _vip_label: Label
 var _draw_node: Node2D
 
-func setup(id: int) -> void:
+func setup(id: int, p_unlocked: bool = true) -> void:
 	slot_id = id
+	is_unlocked = p_unlocked
 	name = "Slot_%d" % id
 	
 	_build_visuals()
 
 func set_state(p_state: int) -> void:
 	slot_state = p_state
+	_update_visual_state()
+
+func set_unlocked(p_unlocked: bool) -> void:
+	is_unlocked = p_unlocked
 	_update_visual_state()
 
 func _build_visuals() -> void:
@@ -40,7 +46,8 @@ func _build_visuals() -> void:
 
 func _update_visual_state() -> void:
 	var is_vip = (slot_id == 0)
-	if slot_state == CarJamParkingManager.SlotState.EMPTY:
+	var is_locked = not is_unlocked and not is_vip
+	if slot_state == CarJamParkingManager.SlotState.EMPTY and not is_locked:
 		_vip_label.visible = is_vip
 	else:
 		_vip_label.visible = false
@@ -48,6 +55,7 @@ func _update_visual_state() -> void:
 
 func _on_draw_lines() -> void:
 	var is_vip = (slot_id == 0)
+	var is_locked = not is_unlocked and not is_vip
 	var is_reserved = (slot_state == CarJamParkingManager.SlotState.RESERVED)
 	var is_departing = (slot_state == CarJamParkingManager.SlotState.DEPARTING)
 
@@ -59,12 +67,12 @@ func _on_draw_lines() -> void:
 
 	# 1. Flat recessed asphalt bay polygon (Color("585967") fill, corner_radius = 6)
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color("585967")
+	sb.bg_color = Color("4b4c59") if is_locked else Color("585967")
 	sb.set_corner_radius_all(int(r))
 	sb.draw(_draw_node.get_canvas_item(), Rect2(-hw, -hh, w, h))
 
 	# 2. Crisp 2.0px painted stencil outline around the bay with a 10px break gap at bottom edge center
-	var outline_color: Color = Color("facc15") if is_vip else Color("d8dee9")
+	var outline_color: Color = Color("facc15") if is_vip else (Color("94a3b8", 0.6) if is_locked else Color("d8dee9"))
 	if is_departing:
 		outline_color = Color("fbbf24")
 
@@ -105,7 +113,22 @@ func _on_draw_lines() -> void:
 
 	_draw_node.draw_polyline(stencil_pts, outline_color, 2.0, true)
 
-	# 3. Reserved chevrons when bus is incoming
+	# 3. Locked padlock visuals
+	if is_locked:
+		var lock_c := Color("e2e8f0", 0.8)
+		# Padlock body
+		_draw_node.draw_rect(Rect2(-8, -2, 16, 12), lock_c, true)
+		# Padlock hoop
+		var sb_hoop := StyleBoxFlat.new()
+		sb_hoop.bg_color = Color.TRANSPARENT
+		sb_hoop.border_color = lock_c
+		sb_hoop.border_width_left = 3
+		sb_hoop.border_width_right = 3
+		sb_hoop.border_width_top = 3
+		sb_hoop.set_corner_radius_all(6)
+		sb_hoop.draw(_draw_node.get_canvas_item(), Rect2(-6, -10, 12, 10))
+
+	# 4. Reserved chevrons when bus is incoming
 	if is_reserved:
 		var chev_c = Color("bae6fd", 0.95)
 		var chev_dim = Color("bae6fd", 0.50)

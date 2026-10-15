@@ -84,40 +84,56 @@ func _test_1_level_1_full_solve() -> void:
 # 2. Level 2 Full Solve
 # -----------------------------------------------------------------
 func _test_2_level_2_full_solve() -> void:
-	_section("2. Level 2 Full Solve (6 Unlocked Slots)")
+	_section("2. Level 2 Full Solve (4 Unlocked Slots: [1, 2, 3, 4])")
 	var lvl2 = load("res://levels/level_002.tres") as CarJamLevelData
 	_expect(lvl2 != null, "Level 2 resource loaded successfully")
 	var res = CarJamPuzzleSolver.solve(lvl2)
-	_expect(res["solvable"], "Level 2 is solvable in CarJamPuzzleSolver")
+	_expect(res["solvable"], "Level 2 is solvable in CarJamPuzzleSolver with 4 slots")
 	_expect(res["moves"].size() == 12, "Level 2 solved in exactly 12 moves (got %d)" % res["moves"].size())
-	_expect(res["unlocked_slots"] == [1, 2, 3, 4, 5, 6], "Level 2 used authoritative unlocked slots [1, 2, 3, 4, 5, 6]")
+	_expect(res["unlocked_slots"] == [1, 2, 3, 4], "Level 2 used authoritative unlocked slots [1, 2, 3, 4] (got %s)" % str(res["unlocked_slots"]))
 	print("    Winning Move Order: %s | Iterations: %d" % [str(res["moves"]), res["iterations"]])
 
 # -----------------------------------------------------------------
-# 3. Six Unlocked Parking Slots (Slots 1..6 Working, Slot 0 VIP Only)
+# 3. Level-Specific Unlocked Parking Slots
 # -----------------------------------------------------------------
 func _test_3_three_unlocked_parking_slots() -> void:
-	_section("3. Six Unlocked Parking Slots (Slots 1..6 Working, Slot 0 VIP Only)")
-	var pm := CarJamParkingManager.new()
-	pm.setup(7)
-	_expect(pm.get_slot_count() == 7, "Total slot count is 7")
-	_expect(pm.get_unlocked_slot_count() == 6, "Initially unlocked slot count is exactly 6")
-	_expect(pm.get_unlocked_slot_ids() == [1, 2, 3, 4, 5, 6], "Unlocked slot IDs are exactly [1, 2, 3, 4, 5, 6]")
-	_expect(not pm.is_slot_unlocked(0), "Slot 0 (VIP) is locked")
-	_expect(pm.is_slot_unlocked(1), "Slot 1 is unlocked")
-	_expect(pm.is_slot_unlocked(2), "Slot 2 is unlocked")
-	_expect(pm.is_slot_unlocked(3), "Slot 3 is unlocked")
-	_expect(pm.is_slot_unlocked(4), "Slot 4 is unlocked")
-	_expect(pm.is_slot_unlocked(5), "Slot 5 is unlocked")
-	_expect(pm.is_slot_unlocked(6), "Slot 6 is unlocked")
+	_section("3. Level-Specific Unlocked Parking Slots (Level 1: 6 slots, Level 2: 4 slots)")
+	var pm1 := CarJamParkingManager.new()
+	pm1.setup(7, [1, 2, 3, 4, 5, 6])
+	_expect(pm1.get_slot_count() == 7, "Level 1: Total slot count is 7")
+	_expect(pm1.get_unlocked_slot_count() == 6, "Level 1: Initially unlocked slot count is exactly 6")
+	_expect(pm1.get_unlocked_slot_ids() == [1, 2, 3, 4, 5, 6], "Level 1: Unlocked slot IDs are exactly [1, 2, 3, 4, 5, 6]")
+	_expect(not pm1.is_slot_unlocked(0), "Level 1: Slot 0 (VIP) is locked")
+	for sid in range(1, 7):
+		_expect(pm1.is_slot_unlocked(sid), "Level 1: Slot %d is unlocked" % sid)
 
-	# Reserve all 6 slots
+	# Reserve all 6 slots in Level 1
 	for vid in range(101, 107):
-		var s = pm.reserve_slot(vid)
-		_expect(s == vid - 100, "Reserved slot %d in order" % s)
-	_expect(pm.is_full(), "Parking is full after 6 reservations")
-	var s7 = pm.reserve_slot(107)
-	_expect(s7 == -1, "7th reservation rejected when all 6 normal slots full")
+		var s = pm1.reserve_slot(vid)
+		_expect(s == vid - 100, "Level 1: Reserved slot %d in order" % s)
+	_expect(pm1.is_full(), "Level 1: Parking is full after 6 reservations")
+	var s7 = pm1.reserve_slot(107)
+	_expect(s7 == -1, "Level 1: 7th reservation rejected when all 6 normal slots full")
+
+	# Test Level 2 parking: slots 1..4 unlocked, slots 0, 5, 6 locked
+	var pm2 := CarJamParkingManager.new()
+	pm2.setup(7, [1, 2, 3, 4])
+	_expect(pm2.get_slot_count() == 7, "Level 2: Total slot count is 7")
+	_expect(pm2.get_unlocked_slot_count() == 4, "Level 2: Unlocked slot count is exactly 4")
+	_expect(pm2.get_unlocked_slot_ids() == [1, 2, 3, 4], "Level 2: Unlocked slot IDs are exactly [1, 2, 3, 4]")
+	_expect(not pm2.is_slot_unlocked(0), "Level 2: Slot 0 (VIP) is locked")
+	_expect(not pm2.is_slot_unlocked(5), "Level 2: Slot 5 is locked")
+	_expect(not pm2.is_slot_unlocked(6), "Level 2: Slot 6 is locked")
+	for sid in range(1, 5):
+		_expect(pm2.is_slot_unlocked(sid), "Level 2: Slot %d is unlocked" % sid)
+
+	# Reserve all 4 slots in Level 2
+	for vid in range(201, 205):
+		var s = pm2.reserve_slot(vid)
+		_expect(s == vid - 200, "Level 2: Reserved slot %d in order" % s)
+	_expect(pm2.is_full(), "Level 2: Parking is full after 4 reservations")
+	var s5 = pm2.reserve_slot(205)
+	_expect(s5 == -1, "Level 2: 5th reservation rejected when all 4 normal slots full")
 
 # -----------------------------------------------------------------
 # 4. Full Parking with One Bus Still Boarding

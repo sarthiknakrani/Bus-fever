@@ -9,6 +9,7 @@ class_name CarJamLevelData
 @export var title: String = "Level 1"
 @export var board_size: Vector2i = Vector2i(7, 7)
 @export var parking_slots_count: int = 4
+@export var unlocked_slot_ids: Array[int] = []
 @export var vehicles: Array[CarJamVehicleData] = []
 @export var passenger_groups: Array[PassengerGroupData] = []
 
@@ -18,6 +19,7 @@ func clone() -> CarJamLevelData:
 	copy.title = title
 	copy.board_size = board_size
 	copy.parking_slots_count = parking_slots_count
+	copy.unlocked_slot_ids = unlocked_slot_ids.duplicate()
 	for v in vehicles:
 		copy.vehicles.append(v.clone())
 	for g in passenger_groups:

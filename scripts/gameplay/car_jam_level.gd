@@ -596,7 +596,8 @@ func _setup_visuals(lvl: CarJamLevelData) -> void:
 
 	for i in lvl.parking_slots_count:
 		var slot_view := ParkingSlotView.new()
-		slot_view.setup(i)
+		var is_unl: bool = controller.parking.is_slot_unlocked(i) if controller and controller.parking else (i >= 1)
+		slot_view.setup(i, is_unl)
 		slot_view.rotation_degrees = -22.0
 		slot_view.position = Vector2(-total_span / 2.0 + float(i) * slot_spacing, 0)
 		parking_slots_node.add_child(slot_view)
@@ -1162,6 +1163,7 @@ func _on_parking_updated() -> void:
 	for i in slot_views.size():
 		var slot := controller.parking.get_slot(i)
 		if slot != null:
+			slot_views[i].set_unlocked(slot.is_unlocked)
 			slot_views[i].set_state(slot.state)
 
 func _on_queue_updated() -> void:

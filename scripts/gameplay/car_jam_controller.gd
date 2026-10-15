@@ -74,7 +74,10 @@ func load_level(lvl: CarJamLevelData) -> void:
 	board.setup(lvl.board_size)
 
 	parking = CarJamParkingManager.new()
-	parking.setup(lvl.parking_slots_count)
+	var custom_unlocked: Array[int] = []
+	if "unlocked_slot_ids" in lvl and not lvl.unlocked_slot_ids.is_empty():
+		custom_unlocked = lvl.unlocked_slot_ids
+	parking.setup(lvl.parking_slots_count, custom_unlocked)
 
 	queue = CarJamPassengerQueue.new()
 	queue.setup(lvl.passenger_groups)
@@ -227,6 +230,15 @@ func on_vehicle_departed_from_slot(vehicle_id: int, slot_id: int, token: int) ->
 	vehicle_departed.emit(vehicle_id, slot_id)
 
 	_check_terminal_states()
+	
+func unlock_parking_slot(slot_id: int) -> bool:
+	if parking == null or slot_id < 0 or slot_id >= parking.get_slot_count():
+		return false
+	if parking.is_slot_unlocked(slot_id):
+		return false
+	parking.unlock_slot(slot_id)
+	parking_updated.emit()
+	return true
 
 
 # -----------------------------------------------------------------

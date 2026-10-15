@@ -83,20 +83,21 @@ func test_recorded_level2_deadlock_reproduction() -> void:
 	var lvl2 = load("res://levels/level_002.tres") as CarJamLevelData
 	ctrl.load_level(lvl2)
 	
+	var target_slots: int = ctrl.parking.get_unlocked_slot_count()
 	var non_red_buses: Array[int] = []
 	for vid in ctrl.vehicles:
 		if ctrl.vehicles[vid].color_id != "red":
 			non_red_buses.append(vid)
-			if non_red_buses.size() == 6: break
+			if non_red_buses.size() == target_slots: break
 			
-	check(non_red_buses.size() == 6, "Level 2 has 6 non-red buses")
+	check(non_red_buses.size() == 4, "Level 2 has 4 non-red buses to fill all unlocked bays")
 	
 	for vid in non_red_buses:
 		var sid = ctrl.parking.reserve_slot(vid)
 		ctrl.parking.confirm_arrival(sid, vid)
 		ctrl.vehicles[vid].state = VehicleModel.VehicleState.PARKED
 	
-	check(ctrl.parking.is_full(), "Parking is completely full (6 occupied bays)")
+	check(ctrl.parking.is_full(), "Parking is completely full (4 occupied bays)")
 	
 	# Mock snapshot representing the recorded state:
 	# All circulating rows on loop are RED
@@ -136,12 +137,13 @@ func test_suppressed_toast_on_deadlock_tap() -> void:
 	var toast_triggered := false
 	l.controller.parking_full_warning.connect(func(): toast_triggered = true)
 	
-	# Find 6 non-red buses and park them to fill parking
+	# Find 4 non-red buses and park them to fill parking
+	var target_vids: int = l.controller.parking.get_unlocked_slot_count()
 	var non_red_vids: Array[int] = []
 	for vid in l.controller.vehicles:
 		if l.controller.vehicles[vid].color_id != "red":
 			non_red_vids.append(vid)
-			if non_red_vids.size() == 6: break
+			if non_red_vids.size() == target_vids: break
 			
 	for vid in non_red_vids:
 		var sid = l.controller.parking.reserve_slot(vid)
