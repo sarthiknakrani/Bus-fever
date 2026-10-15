@@ -210,9 +210,9 @@ func _run_qa() -> void:
 
 	var test_fc := Curve2D.new()
 	test_fc.add_point(Vector2(335, -520), Vector2.ZERO, Vector2(-15, 120))
-	test_fc.add_point(Vector2(245, -110), Vector2(15, -65), Vector2(-20, 65))
-	test_fc.add_point(Vector2(215, 25), Vector2(20, -45), Vector2(-25, 35))
-	test_fc.add_point(Vector2(185, 75), Vector2(25, -30), Vector2.ZERO)
+	test_fc.add_point(Vector2(265, -110), Vector2(15, -65), Vector2(-18, 65))
+	test_fc.add_point(Vector2(235, 20), Vector2(18, -45), Vector2(-22, 35))
+	test_fc.add_point(Vector2(180, 82), Vector2(25, -26), Vector2.ZERO)
 
 	tr_inst.curve = test_c
 	tr_inst.feeder_curve = test_fc
@@ -220,7 +220,7 @@ func _run_qa() -> void:
 	tr_inst.compute_intersections()
 
 	var c_right := Vector2(105.0, 0.0)
-	var r_outer: float = 177.0
+	var r_outer: float = 115.0 + tr_inst.ROAD_HALF_WIDTH
 	var outer_meet_dist = tr_inst.outer_meet_pt.distance_to(c_right)
 	var inner_meet_dist = tr_inst.inner_meet_pt.distance_to(c_right)
 	var outer_err = absf(outer_meet_dist - r_outer)

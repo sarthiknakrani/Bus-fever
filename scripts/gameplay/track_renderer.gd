@@ -16,8 +16,8 @@ var outer_meet_pt := Vector2.ZERO
 var inner_meet_ang: float = -0.65
 var outer_meet_ang: float = 0.09
 
-# Authoritative geometry constants
-const ROAD_HALF_WIDTH: float = 62.0
+# Authoritative geometry constants: narrowed main loop road and tight feeder road
+const ROAD_HALF_WIDTH: float = 55.0
 const GATEWAY_HALF_WIDTH: float = 95.0 # ±95px gateway throat opening
 
 # Authoritative reference colors
@@ -117,14 +117,10 @@ func _draw() -> void:
 	var w: float = ROAD_HALF_WIDTH
 	var x_gate: float = GATEWAY_HALF_WIDTH
 	var plat_y: float = r_outer + 20.0 # 197.0 in track-local coordinates
-
-	# Scaled inner opening: 70% area reduction (30% remaining empty center area)
-	# Original area A0 = 4*105*53 + pi*53^2 = 31084.73 sq px
-	# Target area = 31084.73 * 0.30 = 9325.42 sq px
-	# Scale factor s = sqrt(0.30) = 0.5477225575
-	const SCALE_INNER: float = 0.5477225575
-	var straight_x_inner: float = straight_x * SCALE_INNER # 57.51087
-	var r_inner_scaled: float = r_inner * SCALE_INNER # 29.02930
+	# Tightened track proportions: reduced main gray track width (from 148px down to 116px)
+	# Opens the inner garden oval to comfortable 54px radius and 85px straight length
+	var straight_x_inner: float = 85.0
+	var r_inner_scaled: float = 54.0
 	var c_left_inner := Vector2(-straight_x_inner, 0.0)
 	var c_right_inner := Vector2(straight_x_inner, 0.0)
 

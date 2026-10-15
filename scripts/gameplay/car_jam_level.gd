@@ -85,12 +85,13 @@ class PassengerRow extends RefCounted:
 	var is_feeder: bool = false
 	var passengers: Array[Dictionary] = [] # {"id": int, "color_id": String, "lane": int, "view": PassengerView, "state": String}
 
-const LANE_SPACING := 23.5
-const ROW_SPACING := 38.5
-const MIN_ROW_GAP := 38.0
+const LANE_SPACING := 17.5
+const LANE_SPACING_CURVE := 16.0
+const ROW_SPACING := 29.0
+const MIN_ROW_GAP := 28.5
 const NUM_LANES := 4
-const PASSENGER_SPACING := 23.5
-const MAX_INITIAL_LOOP_PASSENGERS := 112
+const PASSENGER_SPACING := 17.5
+const MAX_INITIAL_LOOP_PASSENGERS := 144
 const SLOT_SPACING := 72.0
 
 var passenger_track: Path2D
@@ -137,9 +138,13 @@ func _get_curve_point_and_normal(c: Curve2D, offset: float, is_loop: bool = fals
 
 func _calc_lane_pos(center_pos: Vector2, normal: Vector2, lane: int) -> Vector2:
 	var curve_fac: float = clampf((absf(center_pos.x) - 75.0) / 30.0, 0.0, 1.0)
-	var dynamic_spacing: float = lerpf(LANE_SPACING, 20.5, curve_fac)
+	var dynamic_spacing: float = lerpf(LANE_SPACING, LANE_SPACING_CURVE, curve_fac)
 	var lane_offset: float = (float(lane) - 1.5) * dynamic_spacing
-	return center_pos + normal * lane_offset
+	var pos := center_pos + normal * lane_offset
+	# Curvature-aware 2.5D vertical centering on straight sections
+	if curve_fac < 0.9 and center_pos.y < 0.0:
+		pos.y += 6.0 * (1.0 - curve_fac)
+	return pos
 
 func _process(delta: float) -> void:
 	if passenger_track == null or controller == null or controller.parking == null: return
@@ -267,7 +272,7 @@ func _process(delta: float) -> void:
 			var needed_cap: int = lead_row.passengers.size()
 			if _oval_freed_capacity >= needed_cap and lead_row.progress >= f_len - 2.0:
 				var merge_clear := true
-				var clearance_buffer: float = 32.0
+				var clearance_buffer: float = ROW_SPACING * 0.85
 				for cr in _circulating_rows:
 					var d = absf(cr.progress - _merge_prog)
 					if d > track_len * 0.5:
@@ -795,21 +800,21 @@ func _init_passenger_track() -> void:
 	_platform_start_prog = curve.get_closest_offset(curve.get_point_position(1))
 	_platform_end_prog = curve.get_closest_offset(curve.get_point_position(2))
 	
-	# CONTINUOUS FEEDER TRACK
+	# CONTINUOUS FEEDER TRACK: smooth, rounded curve with natural, fluid merge geometry
 	feeder_track = Path2D.new()
 	feeder_track.name = "FeederTrack"
 	var f_curve := Curve2D.new()
 	# Point 0 (top-right offscreen): default -520 px well above screen top
 	f_curve.add_point(Vector2(335, -520), Vector2.ZERO, Vector2(-15, 120))
-	# Point 1 (upper-right behind pause button): Vector2(245, -110), in = Vector2(15, -65), out = Vector2(-20, 65)
-	f_curve.add_point(Vector2(245, -110), Vector2(15, -65), Vector2(-20, 65))
-	# Point 2 (approaching lower-right arc): Vector2(215, 25), in = Vector2(20, -45), out = Vector2(-25, 35)
-	f_curve.add_point(Vector2(215, 25), Vector2(20, -45), Vector2(-25, 35))
-	# Point 3 (tangential merge on right arc): Vector2(185, 75), in = Vector2(25, -30), out = Vector2.ZERO
-	f_curve.add_point(Vector2(185, 75), Vector2(25, -30), Vector2.ZERO)
+	# Point 1 (upper-right behind pause button): Vector2(265, -110), in = Vector2(15, -65), out = Vector2(-18, 65)
+	f_curve.add_point(Vector2(265, -110), Vector2(15, -65), Vector2(-18, 65))
+	# Point 2 (smooth rounded sweep approaching right arc): Vector2(235, 20), in = Vector2(18, -45), out = Vector2(-22, 35)
+	f_curve.add_point(Vector2(235, 20), Vector2(18, -45), Vector2(-22, 35))
+	# Point 3 (tangential merge on right arc): Vector2(180, 82), in = Vector2(25, -26), out = Vector2.ZERO
+	f_curve.add_point(Vector2(180, 82), Vector2(25, -26), Vector2.ZERO)
 	feeder_track.curve = f_curve
 
-	_merge_prog = passenger_track.curve.get_closest_offset(Vector2(185, 75))
+	_merge_prog = passenger_track.curve.get_closest_offset(Vector2(180, 82))
 
 	# PREMIUM PLAZA INTEGRATION
 	var plaza = preload("res://scripts/gameplay/plaza_environment.gd").new()
@@ -908,7 +913,7 @@ func _init_passenger_track() -> void:
 		var s_prog := minf(float(s_i) * sample_step, track_len)
 		var pt_s = passenger_track.curve.sample_baked(s_prog)
 		var c_fac = clampf((absf(pt_s.x) - 75.0) / 30.0, 0.0, 1.0)
-		var w_val = lerpf(1.0, 1.0 / 1.42, c_fac)
+		var w_val = lerpf(1.0, 1.0 / 1.25, c_fac)
 		total_w += w_val * sample_step
 		cum_weights.append(total_w)
 
