@@ -95,6 +95,8 @@ func _test_home_screen_hierarchy_and_buttons() -> void:
 	_assert(play_btn != null, "Play button exists on home screen")
 	if play_btn != null:
 		_assert(play_btn.mouse_filter == Control.MOUSE_FILTER_STOP, "Play button has interactive MOUSE_FILTER_STOP")
+		_assert(play_btn.texture_normal != null, "Play button has 3D orange normal texture assigned")
+		_assert(play_btn.texture_pressed != null, "Play button has 3D orange pressed texture assigned")
 
 	main_instance.queue_free()
 	await process_frame
