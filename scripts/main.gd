@@ -37,19 +37,30 @@ func _build_ui() -> void:
 	root.name = "HomeRoot"
 	add_child(root)
 
-	# A. Full portrait background (Sky-blue gradient)
+	# A. Full portrait 3D isometric town background
 	var bg := TextureRect.new()
+	bg.name = "Background3D"
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var grad := Gradient.new()
-	grad.colors = PackedColorArray([Color("8BD3F1"), Color("DAF3FC")])
-	var grad_tex := GradientTexture2D.new()
-	grad_tex.gradient = grad
-	grad_tex.fill_to = Vector2(0, 1)
-	grad_tex.fill_from = Vector2(0, 0)
-	bg.texture = grad_tex
-	bg.ignore_texture_size = true
+	bg.texture = load("res://assets/home_bg_retina.jpg")
+	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(bg)
+
+	# Subtle ambient lighting overlay for high-contrast UI readability
+	var over_grad := Gradient.new()
+	over_grad.colors = PackedColorArray([Color(1, 1, 1, 0.0), Color(0.04, 0.08, 0.16, 0.22)])
+	var over_tex := GradientTexture2D.new()
+	over_tex.gradient = over_grad
+	over_tex.fill_from = Vector2(0.5, 0.6)
+	over_tex.fill_to = Vector2(0.5, 1.0)
+	var over_tr := TextureRect.new()
+	over_tr.name = "BottomVignette"
+	over_tr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	over_tr.texture = over_tex
+	over_tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	over_tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(over_tr)
 
 	var hud := Control.new()
 	hud.name = "HUD"
