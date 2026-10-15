@@ -275,61 +275,70 @@ def create_letter_image(char_key, font_size=190, stroke_w=7, depth=26):
     return letter_img, base_mask, (gw, gh, depth)
 
 def draw_diamond_sparkle(img, cx, cy, radius=22, color=(255, 255, 255, 255)):
-    draw = ImageDraw.Draw(img)
-    glow_r = int(radius * 0.7)
-    draw.ellipse((cx - glow_r, cy - glow_r, cx + glow_r, cy + glow_r), fill=(color[0], color[1], color[2], 100))
+    # Render sparkle with soft blurred aura and crisp 4-point star flare
+    sparkle_layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    d_aura = ImageDraw.Draw(sparkle_layer)
+    glow_r = int(radius * 0.6)
+    d_aura.ellipse((cx - glow_r, cy - glow_r, cx + glow_r, cy + glow_r), fill=(color[0], color[1], color[2], 120))
+    sparkle_layer = sparkle_layer.filter(ImageFilter.GaussianBlur(3))
+
+    star_layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    d_star = ImageDraw.Draw(star_layer)
     points = [
         (cx, cy - radius),
-        (cx + radius * 0.22, cy - radius * 0.22),
+        (cx + radius * 0.20, cy - radius * 0.20),
         (cx + radius, cy),
-        (cx + radius * 0.22, cy + radius * 0.22),
+        (cx + radius * 0.20, cy + radius * 0.20),
         (cx, cy + radius),
-        (cx - radius * 0.22, cy + radius * 0.22),
+        (cx - radius * 0.20, cy + radius * 0.20),
         (cx - radius, cy),
-        (cx - radius * 0.22, cy - radius * 0.22),
+        (cx - radius * 0.20, cy - radius * 0.20),
     ]
-    draw.polygon(points, fill=color)
-    core_r = int(radius * 0.25)
-    draw.ellipse((cx - core_r, cy - core_r, cx + core_r, cy + core_r), fill=(255, 255, 255, 255))
+    d_star.polygon(points, fill=color)
+    core_r = int(radius * 0.22)
+    d_star.ellipse((cx - core_r, cy - core_r, cx + core_r, cy + core_r), fill=(255, 255, 255, 255))
+
+    img.alpha_composite(sparkle_layer)
+    img.alpha_composite(star_layer)
 
 def generate_logo():
-    print("=== GENERATING 3D CASUAL GAME TITLE LOGO (V2 TIGHT UNIFIED BADGE) ===")
+    print("=== GENERATING 3D CASUAL GAME TITLE LOGO (TIGHT KERNING & THIN BORDER) ===")
 
     # Layout configuration
-    # Letters are snug, overlapping slightly to fuse into a single badge
+    # Letters sit close together, slightly overlapping within each word
     lines_def = [
         # Line 1: BUS
         {
             "keys": ["B", "U", "S"],
-            "font_size": 225,
+            "font_size": 240,
             "stroke_w": 9,
             "depth": 28,
-            "y_pos": 140,
-            "spacing": -28, # snug overlap
+            "y_pos": 120,
+            "spacing": -16, # snug overlap
             "angles": [-2.0, 0.0, 2.0],
-            "y_offsets": [4, -4, 4]
+            "y_offsets": [3, -3, 3]
         },
         # Line 2: FEVER
         {
             "keys": ["F", "E1", "V", "E2", "R1"],
-            "font_size": 182,
+            "font_size": 186,
             "stroke_w": 8,
             "depth": 26,
-            "y_pos": 360,
-            "spacing": -22,
+            "y_pos": 345,
+            "spacing": -14, # snug overlap
             "angles": [-1.5, -0.5, 0.0, 0.5, 1.5],
             "y_offsets": [0, -3, 3, -3, 0]
         },
         # Line 3: PARTY!
         {
             "keys": ["P", "A", "R2", "T", "Y", "!"],
-            "font_size": 188,
+            "font_size": 190,
             "stroke_w": 8,
             "depth": 26,
-            "y_pos": 575,
-            "spacing": -20,
-            "angles": [-2.5, -1.2, 0.0, 1.2, 2.5, 7.5],
-            "y_offsets": [2, -2, 0, -2, 2, -6]
+            "y_pos": 555,
+            "spacing": -12, # snug overlap
+            "angles": [-2.5, -1.2, 0.0, 1.2, 2.5, 5.0],
+            "y_offsets": [2, -2, 0, -2, 2, -4]
         }
     ]
 
@@ -346,12 +355,22 @@ def generate_logo():
         
         for idx, k in enumerate(line["keys"]):
             lim, lmask, dims = create_letter_image(k, font_size=f_sz, stroke_w=st_w, depth=dp)
+            # Crop to actual bounding box so spacing controls true letter overlap
+            lbbox = lim.getbbox()
+            if lbbox:
+                lim = lim.crop(lbbox)
+                lmask = lmask.crop(lbbox)
+
             angle = line["angles"][idx]
             y_off = line["y_offsets"][idx]
             
             if abs(angle) > 0.01:
                 lim = lim.rotate(angle, resample=Image.BICUBIC, expand=True)
                 lmask = lmask.rotate(angle, resample=Image.BICUBIC, expand=True)
+                lbbox = lim.getbbox()
+                if lbbox:
+                    lim = lim.crop(lbbox)
+                    lmask = lmask.crop(lbbox)
                 
             line_items.append({
                 "key": k,
@@ -381,29 +400,29 @@ def generate_logo():
         letter_alpha = l["img"].split()[3]
         combined_mask.paste(letter_alpha, (l["pos_x"], l["pos_y"]), mask=letter_alpha)
 
-    # 1. Soft Ambient Drop Shadow (huge detachment and depth)
-    shadow_mask = combined_mask.filter(ImageFilter.MaxFilter(21))
-    shadow_mask = shadow_mask.filter(ImageFilter.GaussianBlur(22))
-    shadow_layer = Image.new("RGBA", (CANVAS_W, CANVAS_H), (8, 12, 30, 140))
-    final_canvas.paste(shadow_layer, (0, 32), mask=shadow_mask)
+    # 1. Soft Ambient Drop Shadow
+    shadow_mask = combined_mask.filter(ImageFilter.MaxFilter(17))
+    shadow_mask = shadow_mask.filter(ImageFilter.GaussianBlur(18))
+    shadow_layer = Image.new("RGBA", (CANVAS_W, CANVAS_H), (8, 12, 30, 130))
+    final_canvas.paste(shadow_layer, (0, 26), mask=shadow_mask)
 
-    # 2. Deep Indigo/Navy Backing Hull (Sturdy comic outline)
-    hull_mask = combined_mask.filter(ImageFilter.MaxFilter(27))
+    # 2. Deep Indigo/Navy Backing Hull (Balanced outline)
+    hull_mask = combined_mask.filter(ImageFilter.MaxFilter(17))
     hull_grad = render_gradient_vertical(CANVAS_W, CANVAS_H, (24, 32, 64), (10, 14, 32))
     hull_layer = Image.new("RGBA", (CANVAS_W, CANVAS_H), (0, 0, 0, 0))
     hull_layer.paste(hull_grad, (0, 0), mask=hull_mask)
     
     # 3D bottom bevel on hull
     hull_bottom_mask = ImageChops.subtract(
-        ImageChops.offset(hull_mask, 0, 8),
+        ImageChops.offset(hull_mask, 0, 6),
         hull_mask
     )
     hull_bottom_dark = Image.new("RGBA", (CANVAS_W, CANVAS_H), (4, 6, 16, 255))
     final_canvas = Image.alpha_composite(final_canvas, hull_layer)
     final_canvas.paste(hull_bottom_dark, (0, 0), mask=hull_bottom_mask)
 
-    # 3. Glossy White / Ice-Cream Sticker Border
-    border_mask = combined_mask.filter(ImageFilter.MaxFilter(13))
+    # 3. Thin, Crisp White Sticker Border (MaxFilter 5 = ~2.5px crisp highlight rim)
+    border_mask = combined_mask.filter(ImageFilter.MaxFilter(5))
     border_grad = render_gradient_vertical(CANVAS_W, CANVAS_H, (255, 255, 255), (235, 242, 252))
     border_layer = Image.new("RGBA", (CANVAS_W, CANVAS_H), (0, 0, 0, 0))
     border_layer.paste(border_grad, (0, 0), mask=border_mask)
@@ -413,27 +432,27 @@ def generate_logo():
     for l in rendered_letters:
         # Cast soft shadow from this letter onto previous letters
         l_alpha = l["img"].split()[3]
-        l_shadow_mask = l_alpha.filter(ImageFilter.GaussianBlur(6))
-        l_shadow = Image.new("RGBA", (l["w"], l["h"]), (0, 0, 0, 85))
-        final_canvas.paste(l_shadow, (l["pos_x"] + 4, l["pos_y"] + 6), mask=l_shadow_mask)
+        l_shadow_mask = l_alpha.filter(ImageFilter.GaussianBlur(5))
+        l_shadow = Image.new("RGBA", (l["w"], l["h"]), (0, 0, 0, 80))
+        final_canvas.paste(l_shadow, (l["pos_x"] + 3, l["pos_y"] + 5), mask=l_shadow_mask)
 
         # Composite the letter
         final_canvas.alpha_composite(l["img"], (l["pos_x"], l["pos_y"]))
 
     # 5. Diamond Star Sparkles
     sparkles = [
-        (rendered_letters[0]["pos_x"] + 65, rendered_letters[0]["pos_y"] + 50, 24, (255, 255, 225, 255)),  # B
-        (rendered_letters[2]["pos_x"] + 145, rendered_letters[2]["pos_y"] + 75, 22, (255, 235, 235, 255)), # S
-        (rendered_letters[7]["pos_x"] + 115, rendered_letters[7]["pos_y"] + 60, 20, (235, 255, 220, 255)), # R (FEVER)
-        (rendered_letters[8]["pos_x"] + 50, rendered_letters[8]["pos_y"] + 50, 24, (255, 255, 210, 255)),  # P
-        (rendered_letters[13]["pos_x"] + 80, rendered_letters[13]["pos_y"] + 35, 28, (255, 250, 180, 255)), # !
+        (rendered_letters[0]["pos_x"] + 50, rendered_letters[0]["pos_y"] + 45, 22, (255, 255, 225, 255)),  # B
+        (rendered_letters[2]["pos_x"] + 120, rendered_letters[2]["pos_y"] + 70, 20, (255, 235, 235, 255)), # S
+        (rendered_letters[7]["pos_x"] + 105, rendered_letters[7]["pos_y"] + 55, 18, (235, 255, 220, 255)), # R (FEVER)
+        (rendered_letters[8]["pos_x"] + 45, rendered_letters[8]["pos_y"] + 45, 22, (255, 255, 210, 255)),  # P
+        (rendered_letters[13]["pos_x"] + 35, rendered_letters[13]["pos_y"] + 30, 24, (255, 250, 180, 255)), # !
     ]
     for sp in sparkles:
         draw_diamond_sparkle(final_canvas, sp[0], sp[1], sp[2], sp[3])
 
     # Crop tightly with padding
     bbox = final_canvas.getbbox()
-    pad = 30
+    pad = 25
     crop_box = (
         max(0, bbox[0] - pad),
         max(0, bbox[1] - pad),

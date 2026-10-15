@@ -484,11 +484,15 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 	if vp_size.x <= 0 or vp_size.y <= 0:
 		vp_size = Vector2(720, 1280)
 
-	# Aspect ratio of the master 3D logo (1256 x 865 = ~1.452)
-	var logo_aspect: float = 1256.0 / 865.0
+	# Aspect ratio of the master 3D logo
+	var logo_aspect: float = 818.0 / 778.0
+	if _logo_rect != null and is_instance_valid(_logo_rect) and _logo_rect.texture != null:
+		var tex_size: Vector2 = _logo_rect.texture.get_size()
+		if tex_size.y > 0.0:
+			logo_aspect = tex_size.x / tex_size.y
 
-	# Responsive width: fit 88% of screen, capped at 620px
-	var max_w: float = minf(vp_size.x * 0.88, 620.0)
+	# Responsive width: fit up to 82% of screen, capped at 540px
+	var max_w: float = minf(vp_size.x * 0.82, 540.0)
 	var logo_w: float = max_w
 	var logo_h: float = logo_w / logo_aspect
 

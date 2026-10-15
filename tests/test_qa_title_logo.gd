@@ -51,7 +51,7 @@ func _test_logo_asset_integrity() -> void:
 	if logo_tex != null:
 		_assert(logo_tex.get_width() > 800 and logo_tex.get_height() > 500, "Logo has high retina resolution (%dx%d px)" % [logo_tex.get_width(), logo_tex.get_height()])
 		var aspect: float = float(logo_tex.get_width()) / float(logo_tex.get_height())
-		_assert(aspect > 1.3 and aspect < 1.6, "Logo aspect ratio is balanced portrait casual standard (%.3f)" % aspect)
+		_assert(aspect > 0.95 and aspect < 1.35, "Logo aspect ratio is balanced portrait casual badge standard (%.3f)" % aspect)
 
 	var font_path := "res://assets/fonts/arial_rounded_bold.ttf"
 	_assert(ResourceLoader.exists(font_path), "Font asset exists in project at %s" % font_path)
