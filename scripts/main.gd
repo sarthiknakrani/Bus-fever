@@ -452,9 +452,9 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 	var logo_h: float = logo_w / logo_aspect
 
 	# Responsive 3D Orange Play Button sizing & position
-	var btn_w: float = minf(vp_size.x * 0.65, 290.0)
-	var btn_h: float = btn_w * (371.0 / 688.0) # aspect ~0.539
-	var btn_y: float = (vp_size.y * 0.85) - (btn_h * 0.5)
+	var btn_w: float = minf(vp_size.x * 0.68, 350.0)
+	var btn_h: float = btn_w * (600.0 / 1122.0) # aspect ~0.5348
+	var btn_y: float = (vp_size.y * 0.84) - (btn_h * 0.5)
 	if _play_btn != null and is_instance_valid(_play_btn):
 		_play_btn.size = Vector2(btn_w, btn_h)
 		_play_btn.position = Vector2((vp_size.x - btn_w) * 0.5, btn_y)
