@@ -1,0 +1,448 @@
+#!/usr/bin/env python3
+"""
+BUS FEVER PARTY! — High-End 3D Casual Mobile Game Logo Generator
+Generates a studio-quality 3D-extruded, candy-glossed, multicolor game logo
+with per-letter vibrant hues, unified badge silhouette, and rich lighting.
+"""
+
+import math
+from PIL import Image, ImageFont, ImageDraw, ImageFilter, ImageChops
+
+FONT_PATH = "assets/fonts/arial_rounded_bold.ttf"
+OUTPUT_PNG = "assets/ui/logo/bus_fever_party_logo.png"
+
+CANVAS_W = 1400
+CANVAS_H = 1100
+CENTER_X = CANVAS_W // 2
+
+# Harmonious, super-vibrant casual palette
+# [highlight, face_top, face_bottom, bevel_shade, ext_top, ext_mid, ext_base]
+LETTER_PALETTES = {
+    # Line 1: B U S
+    "B": {
+        "name": "Golden Yellow",
+        "highlight": (255, 255, 220),
+        "face_top": (255, 230, 45),
+        "face_bottom": (255, 170, 0),
+        "bevel_shade": (235, 130, 0),
+        "ext_top": (215, 95, 0),
+        "ext_mid": (175, 55, 0),
+        "ext_base": (95, 20, 0),
+    },
+    "U": {
+        "name": "Vivid Orange",
+        "highlight": (255, 240, 210),
+        "face_top": (255, 140, 20),
+        "face_bottom": (245, 80, 0),
+        "bevel_shade": (210, 55, 0),
+        "ext_top": (185, 40, 0),
+        "ext_mid": (145, 20, 0),
+        "ext_base": (80, 10, 0),
+    },
+    "S": {
+        "name": "Crimson Red",
+        "highlight": (255, 225, 230),
+        "face_top": (255, 60, 75),
+        "face_bottom": (225, 15, 35),
+        "bevel_shade": (190, 5, 25),
+        "ext_top": (165, 0, 20),
+        "ext_mid": (125, 0, 15),
+        "ext_base": (70, 0, 10),
+    },
+    # Line 2: F E V E R
+    "F": {
+        "name": "Bright Cyan",
+        "highlight": (225, 252, 255),
+        "face_top": (0, 235, 255),
+        "face_bottom": (0, 175, 235),
+        "bevel_shade": (0, 135, 195),
+        "ext_top": (0, 105, 165),
+        "ext_mid": (0, 75, 130),
+        "ext_base": (0, 35, 75),
+    },
+    "E1": {
+        "char": "E",
+        "name": "Royal Blue",
+        "highlight": (225, 240, 255),
+        "face_top": (60, 145, 255),
+        "face_bottom": (25, 90, 245),
+        "bevel_shade": (15, 60, 205),
+        "ext_top": (10, 40, 165),
+        "ext_mid": (5, 25, 125),
+        "ext_base": (0, 12, 70),
+    },
+    "V": {
+        "name": "Rich Purple",
+        "highlight": (248, 230, 255),
+        "face_top": (200, 95, 255),
+        "face_bottom": (150, 35, 235),
+        "bevel_shade": (120, 15, 195),
+        "ext_top": (90, 10, 160),
+        "ext_mid": (65, 5, 120),
+        "ext_base": (35, 0, 75),
+    },
+    "E2": {
+        "char": "E",
+        "name": "Bubblegum Pink",
+        "highlight": (255, 230, 242),
+        "face_top": (255, 75, 155),
+        "face_bottom": (240, 25, 115),
+        "bevel_shade": (200, 10, 85),
+        "ext_top": (160, 5, 65),
+        "ext_mid": (120, 0, 45),
+        "ext_base": (65, 0, 25),
+    },
+    "R1": {
+        "char": "R",
+        "name": "Lime Green",
+        "highlight": (240, 255, 220),
+        "face_top": (135, 245, 25),
+        "face_bottom": (90, 215, 10),
+        "bevel_shade": (65, 175, 5),
+        "ext_top": (45, 135, 5),
+        "ext_mid": (30, 100, 5),
+        "ext_base": (12, 55, 0),
+    },
+    # Line 3: P A R T Y !
+    "P": {
+        "name": "Sunny Yellow",
+        "highlight": (255, 255, 220),
+        "face_top": (255, 235, 55),
+        "face_bottom": (255, 190, 10),
+        "bevel_shade": (235, 150, 0),
+        "ext_top": (210, 105, 0),
+        "ext_mid": (170, 70, 0),
+        "ext_base": (95, 30, 0),
+    },
+    "A": {
+        "name": "Ruby Magenta",
+        "highlight": (255, 225, 235),
+        "face_top": (255, 45, 100),
+        "face_bottom": (220, 10, 60),
+        "bevel_shade": (180, 0, 40),
+        "ext_top": (145, 0, 30),
+        "ext_mid": (105, 0, 20),
+        "ext_base": (55, 0, 10),
+    },
+    "R2": {
+        "char": "R",
+        "name": "Emerald Mint",
+        "highlight": (225, 255, 240),
+        "face_top": (20, 235, 145),
+        "face_bottom": (0, 190, 105),
+        "bevel_shade": (0, 150, 75),
+        "ext_top": (0, 115, 55),
+        "ext_mid": (0, 85, 40),
+        "ext_base": (0, 45, 20),
+    },
+    "T": {
+        "name": "Tangerine Orange",
+        "highlight": (255, 238, 215),
+        "face_top": (255, 125, 20),
+        "face_bottom": (235, 75, 0),
+        "bevel_shade": (200, 50, 0),
+        "ext_top": (165, 35, 0),
+        "ext_mid": (125, 20, 0),
+        "ext_base": (70, 10, 0),
+    },
+    "Y": {
+        "name": "Azure Sky Blue",
+        "highlight": (225, 248, 255),
+        "face_top": (30, 190, 255),
+        "face_bottom": (0, 140, 235),
+        "bevel_shade": (0, 110, 190),
+        "ext_top": (0, 80, 155),
+        "ext_mid": (0, 55, 115),
+        "ext_base": (0, 25, 65),
+    },
+    "!": {
+        "name": "Metallic Gold",
+        "highlight": (255, 255, 225),
+        "face_top": (255, 230, 45),
+        "face_bottom": (255, 175, 0),
+        "bevel_shade": (230, 135, 0),
+        "ext_top": (195, 95, 0),
+        "ext_mid": (155, 60, 0),
+        "ext_base": (90, 25, 0),
+    },
+}
+
+def lerp_color(c1, c2, t):
+    t = max(0.0, min(1.0, t))
+    return (
+        int(c1[0] + (c2[0] - c1[0]) * t),
+        int(c1[1] + (c2[1] - c1[1]) * t),
+        int(c1[2] + (c2[2] - c1[2]) * t),
+    )
+
+def render_gradient_vertical(w, h, c_top, c_bottom):
+    grad = Image.new("RGBA", (w, h))
+    pixels = grad.load()
+    for y in range(h):
+        t = y / max(1, h - 1)
+        c = lerp_color(c_top, c_bottom, t)
+        for x in range(w):
+            pixels[x, y] = (c[0], c[1], c[2], 255)
+    return grad
+
+def create_letter_image(char_key, font_size=190, stroke_w=7, depth=26):
+    """
+    Renders an individual letter with:
+    - 3D extrusion with directional light & occlusion base
+    - Front face vertical gradient
+    - Crisp inner bevel rim & shadow
+    - Candy pill specular gloss
+    """
+    pal = LETTER_PALETTES[char_key]
+    char = pal.get("char", char_key)
+    font = ImageFont.truetype(FONT_PATH, font_size)
+
+    bbox = font.getbbox(char)
+    gw = bbox[2] - bbox[0] + stroke_w * 2 + 10
+    gh = bbox[3] - bbox[1] + stroke_w * 2 + 10
+
+    buf_w = gw + 60
+    buf_h = gh + depth + 60
+    origin_x = 30 - bbox[0] + stroke_w
+    origin_y = 30 - bbox[1] + stroke_w
+
+    letter_img = Image.new("RGBA", (buf_w, buf_h), (0, 0, 0, 0))
+
+    # Base glyph mask (thick, rounded, bold)
+    base_mask = Image.new("L", (buf_w, buf_h), 0)
+    d_base = ImageDraw.Draw(base_mask)
+    d_base.text((origin_x, origin_y), char, font=font, fill=255, stroke_width=stroke_w)
+
+    # 1. 3D Extrusion (downward projection with depth)
+    for step in range(depth, 0, -1):
+        t = (depth - step) / float(depth)
+        if t < 0.5:
+            c = lerp_color(pal["ext_base"], pal["ext_mid"], t * 2.0)
+        else:
+            c = lerp_color(pal["ext_mid"], pal["ext_top"], (t - 0.5) * 2.0)
+
+        step_img = Image.new("RGBA", (buf_w, buf_h), (0, 0, 0, 0))
+        d_step = ImageDraw.Draw(step_img)
+        d_step.text((origin_x, origin_y + step), char, font=font, fill=(c[0], c[1], c[2], 255), stroke_width=stroke_w)
+        letter_img = Image.alpha_composite(letter_img, step_img)
+
+    # 2. Crease shadow at bottom of front face (gives physical depth separation)
+    crease_mask = ImageChops.subtract(
+        ImageChops.offset(base_mask, 0, 3),
+        base_mask
+    )
+    crease_img = Image.new("RGBA", (buf_w, buf_h), (0, 0, 0, 180))
+    letter_img.paste(crease_img, (0, 0), mask=crease_mask)
+
+    # 3. Front Face Gradient
+    face_grad = render_gradient_vertical(buf_w, buf_h, pal["face_top"], pal["face_bottom"])
+    face_img = Image.new("RGBA", (buf_w, buf_h), (0, 0, 0, 0))
+    face_img.paste(face_grad, (0, 0), mask=base_mask)
+
+    # 4. Inner Bevel Highlight (sunlit rim at top-left)
+    shifted_mask = ImageChops.offset(base_mask, 0, 3)
+    rim_top_mask = ImageChops.subtract(base_mask, shifted_mask)
+    rim_img = Image.new("RGBA", (buf_w, buf_h), (pal["highlight"][0], pal["highlight"][1], pal["highlight"][2], 200))
+    face_img.paste(rim_img, (0, 0), mask=rim_top_mask)
+
+    # 5. Inner Bevel Shade (rim shadow at bottom-right)
+    shifted_up_mask = ImageChops.offset(base_mask, 0, -3)
+    rim_btm_mask = ImageChops.subtract(base_mask, shifted_up_mask)
+    shade_img = Image.new("RGBA", (buf_w, buf_h), (pal["bevel_shade"][0], pal["bevel_shade"][1], pal["bevel_shade"][2], 175))
+    face_img.paste(shade_img, (0, 0), mask=rim_btm_mask)
+
+    # 6. Candy Pill Specular Gloss (curved upper highlight)
+    gloss_mask = Image.new("L", (buf_w, buf_h), 0)
+    d_gloss = ImageDraw.Draw(gloss_mask)
+    gloss_rect = (origin_x - 12, origin_y - 12, origin_x + gw + 12, origin_y + int(gh * 0.42))
+    d_gloss.ellipse(gloss_rect, fill=180)
+    gloss_mask = ImageChops.multiply(gloss_mask, base_mask)
+
+    # Vertical gloss fade
+    for y in range(buf_h):
+        fade = max(0, 1.0 - (y - origin_y) / float(gh * 0.42))
+        for x in range(buf_w):
+            val = gloss_mask.getpixel((x, y))
+            if val > 0:
+                gloss_mask.putpixel((x, y), int(val * fade * 0.8))
+
+    gloss_color = Image.new("RGBA", (buf_w, buf_h), (255, 255, 255, 255))
+    face_img.paste(gloss_color, (0, 0), mask=gloss_mask)
+
+    # Composite front face on extrusion
+    letter_img = Image.alpha_composite(letter_img, face_img)
+
+    return letter_img, base_mask, (gw, gh, depth)
+
+def draw_diamond_sparkle(img, cx, cy, radius=22, color=(255, 255, 255, 255)):
+    draw = ImageDraw.Draw(img)
+    glow_r = int(radius * 0.7)
+    draw.ellipse((cx - glow_r, cy - glow_r, cx + glow_r, cy + glow_r), fill=(color[0], color[1], color[2], 100))
+    points = [
+        (cx, cy - radius),
+        (cx + radius * 0.22, cy - radius * 0.22),
+        (cx + radius, cy),
+        (cx + radius * 0.22, cy + radius * 0.22),
+        (cx, cy + radius),
+        (cx - radius * 0.22, cy + radius * 0.22),
+        (cx - radius, cy),
+        (cx - radius * 0.22, cy - radius * 0.22),
+    ]
+    draw.polygon(points, fill=color)
+    core_r = int(radius * 0.25)
+    draw.ellipse((cx - core_r, cy - core_r, cx + core_r, cy + core_r), fill=(255, 255, 255, 255))
+
+def generate_logo():
+    print("=== GENERATING 3D CASUAL GAME TITLE LOGO (V2 TIGHT UNIFIED BADGE) ===")
+
+    # Layout configuration
+    # Letters are snug, overlapping slightly to fuse into a single badge
+    lines_def = [
+        # Line 1: BUS
+        {
+            "keys": ["B", "U", "S"],
+            "font_size": 225,
+            "stroke_w": 9,
+            "depth": 28,
+            "y_pos": 140,
+            "spacing": -28, # snug overlap
+            "angles": [-2.0, 0.0, 2.0],
+            "y_offsets": [4, -4, 4]
+        },
+        # Line 2: FEVER
+        {
+            "keys": ["F", "E1", "V", "E2", "R1"],
+            "font_size": 182,
+            "stroke_w": 8,
+            "depth": 26,
+            "y_pos": 360,
+            "spacing": -22,
+            "angles": [-1.5, -0.5, 0.0, 0.5, 1.5],
+            "y_offsets": [0, -3, 3, -3, 0]
+        },
+        # Line 3: PARTY!
+        {
+            "keys": ["P", "A", "R2", "T", "Y", "!"],
+            "font_size": 188,
+            "stroke_w": 8,
+            "depth": 26,
+            "y_pos": 575,
+            "spacing": -20,
+            "angles": [-2.5, -1.2, 0.0, 1.2, 2.5, 7.5],
+            "y_offsets": [2, -2, 0, -2, 2, -6]
+        }
+    ]
+
+    rendered_letters = []
+    
+    for line in lines_def:
+        f_sz = line["font_size"]
+        st_w = line["stroke_w"]
+        dp = line["depth"]
+        spacing = line["spacing"]
+        
+        line_items = []
+        total_w = 0
+        
+        for idx, k in enumerate(line["keys"]):
+            lim, lmask, dims = create_letter_image(k, font_size=f_sz, stroke_w=st_w, depth=dp)
+            angle = line["angles"][idx]
+            y_off = line["y_offsets"][idx]
+            
+            if abs(angle) > 0.01:
+                lim = lim.rotate(angle, resample=Image.BICUBIC, expand=True)
+                lmask = lmask.rotate(angle, resample=Image.BICUBIC, expand=True)
+                
+            line_items.append({
+                "key": k,
+                "img": lim,
+                "mask": lmask,
+                "w": lim.width,
+                "h": lim.height,
+                "y_off": y_off
+            })
+            total_w += lim.width + spacing
+        
+        total_w -= spacing
+        start_x = CENTER_X - (total_w // 2)
+        curr_x = start_x
+        
+        for item in line_items:
+            item["pos_x"] = curr_x
+            item["pos_y"] = line["y_pos"] + item["y_off"]
+            rendered_letters.append(item)
+            curr_x += item["w"] + spacing
+
+    final_canvas = Image.new("RGBA", (CANVAS_W, CANVAS_H), (0, 0, 0, 0))
+
+    # Combined Silhouette Mask
+    combined_mask = Image.new("L", (CANVAS_W, CANVAS_H), 0)
+    for l in rendered_letters:
+        letter_alpha = l["img"].split()[3]
+        combined_mask.paste(letter_alpha, (l["pos_x"], l["pos_y"]), mask=letter_alpha)
+
+    # 1. Soft Ambient Drop Shadow (huge detachment and depth)
+    shadow_mask = combined_mask.filter(ImageFilter.MaxFilter(21))
+    shadow_mask = shadow_mask.filter(ImageFilter.GaussianBlur(22))
+    shadow_layer = Image.new("RGBA", (CANVAS_W, CANVAS_H), (8, 12, 30, 140))
+    final_canvas.paste(shadow_layer, (0, 32), mask=shadow_mask)
+
+    # 2. Deep Indigo/Navy Backing Hull (Sturdy comic outline)
+    hull_mask = combined_mask.filter(ImageFilter.MaxFilter(27))
+    hull_grad = render_gradient_vertical(CANVAS_W, CANVAS_H, (24, 32, 64), (10, 14, 32))
+    hull_layer = Image.new("RGBA", (CANVAS_W, CANVAS_H), (0, 0, 0, 0))
+    hull_layer.paste(hull_grad, (0, 0), mask=hull_mask)
+    
+    # 3D bottom bevel on hull
+    hull_bottom_mask = ImageChops.subtract(
+        ImageChops.offset(hull_mask, 0, 8),
+        hull_mask
+    )
+    hull_bottom_dark = Image.new("RGBA", (CANVAS_W, CANVAS_H), (4, 6, 16, 255))
+    final_canvas = Image.alpha_composite(final_canvas, hull_layer)
+    final_canvas.paste(hull_bottom_dark, (0, 0), mask=hull_bottom_mask)
+
+    # 3. Glossy White / Ice-Cream Sticker Border
+    border_mask = combined_mask.filter(ImageFilter.MaxFilter(13))
+    border_grad = render_gradient_vertical(CANVAS_W, CANVAS_H, (255, 255, 255), (235, 242, 252))
+    border_layer = Image.new("RGBA", (CANVAS_W, CANVAS_H), (0, 0, 0, 0))
+    border_layer.paste(border_grad, (0, 0), mask=border_mask)
+    final_canvas = Image.alpha_composite(final_canvas, border_layer)
+
+    # 4. Individual 3D Letters (rendered in sequence with letter-on-letter soft cast shadows)
+    for l in rendered_letters:
+        # Cast soft shadow from this letter onto previous letters
+        l_alpha = l["img"].split()[3]
+        l_shadow_mask = l_alpha.filter(ImageFilter.GaussianBlur(6))
+        l_shadow = Image.new("RGBA", (l["w"], l["h"]), (0, 0, 0, 85))
+        final_canvas.paste(l_shadow, (l["pos_x"] + 4, l["pos_y"] + 6), mask=l_shadow_mask)
+
+        # Composite the letter
+        final_canvas.alpha_composite(l["img"], (l["pos_x"], l["pos_y"]))
+
+    # 5. Diamond Star Sparkles
+    sparkles = [
+        (rendered_letters[0]["pos_x"] + 65, rendered_letters[0]["pos_y"] + 50, 24, (255, 255, 225, 255)),  # B
+        (rendered_letters[2]["pos_x"] + 145, rendered_letters[2]["pos_y"] + 75, 22, (255, 235, 235, 255)), # S
+        (rendered_letters[7]["pos_x"] + 115, rendered_letters[7]["pos_y"] + 60, 20, (235, 255, 220, 255)), # R (FEVER)
+        (rendered_letters[8]["pos_x"] + 50, rendered_letters[8]["pos_y"] + 50, 24, (255, 255, 210, 255)),  # P
+        (rendered_letters[13]["pos_x"] + 80, rendered_letters[13]["pos_y"] + 35, 28, (255, 250, 180, 255)), # !
+    ]
+    for sp in sparkles:
+        draw_diamond_sparkle(final_canvas, sp[0], sp[1], sp[2], sp[3])
+
+    # Crop tightly with padding
+    bbox = final_canvas.getbbox()
+    pad = 30
+    crop_box = (
+        max(0, bbox[0] - pad),
+        max(0, bbox[1] - pad),
+        min(CANVAS_W, bbox[2] + pad),
+        min(CANVAS_H, bbox[3] + pad)
+    )
+    cropped = final_canvas.crop(crop_box)
+    cropped.save(OUTPUT_PNG, "PNG", optimize=True)
+    print(f"SUCCESS! Rendered 3D logo saved to {OUTPUT_PNG} ({cropped.width}x{cropped.height} px)")
+
+if __name__ == "__main__":
+    generate_logo()

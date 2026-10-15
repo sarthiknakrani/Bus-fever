@@ -13,9 +13,18 @@ const PLAY_BACK := Color("15803d")
 var _settings_overlay: Control
 var _settings_panel: PanelContainer
 
+var _logo_wrapper: Control
+var _logo_rect: TextureRect
+var _logo_tween: Tween
+
 
 func _ready() -> void:
 	_build_ui()
+	var vp := get_viewport()
+	if vp != null:
+		vp.size_changed.connect(_update_layout)
+	_update_layout()
+	_play_logo_entrance_animation()
 
 
 func _build_ui() -> void:
@@ -53,9 +62,31 @@ func _build_ui() -> void:
 	root.add_child(safe)
 
 	var hud := Control.new()
+	hud.name = "HUD"
 	hud.set_anchors_preset(Control.PRESET_FULL_RECT)
 	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	safe.add_child(hud)
+
+	# B. Premium 3D Game Title Logo ("BUS FEVER PARTY!")
+	_logo_wrapper = Control.new()
+	_logo_wrapper.name = "TitleLogoWrapper"
+	_logo_wrapper.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hud.add_child(_logo_wrapper)
+
+	_logo_rect = TextureRect.new()
+	_logo_rect.name = "LogoTexture"
+	_logo_rect.texture = load("res://assets/ui/logo/bus_fever_party_logo.png")
+	_logo_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_logo_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_logo_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_logo_wrapper.add_child(_logo_rect)
+
+	# Specular traveling glint shader
+	var shine_mat := ShaderMaterial.new()
+	shine_mat.shader = load("res://assets/shaders/logo_shine.gdshader")
+	shine_mat.set_shader_parameter("shine_progress", -1.0)
+	_logo_rect.material = shine_mat
+
 	# C. Top-right Settings button (Glossy Blue SVG)
 	var settings_btn := TextureButton.new()
 	settings_btn.texture_normal = load("res://assets/ui/buttons/settings_gear_normal.svg")
@@ -440,3 +471,88 @@ func _create_close_button(on_close: Callable) -> Button:
 		on_close.call()
 	)
 	return btn
+
+func _exit_tree() -> void:
+	if _logo_tween != null and _logo_tween.is_valid():
+		_logo_tween.kill()
+
+func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
+	if _logo_wrapper == null or not is_instance_valid(_logo_wrapper):
+		return
+	var vp := get_viewport()
+	var vp_size: Vector2 = override_vp_size if override_vp_size != Vector2.ZERO else (vp.get_visible_rect().size if vp != null else Vector2(720, 1280))
+	if vp_size.x <= 0 or vp_size.y <= 0:
+		vp_size = Vector2(720, 1280)
+
+	# Aspect ratio of the master 3D logo (1256 x 865 = ~1.452)
+	var logo_aspect: float = 1256.0 / 865.0
+
+	# Responsive width: fit 88% of screen, capped at 620px
+	var max_w: float = minf(vp_size.x * 0.88, 620.0)
+	var logo_w: float = max_w
+	var logo_h: float = logo_w / logo_aspect
+
+	# Height constraints: Settings button at top, Play button at bottom
+	# Settings button occupies top ~85px
+	# Play button is positioned at anchor_top 0.85 (y = 0.85 * H - 80px)
+	var top_clearance: float = 85.0
+	var btm_clearance: float = (vp_size.y * 0.85) - 95.0
+	var available_h: float = maxf(100.0, btm_clearance - top_clearance)
+
+	# If logo height exceeds 58% of available vertical height, scale down proportionately
+	if logo_h > available_h * 0.58:
+		logo_h = available_h * 0.58
+		logo_w = logo_h * logo_aspect
+
+	# Perfectly center horizontally and position in the golden upper third
+	var logo_x: float = (vp_size.x - logo_w) * 0.5
+	var logo_y: float = top_clearance + (available_h - logo_h) * 0.36
+
+	_logo_wrapper.position = Vector2(logo_x, logo_y)
+	_logo_wrapper.size = Vector2(logo_w, logo_h)
+	_logo_wrapper.pivot_offset = Vector2(logo_w * 0.5, logo_h * 0.5)
+
+	if _logo_rect != null and is_instance_valid(_logo_rect):
+		_logo_rect.position = Vector2.ZERO
+		_logo_rect.size = Vector2(logo_w, logo_h)
+
+func _play_logo_entrance_animation() -> void:
+	if _logo_wrapper == null or not is_instance_valid(_logo_wrapper):
+		return
+	if _logo_tween != null and _logo_tween.is_valid():
+		_logo_tween.kill()
+
+	# Start slightly smaller with zero opacity
+	_logo_wrapper.scale = Vector2(0.55, 0.55)
+	_logo_wrapper.modulate.a = 0.0
+
+	_logo_tween = create_tween()
+	# 1. Pop-in with gentle overshoot (0.0 to 0.42s)
+	_logo_tween.set_parallel(true)
+	_logo_tween.tween_property(_logo_wrapper, "scale", Vector2(1.08, 1.08), 0.42).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_logo_tween.tween_property(_logo_wrapper, "modulate:a", 1.0, 0.30).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+	# 2. Settle into normal position (0.42 to 0.70s)
+	_logo_tween.chain().tween_property(_logo_wrapper, "scale", Vector2.ONE, 0.28).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+	# 3. Soft traveling specular highlight sweep across the text (0.45s to 1.10s)
+	if _logo_rect != null and is_instance_valid(_logo_rect) and _logo_rect.material is ShaderMaterial:
+		var mat := _logo_rect.material as ShaderMaterial
+		mat.set_shader_parameter("shine_progress", -0.5)
+		var shine_tw = create_tween()
+		shine_tw.tween_interval(0.45)
+		shine_tw.tween_method(
+			func(v: float): mat.set_shader_parameter("shine_progress", v),
+			-0.5, 1.5, 0.65
+		).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		shine_tw.tween_callback(func():
+			if is_instance_valid(mat):
+				mat.set_shader_parameter("shine_progress", -1.0)
+		)
+
+	# 4. Subtle, restrained idle breathing (gentle ±3px vertical float over 2.6s)
+	var base_y: float = _logo_wrapper.position.y
+	_logo_tween.chain().tween_property(_logo_wrapper, "position:y", base_y - 3.0, 1.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_logo_tween.tween_property(_logo_wrapper, "position:y", base_y + 3.0, 1.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_logo_tween.set_loops()
+
