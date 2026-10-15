@@ -77,11 +77,7 @@ func get_original_band_height() -> float:
 	return 0.0
 
 func get_band_bottom_y() -> float:
-	var orig_h := get_original_band_height()
-	if orig_h > 0.0:
-		# 200% height: final height = 2.0 * original_height, extending downward only
-		return p_partition_y + (orig_h * 2.0)
-	elif p_separator_y > -9000.0:
+	if p_separator_y > -9000.0:
 		return maxf(p_separator_y, p_partition_y)
 	return p_partition_y
 

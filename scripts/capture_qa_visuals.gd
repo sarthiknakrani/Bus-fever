@@ -7,6 +7,8 @@ var resolutions := [
 	{"name": "level1_390x844", "size": Vector2i(390, 844), "level": 1},
 	{"name": "level1_720x1280", "size": Vector2i(720, 1280), "level": 1},
 	{"name": "level1_810x1746", "size": Vector2i(810, 1746), "level": 1},
+	{"name": "level2_390x844", "size": Vector2i(390, 844), "level": 2},
+	{"name": "level2_720x1280", "size": Vector2i(720, 1280), "level": 2},
 	{"name": "level2_810x1746", "size": Vector2i(810, 1746), "level": 2}
 ]
 var res_idx := 0

@@ -1,6 +1,8 @@
 extends Node2D
 class_name CarJamLevel
 
+const GardenBackgroundView = preload("res://scripts/gameplay/garden_background_view.gd")
+
 ## Production-quality Car Jam single-level gameplay scene.
 ## Pure Godot 2D architecture with 2.5D pseudo-3D layered buses,
 ## exactly 4 parking slots, swept-footprint collision, and ordered passenger queue.
@@ -180,7 +182,7 @@ func _process(delta: float) -> void:
 				_feeder_rows.append(next_row)
 				
 		# B. Advance feeder rows forward towards stop line / row ahead
-		var feeder_stop_pos: float = f_len - 190.0
+		var feeder_stop_pos: float = f_len - 240.0
 		for j in range(_feeder_rows.size()):
 			var f_row = _feeder_rows[j]
 			var max_prog: float = feeder_stop_pos
@@ -189,8 +191,20 @@ func _process(delta: float) -> void:
 					if f_row.progress >= feeder_stop_pos - 0.5:
 						# Lead row is at the stop line; check if freed capacity exists
 						if _oval_freed_capacity >= f_row.passengers.size():
-							_lead_feeder_committed = true
-							max_prog = f_len
+							# Check if conflict zone is clear of oncoming traffic before committing
+							var conflict_clear := true
+							for cr in _circulating_rows:
+								var d = cr.progress - _merge_prog
+								if d < 0.0: d += track_len
+								var dist_to_merge = track_len - d
+								if dist_to_merge < 85.0 or d < 30.0:
+									conflict_clear = false
+									break
+							if conflict_clear:
+								_lead_feeder_committed = true
+								max_prog = f_len
+							else:
+								max_prog = feeder_stop_pos
 						else:
 							max_prog = feeder_stop_pos
 					else:
@@ -203,6 +217,8 @@ func _process(delta: float) -> void:
 				dist_moved = minf(dist_moved, maxf(dist_ahead, 0.0))
 				f_row.progress += dist_moved
 			else:
+				var max_queue_prog = feeder_stop_pos - float(j) * ROW_SPACING
+				var target_prog = minf(_feeder_rows[j - 1].progress - ROW_SPACING, max_queue_prog)
 				var actual_gap: float = _feeder_rows[j - 1].progress - f_row.progress
 				var speed: float = passenger_normal_speed
 				if actual_gap > ROW_SPACING * 1.25:
@@ -210,10 +226,8 @@ func _process(delta: float) -> void:
 				elif actual_gap < ROW_SPACING * 0.90:
 					speed = passenger_normal_speed * 0.85
 				var dist_moved: float = speed * delta
-				if actual_gap <= MIN_ROW_GAP:
-					dist_moved = 0.0
-				else:
-					dist_moved = minf(dist_moved, actual_gap - MIN_ROW_GAP)
+				if f_row.progress + dist_moved > target_prog:
+					dist_moved = maxf(0.0, target_prog - f_row.progress)
 				f_row.progress += dist_moved
 			
 		# C. Merge lead feeder row onto main loop if:
@@ -291,6 +305,15 @@ func _process(delta: float) -> void:
 				speed = passenger_sprint_speed
 			elif dist_ahead < ROW_SPACING * 0.90:
 				speed = passenger_normal_speed * 0.85
+
+		# Trailing row yielding for merging lead feeder row
+		if _lead_feeder_committed:
+			var d_merge = row.progress - _merge_prog
+			if d_merge < 0.0: d_merge += track_len
+			var dist_to_merge = track_len - d_merge
+			if dist_to_merge > 0.0 and dist_to_merge <= 160.0:
+				var yield_dist = maxf(0.0, dist_to_merge - ROW_SPACING)
+				dist_ahead = minf(dist_ahead, yield_dist)
 
 		var old_prog = row.progress
 		var dist_moved = speed * delta
@@ -383,10 +406,8 @@ func _build_scene_hierarchy() -> void:
 	# World Background
 	var bg_layer := CanvasLayer.new()
 	bg_layer.layer = -1
-	var bg := ColorRect.new()
-	bg.color = COLOR_GARDEN_BG # Lush vibrant green garden background matching track center opening
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var bg := GardenBackgroundView.new()
+	bg.name = "GardenBackground"
 	bg_layer.add_child(bg)
 	add_child(bg_layer)
 
@@ -889,7 +910,7 @@ func _init_passenger_track() -> void:
 
 	# Remaining rows form a separate dense waiting queue on feeder cross-track
 	var f_len = feeder_track.curve.get_baked_length()
-	var feeder_stop_pos: float = f_len - 190.0 # Queue stop line rests 190px before junction, completely clear of oval
+	var feeder_stop_pos: float = f_len - 240.0 # Queue stop line rests 240px before junction, completely clear of oval
 	for r in range(initial_rows_count, all_rows.size()):
 		var row = all_rows[r]
 		var feeder_idx = r - initial_rows_count
@@ -2234,68 +2255,66 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 	var board_pixel_w = board_local_size * sqrt(2.0)
 	var board_pixel_h = board_pixel_w * 0.72
 	
-	# 2. Determine required margins and total logical dimensions
-	# Top safe area (~110px: TopBar), bottom safe area (~140px: booster bar + padding)
+	# 2. Determine 40% / 60% Vertical Screen Space Allocation
+	# Top gameplay block: 40% of total screen height (top buttons, title, track, parking platform)
+	# Bottom puzzle block: 60% of total screen height (puzzle board, booster bar)
 	var screen_safe_w = vp_size.x * 0.94
-	var safe_upper_screen_h = (vp_size.y / 2.0) - 110.0
-	var safe_lower_screen_h = (vp_size.y / 2.0) - 140.0
+	var total_top_screen_h = vp_size.y * 0.40
+	var total_btm_screen_h = vp_size.y * 0.60
+
+	# Top safe margin (~75px for TopBar), bottom safe margin (~115px for BoosterBar)
+	var safe_upper_screen_h = total_top_screen_h - 75.0
+	var safe_lower_screen_h = total_btm_screen_h - 115.0
 
 	# Ensure we fit parking strip, board clearance, and track system with feeder
 	var slot_spacing = 58.0
 	var slots_count: int = controller.level_data.parking_slots_count if controller != null and controller.level_data != null else 4
 	var parking_w = float(max(1, slots_count - 1)) * slot_spacing + 35.0
-	var board_padded_w = board_pixel_w + 100.0
-	var track_system_w = 640.0 # Compact track system span (apex=220, outer=282px, total 564px + side margins)
+	var board_padded_w = board_pixel_w + 60.0
+	var track_system_w = 640.0
 	var required_w = maxf(maxf(parking_w, board_padded_w), track_system_w)
-	
-	# Minimum essential dimensions for upper and lower screen halves
-	var min_gap_tp = 24.0 # Tightened gap to bring parking platform close to passenger track
-	var min_band_h = 55.0 # Platform grey band below parking slots
-	var essential_upper_h = track_h + min_gap_tp + parking_h + 10.0 + min_band_h + 30.0
-	
-	var min_sep_to_board = 60.0
-	var min_btm_pad = 30.0
+
+	# Essential heights
+	var min_gap_tp = 20.0 # Platform throat gap to passenger track
+	var min_band_h = 36.0 # Platform grey band below parking slots
+	var essential_upper_h = track_h + min_gap_tp + parking_h + min_band_h + 10.0
+	var min_sep_to_board = 40.0
+	var min_btm_pad = 20.0
 	var essential_lower_h = min_sep_to_board + board_pixel_h + min_btm_pad
 
 	var scale_w = screen_safe_w / required_w
 	var scale_h_upper = safe_upper_screen_h / (essential_upper_h + 10.0)
 	var scale_h_lower = safe_lower_screen_h / (essential_lower_h + 10.0)
-	var scale_factor = clampf(minf(scale_w, minf(scale_h_upper, scale_h_lower)), 0.42, 2.20)
+	var scale_factor = clampf(minf(scale_w, minf(scale_h_upper, scale_h_lower)), 0.38, 2.20)
 
 	# Apply scale to world root
 	world_root.scale = Vector2(scale_factor, scale_factor)
 	world_root.position = Vector2.ZERO
-	
-	# In world_root coordinates, local Y = 0.0 corresponds to exact vertical screen center:
-	# separator_line_global_y = (vp_size.y / 2.0) + (0.0 * scale_factor) = H / 2.0
-	var divider_y: float = 0.0
-	
+
 	var half_h = (vp_size.y / 2.0) / scale_factor
-	var top_safe_y = -half_h + (110.0 / scale_factor)
-	var btm_safe_y = half_h - (140.0 / scale_factor)
+	var top_safe_y = -half_h + (75.0 / scale_factor)
+	var btm_safe_y = half_h - (115.0 / scale_factor)
 
-	# Distribute extra upper space gracefully above divider line (which sits at screen center Y = 0.0)
-	var avail_upper_h = -top_safe_y
-	var fixed_content_h = track_h + min_gap_tp + parking_h + 10.0
-	var extra_upper_h = maxf(0.0, avail_upper_h - fixed_content_h)
-	var gap_tp = clampf(min_gap_tp + extra_upper_h * 0.04, 24.0, 30.0)
-	var top_pad = maxf(30.0, 30.0 + extra_upper_h * 0.20)
-	var band_h = maxf(min_band_h, avail_upper_h - top_pad - track_h - gap_tp - parking_h - 10.0)
+	# In world_root coordinates, local Y = 0.0 corresponds to vertical screen center (50%).
+	# 40% from top of screen means global Y = 0.40 * H.
+	# Converting global Y to world_root local Y:
+	# Y_local = (0.40 * H - 0.50 * H) / scale_factor = -0.10 * (H / scale_factor)
+	var divider_y: float = -0.10 * (vp_size.y / scale_factor)
 
-	# Position upper elements tightly as one unified block anchored to divider_y = 0.0:
-	var partition_y = -band_h
-	var parking_bottom = partition_y - 10.0
+	# Upper elements: strictly occupy the top 40% (between top_safe_y and divider_y)
+	# Platform band bottom rests cleanly at divider_y (the 40% line):
+	var band_h = min_band_h
+	var partition_y = divider_y - band_h
+	var parking_bottom = partition_y - 6.0
 	var parking_y = parking_bottom - (parking_h / 2.0)
-	var track_bottom = parking_y - (parking_h / 2.0) - gap_tp
+	var track_bottom = parking_y - (parking_h / 2.0) - min_gap_tp
 	var track_y = track_bottom - (track_h / 2.0)
-	var plat_top = parking_y - (parking_h / 2.0) - 20.0
-	var separator_y = partition_y + (band_h / 2.0)
+	var plat_top = parking_y - (parking_h / 2.0) - 18.0
+	var separator_y = divider_y
 
-	# Distribute extra lower space gracefully below separator line
-	var avail_lower_h = btm_safe_y
-	var extra_lower_h = maxf(0.0, avail_lower_h - essential_lower_h)
-	var sep_to_board = clampf(min_sep_to_board + extra_lower_h * 0.45, 60.0, 110.0)
-	var board_y = sep_to_board + (board_pixel_h / 2.0)
+	# Lower elements: centered inside the 60% bottom space (between divider_y and btm_safe_y)
+	var avail_lower_h = btm_safe_y - divider_y
+	var board_y = divider_y + (avail_lower_h / 2.0)
 
 	# Passenger track prominent in upper section
 	if passenger_track_root != null:
@@ -2335,7 +2354,7 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 	if passenger_track_bg != null:
 		var tr = passenger_track_bg.get_node_or_null("TrackRenderer") as CarJamTrackRenderer
 		if tr != null:
-			tr.plat_top_local = 197.0
+			tr.plat_top_local = plat_top - track_y
 			tr.queue_redraw()
 
 func _update_feeder_curve(p0: Vector2) -> void:

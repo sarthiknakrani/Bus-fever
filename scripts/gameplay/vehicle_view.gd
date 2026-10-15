@@ -25,11 +25,11 @@ const CANONICAL_CANVAS_HEIGHT: float = 110.0
 # Authoritative visual scale factor (~15% reduction across all short buses in parking)
 const BUS_VISUAL_SCALE: float = 0.85
 
-# Board bus cell-fit parameters (tightens spacing on board to compact 7.6px gap matching reference)
+# Board bus cell-fit parameters (tightens spacing on board to compact 5.0px gap matching reference)
 # BOARD_BUS_TARGET_WIDTH is the target visible body WIDTH in board-local px.
-# At 68.0 px, adjacent parallel buses leave 7.6-8.0 px on-screen clearance without intersecting.
+# At 50.0 px, adjacent parallel buses leave 4.7-5.3 px on-screen clearance with 0 overlaps across all levels.
 # BOARD_ANCHOR_SHIFT is 0.0 to prevent cross-cluster divergence and frontal overlaps.
-const BOARD_BUS_TARGET_WIDTH: float = 68.0
+const BOARD_BUS_TARGET_WIDTH: float = 50.0
 const BOARD_ANCHOR_SHIFT: float = 0.0
 
 var board_scale_factor: float = 1.0
