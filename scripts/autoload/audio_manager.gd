@@ -18,6 +18,8 @@ const SFX_VICTORY := "victory"
 const SFX_FAILURE := "failure"
 const SFX_FAILURE_ALARM := "failure_alarm"
 const SFX_BOOSTER := "booster"
+const SFX_COIN := "coin"
+const SFX_FIREWORK := "firework"
 
 const MIX_RATE: int = 44100
 
@@ -108,6 +110,8 @@ func _generate_all_sfx() -> void:
 	_streams[SFX_FAILURE] = _gen_failure_buzzer()
 	_streams[SFX_FAILURE_ALARM] = _gen_failure_alarm()
 	_streams[SFX_BOOSTER] = _gen_booster_sparkle()
+	_streams[SFX_COIN] = _gen_coin_clink()
+	_streams[SFX_FIREWORK] = _gen_firework_pop()
 
 func _gen_wav(samples: PackedFloat32Array, loop: bool = false) -> AudioStreamWAV:
 	var count: int = samples.size()
@@ -307,3 +311,28 @@ func _generate_music() -> void:
 		var melody: float = sin(t * (root * 2.5) * TAU) * melody_env
 		samples[i] = bass + chord + melody
 	_music_stream = _gen_wav(samples, true)
+
+func _gen_coin_clink() -> AudioStreamWAV:
+	var dur: float = 0.16
+	var count: int = int(float(MIX_RATE) * dur)
+	var samples: PackedFloat32Array = PackedFloat32Array()
+	samples.resize(count)
+	for i in count:
+		var t: float = float(i) / float(MIX_RATE)
+		var env: float = exp(-t * 22.0)
+		var s: float = (sin(t * 1975.53 * TAU) * 0.4 + sin(t * 2637.02 * TAU) * 0.25 + sin(t * 3951.07 * TAU) * 0.1) * env
+		samples[i] = s
+	return _gen_wav(samples)
+
+func _gen_firework_pop() -> AudioStreamWAV:
+	var dur: float = 0.30
+	var count: int = int(float(MIX_RATE) * dur)
+	var samples: PackedFloat32Array = PackedFloat32Array()
+	samples.resize(count)
+	for i in count:
+		var t: float = float(i) / float(MIX_RATE)
+		var env: float = exp(-t * 12.0)
+		var noise: float = randf_range(-0.25, 0.25) * env
+		var thump: float = sin(t * lerpf(340.0, 80.0, t / dur) * TAU) * 0.35 * env
+		samples[i] = thump + noise
+	return _gen_wav(samples)

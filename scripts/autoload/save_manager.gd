@@ -2,11 +2,14 @@ extends Node
 ## Persistent save data. Tiny KV store backed by user://save.cfg.
 ## Keys are strings; values can be bool/int/float/String.
 
+signal coins_changed(new_balance: int)
+
 const KEY_TUTORIAL_DONE := "tutorial_done"
 const KEY_LEVEL_1_DONE := "level_1_done"
 const KEY_CURRENT_LEVEL := "current_level"
 const KEY_MAX_UNLOCKED_LEVEL := "max_unlocked_level"
 const KEY_COINS := "coins"
+const KEY_CLAIMED_RUNS := "claimed_runs"
 const KEY_HINTS := "booster_hints"
 const KEY_UNDOS := "booster_undos"
 const KEY_EXTRA_BAYS := "booster_extra_bays"
@@ -29,6 +32,8 @@ func _init_defaults() -> void:
 		_data[KEY_MAX_UNLOCKED_LEVEL] = 1
 	if not _data.has(KEY_COINS):
 		_data[KEY_COINS] = 0
+	if not _data.has(KEY_CLAIMED_RUNS) or not (_data[KEY_CLAIMED_RUNS] is Dictionary):
+		_data[KEY_CLAIMED_RUNS] = {}
 	if not _data.has(KEY_HINTS):
 		_data[KEY_HINTS] = 5
 	if not _data.has(KEY_UNDOS):
@@ -99,9 +104,40 @@ func unlock_level(lvl: int) -> void:
 func get_coins() -> int:
 	return get_int(KEY_COINS, 0)
 
+func set_coins(amount: int) -> void:
+	var c := maxi(0, amount)
+	set_value(KEY_COINS, c)
+	coins_changed.emit(c)
+
 func add_coins(amount: int) -> void:
-	var c := get_coins() + amount
-	set_value(KEY_COINS, maxi(0, c))
+	var c := maxi(0, get_coins() + amount)
+	set_value(KEY_COINS, c)
+	coins_changed.emit(c)
+
+## Awards exactly `amount` coins (default 50) for a legitimate completed level run.
+## Guarantees strict per-attempt idempotency: the exact same (level_id, run_id) can never pay twice.
+## Returns true if the reward was newly granted and saved, false if already claimed or invalid.
+func award_level_completion_reward(level_id: int, run_id: String, amount: int = 50) -> bool:
+	if amount <= 0 or run_id.is_empty():
+		return false
+
+	if not _data.has(KEY_CLAIMED_RUNS) or not (_data[KEY_CLAIMED_RUNS] is Dictionary):
+		_data[KEY_CLAIMED_RUNS] = {}
+
+	var claimed: Dictionary = _data[KEY_CLAIMED_RUNS]
+	var run_key: String = "%d_%s" % [level_id, run_id]
+	if claimed.has(run_key):
+		# Already rewarded for this gameplay attempt!
+		return false
+
+	claimed[run_key] = Time.get_unix_time_from_system()
+	_data[KEY_CLAIMED_RUNS] = claimed
+
+	var new_bal: int = get_coins() + amount
+	_data[KEY_COINS] = new_bal
+	var save_ok: bool = _save()
+	coins_changed.emit(new_bal)
+	return save_ok
 
 func get_booster_count(booster: String) -> int:
 	match booster:
@@ -137,7 +173,10 @@ func set_level_stars(lvl: int, stars: int) -> void:
 
 const FALLBACK_PATH: String = "res://.user_save.cfg"
 
-func _save() -> void:
+func save_data() -> bool:
+	return _save()
+
+func _save() -> bool:
 	var cfg := ConfigFile.new()
 	for k in _data.keys():
 		cfg.set_value("data", k, _data[k])
@@ -147,6 +186,8 @@ func _save() -> void:
 		var fallback_err := cfg.save(FALLBACK_PATH)
 		if fallback_err != OK:
 			push_warning("SaveManager: failed to save %s (err %d) and fallback (err %d)" % [_path, err, fallback_err])
+			return false
+	return true
 
 func _load() -> void:
 	var cfg := ConfigFile.new()
@@ -163,4 +204,5 @@ func _load() -> void:
 
 func wipe() -> void:
 	_data = {}
+	_init_defaults()
 	_save()

@@ -58,9 +58,21 @@ var result_title_label: Label
 var result_btn: TextureButton
 var result_btn_label: Label
 var result_retry_btn: TextureButton
+var result_home_btn: TextureButton
 var result_subtitle_label: Label
 var result_icon: TextureRect
 var _result_outcome: String = ""  # "victory" or "failure" — guards which buttons are shown
+
+var coin_counter_wrapper: PanelContainer
+var coin_counter_icon: TextureRect
+var coin_balance_label: Label
+var reward_badge: PanelContainer
+var reward_badge_label: Label
+var _session_run_id: String = ""
+var _reward_claimed_for_session: bool = false
+var _next_pressed: bool = false
+var _celebration_tweens: Array[Tween] = []
+var _firework_nodes: Array[Node] = []
 
 var _result_panel: PanelContainer
 var _result_scrim: ColorRect
@@ -572,15 +584,27 @@ func _load_current_level() -> void:
 		else:
 			lvl = CarJamLevelFactory.create_level_1()
 
+	# Generate a unique run ID for this gameplay attempt
+	_session_run_id = "%d_%d_%d" % [lvl_num, Time.get_ticks_msec(), randi()]
+	_reward_claimed_for_session = false
+	_next_pressed = false
+
 	# Reset result overlay state for this fresh level run.
 	_result_outcome = ""
 	_stop_failure_animations()
+	_stop_celebration_effects()
 	if result_overlay != null:
 		result_overlay.visible = false
 	if result_btn != null:
 		result_btn.visible = false
 	if result_retry_btn != null:
 		result_retry_btn.visible = false
+	if result_home_btn != null:
+		result_home_btn.visible = false
+	if reward_badge != null:
+		reward_badge.visible = false
+	if coin_counter_wrapper != null:
+		coin_counter_wrapper.visible = false
 	if result_subtitle_label != null:
 		result_subtitle_label.visible = false
 		result_subtitle_label.text = ""
@@ -1290,10 +1314,19 @@ func _on_level_completed() -> void:
 	if gc != null:
 		current_num = int(gc.current_level_number)
 
-	# Persist legitimate completion — but never unlock levels on a failure path.
+	# 1. Authoritative Currency Award (+50 Coins)
+	var old_coins: int = 0
+	var new_coins: int = 50
 	var save_mgr = get_tree().root.get_node_or_null("SaveManager")
 	if save_mgr != null:
-		# Save per-level completion + raise max unlocked to current+1 if next exists.
+		old_coins = save_mgr.get_coins()
+		if not _reward_claimed_for_session:
+			var awarded: bool = save_mgr.award_level_completion_reward(current_num, _session_run_id, 50)
+			if awarded:
+				_reward_claimed_for_session = true
+		new_coins = save_mgr.get_coins()
+
+		# Persist legitimate completion — but never unlock levels on a failure path.
 		if current_num == 1:
 			save_mgr.set_level_1_done(true)
 		var next_num: int = current_num + 1
@@ -1310,10 +1343,14 @@ func _on_level_completed() -> void:
 	result_title_label.scale = Vector2.ONE
 	result_title_label.rotation = 0.0
 
+	# Show reward badge
+	if reward_badge != null:
+		reward_badge.visible = true
+
 	# Configure the next-level button based on actual authored levels.
 	var next_num: int = current_num + 1
 	if gc != null and gc.has_level(next_num):
-		result_btn_label.text = "Level %d" % next_num
+		result_btn_label.text = "NEXT"
 		result_btn.visible = true
 		result_subtitle_label.visible = false
 		result_subtitle_label.text = ""
@@ -1323,16 +1360,24 @@ func _on_level_completed() -> void:
 		result_subtitle_label.text = "More Levels Coming Soon"
 		result_subtitle_label.visible = true
 
-	# Failure-only button is never shown on victory.
-	result_retry_btn.visible = false
+	# STRICT NON-BREAK: Victory screen contains ONLY ONE action button: NEXT.
+	# Failure-only and home buttons are hidden on victory.
+	if result_retry_btn != null:
+		result_retry_btn.visible = false
+	if result_home_btn != null:
+		result_home_btn.visible = false
 
 	result_overlay.visible = true
+
+	# Start celebratory fireworks, flying coins and balance roll
+	_start_victory_celebration(old_coins, new_coins)
 
 func _on_puzzle_failed() -> void:
 	# Guard: failure flow runs once per session.
 	if _result_outcome == "failure":
 		return
 	_result_outcome = "failure"
+	_stop_celebration_effects()
 	_stop_failure_animations()
 	_play_sfx("failure")
 
@@ -1353,11 +1398,17 @@ func _on_puzzle_failed() -> void:
 	if result_icon != null:
 		result_icon.texture = load("res://assets/ui/icons/warning_icon.svg")
 
-	# Hide the victory-only progression action.
+	# Hide the victory-only progression action and reward elements.
 	result_btn.visible = false
+	if reward_badge != null:
+		reward_badge.visible = false
+	if coin_counter_wrapper != null:
+		coin_counter_wrapper.visible = false
 	result_subtitle_label.text = "No parking spaces left!"
 	result_subtitle_label.visible = true
 	result_retry_btn.visible = true
+	if result_home_btn != null:
+		result_home_btn.visible = true
 
 	result_overlay.visible = true
 
@@ -1516,6 +1567,10 @@ func _on_result_next_pressed() -> void:
 	# do nothing rather than silently advancing levels.
 	if _result_outcome != "victory":
 		return
+	if _next_pressed:
+		return
+	_next_pressed = true
+	_stop_celebration_effects()
 	_stop_failure_animations()
 	_play_sfx("ui")
 	get_tree().paused = false
@@ -1531,6 +1586,7 @@ func _on_result_next_pressed() -> void:
 func _on_result_retry_pressed() -> void:
 	if _result_outcome != "failure":
 		return
+	_stop_celebration_effects()
 	_stop_failure_animations()
 	_play_sfx("ui")
 	get_tree().paused = false
@@ -1539,6 +1595,221 @@ func _on_result_retry_pressed() -> void:
 		gc.start_level(gc.current_level_number)
 	else:
 		get_tree().reload_current_scene()
+
+func _exit_tree() -> void:
+	_stop_celebration_effects()
+	_stop_failure_animations()
+
+func _stop_celebration_effects() -> void:
+	for tw in _celebration_tweens:
+		if is_instance_valid(tw) and tw.is_valid():
+			tw.kill()
+	_celebration_tweens.clear()
+
+	for n in _firework_nodes:
+		if is_instance_valid(n):
+			n.queue_free()
+	_firework_nodes.clear()
+
+func _format_number(n: int) -> String:
+	var s := str(abs(n))
+	var res := ""
+	var count := 0
+	for i in range(s.length() - 1, -1, -1):
+		res = s[i] + res
+		count += 1
+		if count % 3 == 0 and i > 0:
+			res = "," + res
+	if n < 0:
+		res = "-" + res
+	return res
+
+func _start_victory_celebration(old_coins: int, new_coins: int) -> void:
+	_stop_celebration_effects()
+
+	if coin_counter_wrapper != null:
+		coin_counter_wrapper.visible = true
+		coin_counter_wrapper.scale = Vector2(0.8, 0.8)
+		var ctw = create_tween()
+		ctw.tween_property(coin_counter_wrapper, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		_celebration_tweens.append(ctw)
+	if coin_balance_label != null:
+		coin_balance_label.text = _format_number(old_coins)
+
+	if _result_panel != null:
+		_result_panel.scale = Vector2(0.85, 0.85)
+		_result_panel.pivot_offset = _result_panel.size * 0.5
+		var ptw = create_tween()
+		ptw.tween_property(_result_panel, "scale", Vector2.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		_celebration_tweens.append(ptw)
+
+	if result_icon != null:
+		result_icon.scale = Vector2(0.6, 0.6)
+		var itw = create_tween()
+		itw.tween_interval(0.1)
+		itw.tween_property(result_icon, "scale", Vector2(1.25, 1.25), 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		itw.tween_property(result_icon, "scale", Vector2.ONE, 0.15)
+		_celebration_tweens.append(itw)
+
+	if reward_badge != null:
+		reward_badge.scale = Vector2.ZERO
+		var rtw = create_tween()
+		rtw.tween_interval(0.2)
+		rtw.tween_property(reward_badge, "scale", Vector2(1.15, 1.15), 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		rtw.tween_property(reward_badge, "scale", Vector2.ONE, 0.15)
+		_celebration_tweens.append(rtw)
+
+	# Trigger staggered colorful celebratory fireworks bursts
+	var bursts := [
+		{"pos_ratio": Vector2(0.22, 0.36), "color": Color("facc15"), "delay": 0.08},
+		{"pos_ratio": Vector2(0.78, 0.33), "color": Color("38bdf8"), "delay": 0.26},
+		{"pos_ratio": Vector2(0.18, 0.54), "color": Color("ec4899"), "delay": 0.44},
+		{"pos_ratio": Vector2(0.82, 0.56), "color": Color("a855f7"), "delay": 0.62},
+		{"pos_ratio": Vector2(0.50, 0.22), "color": Color("fb923c"), "delay": 0.80}
+	]
+	for b in bursts:
+		var ftw = create_tween()
+		ftw.tween_interval(b.delay)
+		ftw.tween_callback(func():
+			if _result_outcome == "victory" and result_overlay != null and result_overlay.visible:
+				_spawn_firework_burst(b.pos_ratio, b.color)
+		)
+		_celebration_tweens.append(ftw)
+
+	# Launch flying coin animation at 0.5s
+	var ltw = create_tween()
+	ltw.tween_interval(0.5)
+	ltw.tween_callback(func():
+		if _result_outcome == "victory" and result_overlay != null and result_overlay.visible:
+			_launch_coin_flight_animation(old_coins, new_coins)
+	)
+	_celebration_tweens.append(ltw)
+
+func _spawn_firework_burst(pos_ratio: Vector2, burst_color: Color) -> void:
+	if result_overlay == null or not is_inside_tree():
+		return
+	var vp_rect := get_viewport().get_visible_rect()
+	var spawn_pos := Vector2(vp_rect.size.x * pos_ratio.x, vp_rect.size.y * pos_ratio.y)
+
+	_play_sfx("firework")
+
+	var emitter := CPUParticles2D.new()
+	emitter.position = spawn_pos
+	emitter.emitting = true
+	emitter.one_shot = true
+	emitter.explosiveness = 0.95
+	emitter.lifetime = 0.9
+	emitter.amount = 28
+	emitter.direction = Vector2.UP
+	emitter.spread = 180.0
+	emitter.gravity = Vector2(0, 180.0)
+	emitter.initial_velocity_min = 100.0
+	emitter.initial_velocity_max = 240.0
+	emitter.scale_amount_min = 3.5
+	emitter.scale_amount_max = 6.5
+	emitter.color = burst_color
+
+	# Add behind the center dialog so fireworks explode around it
+	if _result_scrim != null:
+		var scrim_idx = _result_scrim.get_index()
+		result_overlay.add_child(emitter)
+		result_overlay.move_child(emitter, scrim_idx + 1)
+	else:
+		result_overlay.add_child(emitter)
+		result_overlay.move_child(emitter, 0)
+
+	_firework_nodes.append(emitter)
+
+	var cleanup_tw = create_tween()
+	cleanup_tw.tween_interval(1.1)
+	cleanup_tw.tween_callback(func():
+		if is_instance_valid(emitter):
+			_firework_nodes.erase(emitter)
+			emitter.queue_free()
+	)
+	_celebration_tweens.append(cleanup_tw)
+
+func _launch_coin_flight_animation(old_coins: int, new_coins: int) -> void:
+	if result_overlay == null or not is_inside_tree():
+		if coin_balance_label != null:
+			coin_balance_label.text = _format_number(new_coins)
+		return
+
+	var start_pos: Vector2 = Vector2(360, 400)
+	if reward_badge != null and reward_badge.is_inside_tree():
+		start_pos = reward_badge.global_position + reward_badge.size * 0.5
+
+	var target_pos: Vector2 = Vector2(40, 40)
+	if coin_counter_icon != null and coin_counter_icon.is_inside_tree():
+		target_pos = coin_counter_icon.global_position + coin_counter_icon.size * 0.5
+
+	var coin_tex = load("res://assets/ui/icons/coin.svg")
+	var total_coins := 7
+	for i in range(total_coins):
+		var delay: float = float(i) * 0.065
+		var coin_tw = create_tween()
+		coin_tw.tween_interval(delay)
+		coin_tw.tween_callback(func():
+			if _result_outcome != "victory" or not is_inside_tree() or result_overlay == null:
+				return
+			var coin_sprite := TextureRect.new()
+			coin_sprite.texture = coin_tex
+			coin_sprite.custom_minimum_size = Vector2(24, 24)
+			coin_sprite.ignore_texture_size = true
+			coin_sprite.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			coin_sprite.pivot_offset = Vector2(12, 12)
+			coin_sprite.global_position = start_pos - Vector2(12, 12)
+			coin_sprite.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			result_overlay.add_child(coin_sprite)
+			_firework_nodes.append(coin_sprite)
+
+			# Calculate quadratic control point for natural arc
+			var mid: Vector2 = (start_pos + target_pos) * 0.5
+			var dir: Vector2 = (target_pos - start_pos).normalized()
+			var perp: Vector2 = Vector2(-dir.y, dir.x)
+			var arc_dist: float = randf_range(35.0, 75.0) * (1.0 if randf() > 0.5 else -1.0)
+			var ctrl: Vector2 = mid + perp * arc_dist
+
+			var fly_tw = create_tween()
+			fly_tw.tween_method(func(t: float):
+				if is_instance_valid(coin_sprite):
+					var p := (1.0 - t) * (1.0 - t) * start_pos + 2.0 * (1.0 - t) * t * ctrl + t * t * target_pos
+					coin_sprite.global_position = p - Vector2(12, 12)
+					coin_sprite.scale = Vector2.ONE * (1.0 + sin(t * PI) * 0.3)
+			, 0.0, 1.0, 0.48).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+
+			fly_tw.tween_callback(func():
+				if is_instance_valid(coin_sprite):
+					_firework_nodes.erase(coin_sprite)
+					coin_sprite.queue_free()
+
+				_play_sfx("coin")
+
+				# Punch counter icon
+				if coin_counter_icon != null and is_instance_valid(coin_counter_icon):
+					coin_counter_icon.scale = Vector2(1.28, 1.28)
+					var p_tw = create_tween()
+					p_tw.tween_property(coin_counter_icon, "scale", Vector2.ONE, 0.12)
+					_celebration_tweens.append(p_tw)
+
+				# Update roll label
+				var fraction: float = float(i + 1) / float(total_coins)
+				var roll_val: int = int(round(lerp(float(old_coins), float(new_coins), fraction)))
+				if coin_balance_label != null and is_instance_valid(coin_balance_label):
+					coin_balance_label.text = _format_number(roll_val)
+			)
+			_celebration_tweens.append(fly_tw)
+		)
+		_celebration_tweens.append(coin_tw)
+
+	# Ensure authoritative final number settled at end of animation
+	var final_tw = create_tween()
+	final_tw.tween_interval(0.065 * total_coins + 0.55)
+	final_tw.tween_callback(func():
+		if coin_balance_label != null and is_instance_valid(coin_balance_label):
+			coin_balance_label.text = _format_number(new_coins)
+	)
+	_celebration_tweens.append(final_tw)
 
 # -----------------------------------------------------------------
 # RESPONSIVE HUD & SAFE AREA
@@ -1948,15 +2219,69 @@ func _build_hud() -> void:
 	res_bg.mouse_filter = Control.MOUSE_FILTER_STOP
 	result_overlay.add_child(res_bg)
 	_result_scrim = res_bg
-	
+
+	# Top-left Coin Balance Pill (Requirement 4)
+	coin_counter_wrapper = PanelContainer.new()
+	coin_counter_wrapper.name = "ResultCoinCounter"
+	coin_counter_wrapper.anchor_left = 0.0
+	coin_counter_wrapper.anchor_top = 0.0
+	coin_counter_wrapper.anchor_right = 0.0
+	coin_counter_wrapper.anchor_bottom = 0.0
+	coin_counter_wrapper.offset_left = 24.0
+	coin_counter_wrapper.offset_top = 28.0
+	coin_counter_wrapper.visible = false
+
+	var coin_pill_style := StyleBoxFlat.new()
+	coin_pill_style.bg_color = Color(0.08, 0.10, 0.15, 0.92) # sleek dark glossy slate
+	coin_pill_style.corner_radius_top_left = 20
+	coin_pill_style.corner_radius_top_right = 20
+	coin_pill_style.corner_radius_bottom_left = 20
+	coin_pill_style.corner_radius_bottom_right = 20
+	coin_pill_style.border_width_left = 2
+	coin_pill_style.border_width_top = 2
+	coin_pill_style.border_width_right = 2
+	coin_pill_style.border_width_bottom = 3
+	coin_pill_style.border_color = Color("f59e0b") # warm gold border
+	coin_pill_style.content_margin_left = 12
+	coin_pill_style.content_margin_right = 16
+	coin_pill_style.content_margin_top = 6
+	coin_pill_style.content_margin_bottom = 6
+	coin_pill_style.shadow_color = Color(0, 0, 0, 0.4)
+	coin_pill_style.shadow_size = 10
+	coin_pill_style.shadow_offset = Vector2(0, 3)
+	coin_counter_wrapper.add_theme_stylebox_override("panel", coin_pill_style)
+
+	var coin_hbox := HBoxContainer.new()
+	coin_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	coin_hbox.add_theme_constant_override("separation", 8)
+	coin_counter_wrapper.add_child(coin_hbox)
+
+	coin_counter_icon = TextureRect.new()
+	coin_counter_icon.texture = load("res://assets/ui/icons/coin.svg")
+	coin_counter_icon.custom_minimum_size = Vector2(28, 28)
+	coin_counter_icon.ignore_texture_size = true
+	coin_counter_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	coin_counter_icon.pivot_offset = Vector2(14, 14)
+	coin_hbox.add_child(coin_counter_icon)
+
+	coin_balance_label = Label.new()
+	coin_balance_label.text = "0"
+	coin_balance_label.add_theme_font_size_override("font_size", 20)
+	coin_balance_label.add_theme_color_override("font_color", Color("fef08a")) # bright warm gold
+	coin_balance_label.add_theme_color_override("font_outline_color", Color("451a03"))
+	coin_balance_label.add_theme_constant_override("outline_size", 4)
+	coin_hbox.add_child(coin_balance_label)
+
+	result_overlay.add_child(coin_counter_wrapper)
+
 	var res_center := CenterContainer.new()
 	res_center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	result_overlay.add_child(res_center)
-	
+
 	var res_panel := PanelContainer.new()
-	res_panel.custom_minimum_size = Vector2(300, 320)
+	res_panel.custom_minimum_size = Vector2(300, 330)
 	_result_panel = res_panel
-	
+
 	# Create a warm glowing panel style specifically for the victory screen
 	_victory_panel_style = StyleBoxFlat.new()
 	_victory_panel_style.bg_color = Color("fffdf5") # warm white
@@ -1964,11 +2289,14 @@ func _build_hud() -> void:
 	_victory_panel_style.corner_radius_top_right = 32
 	_victory_panel_style.corner_radius_bottom_left = 32
 	_victory_panel_style.corner_radius_bottom_right = 32
-	_victory_panel_style.shadow_color = Color(1.0, 0.85, 0.4, 0.25) # soft golden glow
-	_victory_panel_style.shadow_size = 20
-	_victory_panel_style.shadow_offset = Vector2(0, 4)
+	_victory_panel_style.shadow_color = Color(1.0, 0.78, 0.25, 0.40) # rich golden celebration glow
+	_victory_panel_style.shadow_size = 28
+	_victory_panel_style.shadow_offset = Vector2(0, 6)
+	_victory_panel_style.border_width_left = 3
+	_victory_panel_style.border_width_top = 3
+	_victory_panel_style.border_width_right = 3
 	_victory_panel_style.border_width_bottom = 6
-	_victory_panel_style.border_color = Color("e5d3b3")
+	_victory_panel_style.border_color = Color("f59e0b")
 
 	# Create a darker alarm-themed panel style specifically for the failure screen (Requirement 1)
 	_failure_panel_style = StyleBoxFlat.new()
@@ -2024,6 +2352,55 @@ func _build_hud() -> void:
 	result_title_label.pivot_offset = Vector2(126, 18)
 	header_vbox.add_child(result_title_label)
 	
+	# --- Reward Badge (+50 COINS) ---
+	reward_badge = PanelContainer.new()
+	reward_badge.custom_minimum_size = Vector2(180, 50)
+	var rb_style := StyleBoxFlat.new()
+	rb_style.bg_color = Color("fef3c7") # warm amber / gold badge
+	rb_style.corner_radius_top_left = 25
+	rb_style.corner_radius_top_right = 25
+	rb_style.corner_radius_bottom_left = 25
+	rb_style.corner_radius_bottom_right = 25
+	rb_style.border_width_left = 2
+	rb_style.border_width_top = 2
+	rb_style.border_width_right = 2
+	rb_style.border_width_bottom = 4
+	rb_style.border_color = Color("f59e0b")
+	rb_style.shadow_color = Color(0.96, 0.62, 0.04, 0.3)
+	rb_style.shadow_size = 12
+	rb_style.shadow_offset = Vector2(0, 3)
+	rb_style.content_margin_left = 16
+	rb_style.content_margin_right = 18
+	rb_style.content_margin_top = 6
+	rb_style.content_margin_bottom = 6
+	reward_badge.add_theme_stylebox_override("panel", rb_style)
+	reward_badge.pivot_offset = Vector2(90, 25)
+
+	var rb_hbox := HBoxContainer.new()
+	rb_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	rb_hbox.add_theme_constant_override("separation", 10)
+	reward_badge.add_child(rb_hbox)
+
+	var rb_coin := TextureRect.new()
+	rb_coin.texture = load("res://assets/ui/icons/coin.svg")
+	rb_coin.custom_minimum_size = Vector2(32, 32)
+	rb_coin.ignore_texture_size = true
+	rb_coin.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	rb_coin.pivot_offset = Vector2(16, 16)
+	rb_hbox.add_child(rb_coin)
+
+	reward_badge_label = Label.new()
+	reward_badge_label.text = "+50"
+	reward_badge_label.add_theme_font_size_override("font_size", 24)
+	reward_badge_label.add_theme_color_override("font_color", Color("78350f"))
+	reward_badge_label.add_theme_color_override("font_outline_color", Color("fef3c7"))
+	reward_badge_label.add_theme_constant_override("outline_size", 2)
+	rb_hbox.add_child(reward_badge_label)
+
+	var rb_center := CenterContainer.new()
+	rb_center.add_child(reward_badge)
+	res_vbox.add_child(rb_center)
+
 	var btn_vbox = VBoxContainer.new()
 	btn_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	btn_vbox.add_theme_constant_override("separation", 16)
@@ -2039,7 +2416,7 @@ func _build_hud() -> void:
 	res_btn_level2.visible = false  # shown only on victory, text set per-level
 
 	var l2_lbl = Label.new()
-	l2_lbl.text = "Next"
+	l2_lbl.text = "NEXT"
 	l2_lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
 	l2_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l2_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -2118,13 +2495,14 @@ func _build_hud() -> void:
 	result_subtitle_label.visible = false
 	btn_vbox.add_child(result_subtitle_label)
 	
-	# --- Button 2: Home ---
+	# --- Button 2: Home (Failure only) ---
 	var res_btn_home := TextureButton.new()
 	res_btn_home.texture_normal = load("res://assets/ui/settings_buttons/home_normal.svg")
 	res_btn_home.texture_pressed = load("res://assets/ui/settings_buttons/home_pressed.svg")
 	res_btn_home.ignore_texture_size = true
 	res_btn_home.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
 	res_btn_home.custom_minimum_size = Vector2(160, 56)
+	res_btn_home.visible = false
 	
 	var rh_lbl = Label.new()
 	rh_lbl.text = "Home"
@@ -2161,6 +2539,7 @@ func _build_hud() -> void:
 			gc.goto_scene("res://scenes/main.tscn")
 	)
 	btn_vbox.add_child(res_btn_home)
+	result_home_btn = res_btn_home
 
 	# --- Restart Confirmation Popup ---
 	restart_confirm_overlay = Control.new()
@@ -2424,6 +2803,15 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 		var divider_screen_y = 0.44 * vp_size.y
 		var track_screen_y = (vp_size.y / 2.0) + (track_y * scale_factor)
 		garden_bg.update_layout(vp_size, track_screen_y, scale_factor, divider_screen_y)
+
+	if coin_counter_wrapper != null:
+		var safe_top: float = 28.0
+		if DisplayServer.has_method("get_display_safe_area"):
+			var safe_rect = DisplayServer.get_display_safe_area()
+			if safe_rect.position.y > 0:
+				safe_top = maxf(28.0, safe_rect.position.y + 8.0)
+		coin_counter_wrapper.offset_top = safe_top
+		coin_counter_wrapper.offset_left = 24.0
 
 func _update_feeder_curve(p0: Vector2) -> void:
 	if feeder_track == null:
