@@ -32,7 +32,7 @@ func _run() -> void:
 		
 		var move_idx := 0
 		var sim_frames := 0
-		var max_frames := 4000
+		var max_frames := 6000 if lvl_num == 1 else 14000
 		
 		while sim_frames < max_frames:
 			await process_frame
