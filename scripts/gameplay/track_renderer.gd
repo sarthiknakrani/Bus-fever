@@ -310,8 +310,8 @@ func _draw() -> void:
 	draw_polyline(s_left, COLOR_SHADOW, 5.0, true)
 	draw_polyline(s_right, COLOR_SHADOW, 5.0, true)
 
-	# Step B1: Green garden background in central opening (30% remaining area)
-	draw_colored_polygon(curb_inner, COLOR_GARDEN)
+	# Step B1: Central opening exposes the seamless stylized garden environment (30% remaining area)
+	# (curb_inner is left transparent so GardenBackgroundView shows through directly)
 
 	# Step B2: Unified grey road surface
 	draw_colored_polygon(top_poly, COLOR_ROAD)

@@ -27,6 +27,7 @@ var platform_bg: Node2D
 var parking_strip: Node2D
 var vehicle_layer: Node2D
 var board_effects: Node2D
+var garden_bg: GardenBackgroundView
 
 var parking_root: Node2D
 var parking_slots_node: Node2D
@@ -406,9 +407,9 @@ func _build_scene_hierarchy() -> void:
 	# World Background
 	var bg_layer := CanvasLayer.new()
 	bg_layer.layer = -1
-	var bg := GardenBackgroundView.new()
-	bg.name = "GardenBackground"
-	bg_layer.add_child(bg)
+	garden_bg = GardenBackgroundView.new()
+	garden_bg.name = "GardenBackground"
+	bg_layer.add_child(garden_bg)
 	add_child(bg_layer)
 
 
@@ -2348,7 +2349,7 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 	# Calculate the top-right offscreen coordinate in passenger_track_root's local space
 	var top_local_y: float = -half_h - track_y
 	var feeder_top_y: float = top_local_y - 120.0
-	var feeder_top_x: float = 245.0 + (-110.0 - feeder_top_y) * 0.22
+	var feeder_top_x: float = maxf(360.0, 245.0 + (-110.0 - feeder_top_y) * 0.30)
 	_update_feeder_curve(Vector2(feeder_top_x, feeder_top_y))
 
 	if passenger_track_bg != null:
@@ -2356,6 +2357,11 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 		if tr != null:
 			tr.plat_top_local = plat_top - track_y
 			tr.queue_redraw()
+
+	if garden_bg != null:
+		var divider_screen_y = 0.40 * vp_size.y
+		var track_screen_y = (vp_size.y / 2.0) + (track_y * scale_factor)
+		garden_bg.update_layout(vp_size, track_screen_y, scale_factor, divider_screen_y)
 
 func _update_feeder_curve(p0: Vector2) -> void:
 	if feeder_track == null:

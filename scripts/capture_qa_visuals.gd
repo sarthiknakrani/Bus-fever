@@ -25,6 +25,7 @@ func _run_next() -> void:
 	var r = resolutions[res_idx]
 	print("[QA CAPTURE] Capturing %s (%dx%d)..." % [r["name"], r["size"].x, r["size"].y])
 	DisplayServer.window_set_size(r["size"])
+	get_root().size = r["size"]
 	
 	var gc = root.get_node_or_null("GameController")
 	if gc != null:
@@ -47,6 +48,7 @@ func _snap_current(file_name: String) -> void:
 func _run_detailed_qa_snaps() -> void:
 	print("[QA CAPTURE] Running detailed gameplay flow captures (Level 1, 810x1746)...")
 	DisplayServer.window_set_size(Vector2i(810, 1746))
+	get_root().size = Vector2i(810, 1746)
 	var gc = root.get_node_or_null("GameController")
 	if gc != null: gc.current_level_number = 1
 	var scene = load("res://scenes/gameplay/car_jam_level.tscn")
