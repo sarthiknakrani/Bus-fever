@@ -457,15 +457,15 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 		if tex_size.y > 0.0:
 			logo_aspect = tex_size.x / tex_size.y
 
-	# Responsive width: fit up to 90% of screen, capped at 680px
-	var max_w: float = minf(vp_size.x * 0.90, 680.0)
+	# Responsive width: fit up to 88% of screen, capped at 640px
+	var max_w: float = minf(vp_size.x * 0.88, 640.0)
 	var logo_w: float = max_w
 	var logo_h: float = logo_w / logo_aspect
 
-	# Responsive 3D Orange Play Button sizing & position
-	var btn_w: float = minf(vp_size.x * 0.68, 350.0)
-	var btn_h: float = btn_w * (600.0 / 1122.0) # aspect ~0.5348
-	var btn_y: float = (vp_size.y * 0.84) - (btn_h * 0.5)
+	# Responsive 3D Orange Play Button sizing & position (Bold, prominent, AAA casual size)
+	var btn_w: float = minf(vp_size.x * 0.70, 420.0)
+	var btn_h: float = btn_w * (600.0 / 1140.0) # aspect ~0.5263
+	var btn_y: float = (vp_size.y * 0.86) - (btn_h * 0.5)
 	if _play_btn != null and is_instance_valid(_play_btn):
 		_play_btn.size = Vector2(btn_w, btn_h)
 		_play_btn.position = Vector2((vp_size.x - btn_w) * 0.5, btn_y)
@@ -476,14 +476,14 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 	var btm_clearance: float = btn_y - 20.0
 	var available_h: float = maxf(100.0, btm_clearance - top_clearance)
 
-	# If logo height exceeds 60% of available vertical height, scale down proportionately
-	if logo_h > available_h * 0.60:
-		logo_h = available_h * 0.60
+	# If logo height exceeds 55% of available vertical height, scale down proportionately
+	if logo_h > available_h * 0.55:
+		logo_h = available_h * 0.55
 		logo_w = logo_h * logo_aspect
 
-	# Perfectly center both horizontally and vertically in the screen space between top and Play button
+	# Perfectly center horizontally, and place vertically at 0.40 of available space (sky zone)
 	var logo_x: float = (vp_size.x - logo_w) * 0.5
-	var logo_y: float = top_clearance + (available_h - logo_h) * 0.50
+	var logo_y: float = top_clearance + (available_h - logo_h) * 0.40
 
 	_logo_wrapper.position = Vector2(logo_x, logo_y)
 	_logo_wrapper.size = Vector2(logo_w, logo_h)

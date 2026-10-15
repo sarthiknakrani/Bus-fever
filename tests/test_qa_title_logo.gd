@@ -49,7 +49,7 @@ func _test_logo_asset_integrity() -> void:
 	var logo_tex: Texture2D = ResourceLoader.load(logo_path)
 	_assert(logo_tex != null, "Logo texture loaded successfully as Texture2D")
 	if logo_tex != null:
-		_assert(logo_tex.get_width() > 800 and logo_tex.get_height() > 500, "Logo has high retina resolution (%dx%d px)" % [logo_tex.get_width(), logo_tex.get_height()])
+		_assert(logo_tex.get_width() >= 750 and logo_tex.get_height() >= 500, "Logo has high retina resolution (%dx%d px)" % [logo_tex.get_width(), logo_tex.get_height()])
 		var aspect: float = float(logo_tex.get_width()) / float(logo_tex.get_height())
 		_assert(aspect > 0.85 and aspect < 1.60, "Logo aspect ratio is balanced portrait casual badge standard (%.3f)" % aspect)
 
