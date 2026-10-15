@@ -47,20 +47,7 @@ func _build_ui() -> void:
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(bg)
 
-	# Subtle ambient lighting overlay for high-contrast UI readability
-	var over_grad := Gradient.new()
-	over_grad.colors = PackedColorArray([Color(1, 1, 1, 0.0), Color(0.04, 0.08, 0.16, 0.22)])
-	var over_tex := GradientTexture2D.new()
-	over_tex.gradient = over_grad
-	over_tex.fill_from = Vector2(0.5, 0.6)
-	over_tex.fill_to = Vector2(0.5, 1.0)
-	var over_tr := TextureRect.new()
-	over_tr.name = "BottomVignette"
-	over_tr.set_anchors_preset(Control.PRESET_FULL_RECT)
-	over_tr.texture = over_tex
-	over_tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	over_tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.add_child(over_tr)
+
 
 	var hud := Control.new()
 	hud.name = "HUD"
@@ -464,7 +451,7 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 
 	# Responsive 3D Orange Play Button sizing & position (Bold, prominent, AAA casual size)
 	var btn_w: float = minf(vp_size.x * 0.70, 420.0)
-	var btn_h: float = btn_w * (600.0 / 1140.0) # aspect ~0.5263
+	var btn_h: float = btn_w * (600.0 / 1160.0) # aspect ~0.5172
 	var btn_y: float = (vp_size.y * 0.86) - (btn_h * 0.5)
 	if _play_btn != null and is_instance_valid(_play_btn):
 		_play_btn.size = Vector2(btn_w, btn_h)
@@ -481,9 +468,9 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 		logo_h = available_h * 0.55
 		logo_w = logo_h * logo_aspect
 
-	# Perfectly center horizontally, and place vertically at 0.40 of available space (sky zone)
+	# Perfectly center horizontally, and place vertically at 0.35 of available space (sky zone)
 	var logo_x: float = (vp_size.x - logo_w) * 0.5
-	var logo_y: float = top_clearance + (available_h - logo_h) * 0.40
+	var logo_y: float = top_clearance + (available_h - logo_h) * 0.35
 
 	_logo_wrapper.position = Vector2(logo_x, logo_y)
 	_logo_wrapper.size = Vector2(logo_w, logo_h)
