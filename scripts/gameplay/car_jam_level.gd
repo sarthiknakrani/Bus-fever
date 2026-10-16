@@ -1,8 +1,6 @@
 extends Node2D
 class_name CarJamLevel
 
-const GardenBackgroundView = preload("res://scripts/gameplay/garden_background_view.gd")
-
 ## Production-quality Car Jam single-level gameplay scene.
 ## Pure Godot 2D architecture with 2.5D pseudo-3D layered buses,
 ## exactly 4 parking slots, swept-footprint collision, and ordered passenger queue.
@@ -933,7 +931,7 @@ func _init_passenger_track() -> void:
 
 	# Main oval starts densely packed (28 rows = 112 passengers)
 	var track_len = passenger_track.curve.get_baked_length()
-	var initial_rows_count = mini(all_rows.size(), int(MAX_INITIAL_LOOP_PASSENGERS / NUM_LANES))
+	var initial_rows_count = mini(all_rows.size(), int(float(MAX_INITIAL_LOOP_PASSENGERS) / float(NUM_LANES)))
 	
 	# Pre-bake curve-aware cumulative weights for initial placement
 	var sample_step := 2.0
@@ -956,7 +954,7 @@ func _init_passenger_track() -> void:
 		var low := 0
 		var high := cum_weights.size() - 1
 		while low < high:
-			var mid = (low + high) / 2
+			var mid = (low + high) >> 1
 			if cum_weights[mid] < target_w:
 				low = mid + 1
 			else:
@@ -1112,12 +1110,12 @@ func _on_vehicle_dispatch_started(vehicle_id: int, slot_id: int, corridor: Array
 	# Reparent to TransitLayer preserving global position
 	var global_start := vv.global_position
 	var global_rot := vv.global_rotation
-	var global_scale := vv.global_scale
+	var orig_global_scale := vv.global_scale
 	vv.get_parent().remove_child(vv)
 	transit_layer.add_child(vv)
 	vv.global_position = global_start
 	vv.global_rotation = global_rot
-	vv.global_scale = global_scale
+	vv.global_scale = orig_global_scale
 
 	var target_slot_pos := _get_slot_world_pos(slot_id)
 	var exit_cell: Vector2i = corridor.back() if not corridor.is_empty() else vv.vehicle_footprint[0]
@@ -1238,7 +1236,7 @@ func _on_vehicle_blocked(vehicle_id: int, _blocker_id: int) -> void:
 	if vv != null:
 		vv.play_blocked_shake()
 
-func _on_boarding_started(vehicle_id: int, color_id: String, count: int, slot_id: int) -> void:
+func _on_boarding_started(vehicle_id: int, _color_id: String, _count: int, _slot_id: int) -> void:
 	_play_sfx("board")
 	var vv: VehicleView = vehicle_views.get(vehicle_id, null)
 	if vv != null:
@@ -1319,6 +1317,7 @@ func _on_level_completed() -> void:
 	var current_num: int = 1
 	if gc != null:
 		current_num = int(gc.current_level_number)
+	var next_num: int = current_num + 1
 
 	# 1. Authoritative Currency Award (+50 Coins)
 	var old_coins: int = 0
@@ -1335,7 +1334,6 @@ func _on_level_completed() -> void:
 		# Persist legitimate completion — but never unlock levels on a failure path.
 		if current_num == 1:
 			save_mgr.set_level_1_done(true)
-		var next_num: int = current_num + 1
 		if gc != null and gc.has_level(next_num):
 			save_mgr.unlock_level(next_num)
 
@@ -1354,7 +1352,6 @@ func _on_level_completed() -> void:
 		reward_badge.visible = true
 
 	# Configure the next-level button based on actual authored levels.
-	var next_num: int = current_num + 1
 	if gc != null and gc.has_level(next_num):
 		result_btn_label.text = "NEXT"
 		result_btn.visible = true
@@ -2739,7 +2736,7 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 	world_root.position = Vector2.ZERO
 
 	var half_h = (vp_size.y / 2.0) / scale_factor
-	var top_safe_y = -half_h + (75.0 / scale_factor)
+	var _top_safe_y = -half_h + (75.0 / scale_factor)
 	var btm_safe_y = half_h - (115.0 / scale_factor)
 
 	# In world_root coordinates, local Y = 0.0 corresponds to vertical screen center (50%).
@@ -2800,10 +2797,10 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 	_update_feeder_curve(Vector2(feeder_top_x, feeder_top_y))
 
 	if passenger_track_bg != null:
-		var tr = passenger_track_bg.get_node_or_null("TrackRenderer") as CarJamTrackRenderer
-		if tr != null:
-			tr.plat_top_local = plat_top - track_y
-			tr.queue_redraw()
+		var track_rend = passenger_track_bg.get_node_or_null("TrackRenderer") as CarJamTrackRenderer
+		if track_rend != null:
+			track_rend.plat_top_local = plat_top - track_y
+			track_rend.queue_redraw()
 
 	if garden_bg != null:
 		var divider_screen_y = 0.44 * vp_size.y
@@ -2832,10 +2829,10 @@ func _update_feeder_curve(p0: Vector2) -> void:
 	f_curve.add_point(merge_pt, Vector2(25, -30), Vector2.ZERO)
 	feeder_track.curve = f_curve
 	if passenger_track_bg != null:
-		var tr = passenger_track_bg.get_node_or_null("TrackRenderer") as CarJamTrackRenderer
-		if tr != null:
-			tr.feeder_curve = f_curve
-			tr.queue_redraw()
+		var track_rend = passenger_track_bg.get_node_or_null("TrackRenderer") as CarJamTrackRenderer
+		if track_rend != null:
+			track_rend.feeder_curve = f_curve
+			track_rend.queue_redraw()
 
 func restart_level() -> void:
 	_load_current_level()
@@ -3138,7 +3135,7 @@ func _load_interim_sprite(path: String) -> Texture2D:
 	return null
 
 
-func _animate_individual_boarding(p: Dictionary, vehicle_id: int, slot_id: int, exact_prog: float) -> void:
+func _animate_individual_boarding(p: Dictionary, vehicle_id: int, slot_id: int, _exact_prog: float) -> void:
 	var pv: PassengerView = p["view"]
 	var pf: PathFollow2D = p.get("follower", null)
 	
@@ -3187,9 +3184,9 @@ func _animate_individual_boarding(p: Dictionary, vehicle_id: int, slot_id: int, 
 
 	var plat_y_local: float = 197.0
 	if passenger_track_bg != null:
-		var tr = passenger_track_bg.get_node_or_null("TrackRenderer") as CarJamTrackRenderer
-		if tr != null and tr.plat_top_local > 150.0:
-			plat_y_local = tr.plat_top_local
+		var track_rend = passenger_track_bg.get_node_or_null("TrackRenderer") as CarJamTrackRenderer
+		if track_rend != null and track_rend.plat_top_local > 150.0:
+			plat_y_local = track_rend.plat_top_local
 
 	# W1: Gateway neck mouth (y = 165, x safely inside [-60, 60])
 	var w1_x: float = clampf(lerpf(p0_local.x, tgt_local.x * 0.25, 0.4) + lane_offset, -60.0, 60.0)
@@ -3404,9 +3401,9 @@ func _create_custom_toggle(text: String, icon_path: String, is_on: bool, on_togg
 		on_toggle.call(on)
 	)
 
-	var wrap := CenterContainer.new()
-	wrap.add_child(pill)
-	row.add_child(wrap)
+	var pill_center := CenterContainer.new()
+	pill_center.add_child(pill)
+	row.add_child(pill_center)
 	return row
 
 
