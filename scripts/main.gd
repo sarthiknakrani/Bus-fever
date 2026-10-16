@@ -14,28 +14,11 @@ var _settings_overlay: Control
 var _settings_panel: PanelContainer
 
 var _bg_rect: TextureRect
-var _sunbeam: TextureRect
-var _clouds: Array[TextureRect] = []
-var _cloud_speeds: Array[float] = []
-var _cloud_base_y: Array[float] = []
-var _confetti: CPUParticles2D
-var _sparkle_1: TextureRect
-var _sparkle_2: TextureRect
 var _settings_btn: TextureButton
-
 var _logo_wrapper: Control
 var _logo_rect: TextureRect
 var _logo_tween: Tween
 var _play_btn: TextureButton
-
-var _anim_time: float = 0.0
-var _base_logo_pos: Vector2 = Vector2.ZERO
-var _base_logo_size: Vector2 = Vector2.ZERO
-var _base_play_pos: Vector2 = Vector2.ZERO
-var _base_play_size: Vector2 = Vector2.ZERO
-var _is_play_pressed: bool = false
-var _sheen_timer: float = 0.0
-var _gear_timer: float = 0.0
 
 
 func _ready() -> void:
@@ -56,7 +39,7 @@ func _build_ui() -> void:
 	root.name = "HomeRoot"
 	add_child(root)
 
-	# A. Full portrait 3D isometric town background with subtle breathing parallax
+	# A. Full portrait 3D isometric town background (static)
 	_bg_rect = TextureRect.new()
 	_bg_rect.name = "Background3D"
 	_bg_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -66,81 +49,13 @@ func _build_ui() -> void:
 	_bg_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(_bg_rect)
 
-	# B. Sky Atmospheric Effects: Sunbeam and drifting fluffy cartoon clouds
-	_sunbeam = TextureRect.new()
-	_sunbeam.name = "SunbeamGlow"
-	_sunbeam.texture = load("res://assets/ui/fx/sunbeam.svg")
-	_sunbeam.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_sunbeam.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	_sunbeam.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_sunbeam.modulate = Color(1.0, 0.98, 0.85, 0.22)
-	root.add_child(_sunbeam)
-
-	_clouds.clear()
-	_cloud_speeds.clear()
-	_cloud_base_y.clear()
-
-	var cloud_defs = [
-		{"tex": "res://assets/ui/fx/cloud_1.svg", "speed": 12.0, "y": 25.0, "w": 180.0, "h": 90.0, "alpha": 0.65},
-		{"tex": "res://assets/ui/fx/cloud_2.svg", "speed": 18.0, "y": 65.0, "w": 220.0, "h": 102.0, "alpha": 0.55},
-		{"tex": "res://assets/ui/fx/cloud_1.svg", "speed": 8.0,  "y": 110.0, "w": 150.0, "h": 75.0,  "alpha": 0.45}
-	]
-
-	for i in range(cloud_defs.size()):
-		var c_data = cloud_defs[i]
-		var c_node := TextureRect.new()
-		c_node.name = "Cloud_%d" % i
-		c_node.texture = load(c_data["tex"])
-		c_node.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		c_node.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		c_node.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		c_node.custom_minimum_size = Vector2(c_data["w"], c_data["h"])
-		c_node.size = Vector2(c_data["w"], c_data["h"])
-		c_node.modulate = Color(1.0, 1.0, 1.0, c_data["alpha"])
-		c_node.position = Vector2(float(i * 260) - 100.0, c_data["y"])
-		root.add_child(c_node)
-		_clouds.append(c_node)
-		_cloud_speeds.append(c_data["speed"])
-		_cloud_base_y.append(c_data["y"])
-
-	# C. Festive Party Confetti Ambient Particles
-	_confetti = CPUParticles2D.new()
-	_confetti.name = "PartyConfetti"
-	_confetti.emitting = true
-	_confetti.amount = 24
-	_confetti.lifetime = 6.5
-	_confetti.preprocess = 3.5
-	_confetti.texture = load("res://assets/ui/fx/confetti.svg")
-	_confetti.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
-	_confetti.emission_rect_extents = Vector2(400, 10)
-	_confetti.direction = Vector2(0, 1)
-	_confetti.spread = 22.0
-	_confetti.gravity = Vector2(0, 22)
-	_confetti.initial_velocity_min = 18.0
-	_confetti.initial_velocity_max = 38.0
-	_confetti.angular_velocity_min = -60.0
-	_confetti.angular_velocity_max = 60.0
-	_confetti.scale_amount_min = 0.45
-	_confetti.scale_amount_max = 0.85
-	
-	var grad := Gradient.new()
-	grad.colors = PackedColorArray([
-		Color("f43f5e"), # Strawberry pink
-		Color("f59e0b"), # Amber yellow
-		Color("10b981"), # Green
-		Color("06b6d4"), # Cyan
-		Color("ec4899")  # Magenta
-	])
-	_confetti.color_ramp = grad
-	root.add_child(_confetti)
-
 	var hud := Control.new()
 	hud.name = "HUD"
 	hud.set_anchors_preset(Control.PRESET_FULL_RECT)
 	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(hud)
 
-	# D. Premium 3D Game Title Logo ("BUS FEVER PARTY!")
+	# B. Premium 3D Game Title Logo ("BUS FEVER PARTY!" - static)
 	_logo_wrapper = Control.new()
 	_logo_wrapper.name = "TitleLogoWrapper"
 	_logo_wrapper.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -154,34 +69,7 @@ func _build_ui() -> void:
 	_logo_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_logo_wrapper.add_child(_logo_rect)
 
-	# Specular traveling glint shader
-	var shine_mat := ShaderMaterial.new()
-	shine_mat.shader = load("res://assets/shaders/logo_shine.gdshader")
-	shine_mat.set_shader_parameter("shine_progress", -1.0)
-	_logo_rect.material = shine_mat
-
-	# Twinkling 3D Star Sparkles on the logo
-	_sparkle_1 = TextureRect.new()
-	_sparkle_1.name = "LogoSparkleExclamation"
-	_sparkle_1.texture = load("res://assets/ui/icons/sparkle.svg")
-	_sparkle_1.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_sparkle_1.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_sparkle_1.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_sparkle_1.size = Vector2(38, 38)
-	_sparkle_1.pivot_offset = Vector2(19, 19)
-	_logo_wrapper.add_child(_sparkle_1)
-
-	_sparkle_2 = TextureRect.new()
-	_sparkle_2.name = "LogoSparkleBus"
-	_sparkle_2.texture = load("res://assets/ui/icons/sparkle.svg")
-	_sparkle_2.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_sparkle_2.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_sparkle_2.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_sparkle_2.size = Vector2(30, 30)
-	_sparkle_2.pivot_offset = Vector2(15, 15)
-	_logo_wrapper.add_child(_sparkle_2)
-
-	# E. Top-right Settings button (Glossy Blue SVG)
+	# C. Top-right Settings button (Glossy Blue SVG - static)
 	_settings_btn = TextureButton.new()
 	_settings_btn.name = "settings_btn"
 	_settings_btn.texture_normal = load("res://assets/ui/buttons/settings_gear_normal.svg")
@@ -198,19 +86,10 @@ func _build_ui() -> void:
 	_settings_btn.offset_bottom = 92.0
 	_settings_btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	_settings_btn.pivot_offset = Vector2(32, 32)
-	
-	_settings_btn.button_down.connect(func():
-		var tw = _settings_btn.create_tween()
-		tw.tween_property(_settings_btn, "scale", Vector2(0.9, 0.9), 0.05).set_trans(Tween.TRANS_QUAD)
-	)
-	_settings_btn.button_up.connect(func():
-		var tw = _settings_btn.create_tween()
-		tw.tween_property(_settings_btn, "scale", Vector2.ONE, 0.1).set_trans(Tween.TRANS_QUAD)
-	)
 	_settings_btn.pressed.connect(_on_settings_pressed)
 	hud.add_child(_settings_btn)
 
-	# F. Bottom-center Play button (Glossy 3D Candy Orange Button)
+	# D. Bottom-center Play button (Glossy 3D Candy Orange Button - static)
 	_play_btn = TextureButton.new()
 	_play_btn.name = "PlayButton"
 	_play_btn.texture_normal = load("res://assets/ui/buttons/play_orange_normal.png")
@@ -218,20 +97,6 @@ func _build_ui() -> void:
 	_play_btn.ignore_texture_size = true
 	_play_btn.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
 	_play_btn.mouse_filter = Control.MOUSE_FILTER_STOP
-	
-	_play_btn.button_down.connect(func():
-		_is_play_pressed = true
-		var tw = _play_btn.create_tween()
-		tw.tween_property(_play_btn, "scale", Vector2(0.92, 0.92), 0.06).set_trans(Tween.TRANS_QUAD)
-	)
-	
-	_play_btn.button_up.connect(func():
-		var tw = _play_btn.create_tween()
-		tw.tween_property(_play_btn, "scale", Vector2(1.08, 1.08), 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-		tw.tween_property(_play_btn, "scale", Vector2.ONE, 0.10).set_trans(Tween.TRANS_SINE)
-		tw.tween_callback(func(): _is_play_pressed = false)
-	)
-	
 	_play_btn.pressed.connect(func():
 		if _play_btn.disabled: return
 		_play_btn.disabled = true
@@ -548,8 +413,8 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 
 	# Background wallpaper remains static and rock-solid (no screen-wide motion)
 	if _bg_rect != null and is_instance_valid(_bg_rect):
-		_bg_rect.position = Vector2.ZERO
-		_bg_rect.size = vp_size
+		_bg_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+
 
 	# Aspect ratio of the master 3D logo
 	var logo_aspect: float = 732.0 / 664.0
@@ -591,136 +456,37 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 	var logo_x: float = (vp_size.x - logo_w) * 0.5
 	var logo_y: float = top_clearance + (cloud_zone_h - logo_h) * 0.45
 
-	_base_logo_pos = Vector2(logo_x, logo_y)
-	_base_logo_size = Vector2(logo_w, logo_h)
-	_base_play_pos = Vector2((vp_size.x - btn_w) * 0.5, btn_y)
-	_base_play_size = Vector2(btn_w, btn_h)
-
 	_logo_wrapper.position = Vector2(logo_x, logo_y)
 	_logo_wrapper.size = Vector2(logo_w, logo_h)
 	_logo_wrapper.pivot_offset = Vector2(logo_w * 0.5, logo_h * 0.5)
+	_logo_wrapper.scale = Vector2.ONE
+	_logo_wrapper.rotation = 0.0
+	_logo_wrapper.modulate.a = 1.0
 
 	if _logo_rect != null and is_instance_valid(_logo_rect):
 		_logo_rect.position = Vector2.ZERO
 		_logo_rect.size = Vector2(logo_w, logo_h)
 
-	# Position twinkling star sparkles on the candy logo
-	if _sparkle_1 != null and is_instance_valid(_sparkle_1):
-		_sparkle_1.position = Vector2(logo_w * 0.88 - 19.0, logo_h * 0.66 - 19.0)
-	if _sparkle_2 != null and is_instance_valid(_sparkle_2):
-		_sparkle_2.position = Vector2(logo_w * 0.14 - 15.0, logo_h * 0.10 - 15.0)
+	if _play_btn != null and is_instance_valid(_play_btn):
+		_play_btn.scale = Vector2.ONE
+		_play_btn.rotation = 0.0
 
-	# Position sunbeam atmospheric glow in top sky corner
-	if _sunbeam != null and is_instance_valid(_sunbeam):
-		_sunbeam.position = Vector2(-20.0, -20.0)
-		_sunbeam.size = Vector2(vp_size.x * 0.75, vp_size.y * 0.45)
-
-	# Position party confetti emitter across top width
-	if _confetti != null and is_instance_valid(_confetti):
-		_confetti.position = Vector2(vp_size.x * 0.5, -20.0)
-		_confetti.emission_rect_extents = Vector2(vp_size.x * 0.55, 10.0)
-
-
-func _process(delta: float) -> void:
-	_anim_time += delta
-	var vp := get_viewport()
-	var vp_size: Vector2 = vp.get_visible_rect().size if vp != null else Vector2(720, 1280)
-
-	# 1. Atmospheric Sunbeam pulse
-	if _sunbeam != null and is_instance_valid(_sunbeam):
-		_sunbeam.modulate.a = 0.22 + sin(_anim_time * 1.2) * 0.08
-
-	# 3. Drifting Fluffy Cartoon Clouds across the sky
-	for i in range(_clouds.size()):
-		var c := _clouds[i]
-		if c != null and is_instance_valid(c):
-			c.position.x += _cloud_speeds[i] * delta
-			c.position.y = _cloud_base_y[i] + sin(_anim_time * 1.5 + float(i) * 2.1) * 3.0
-			if c.position.x > vp_size.x + 60.0:
-				c.position.x = -c.size.x - 60.0
-
-	# 4. Floating 3D Title Logo Bobbing & Gentle Sway
-	if _logo_wrapper != null and is_instance_valid(_logo_wrapper):
-		var bob_y := sin(_anim_time * 2.0) * 5.5
-		var rot_sway := sin(_anim_time * 1.3) * 0.016
-		var breathe := 1.0 + sin(_anim_time * 2.2) * 0.02
-		_logo_wrapper.position = _base_logo_pos + Vector2(0.0, bob_y)
-		_logo_wrapper.rotation = rot_sway
-		_logo_wrapper.scale = Vector2(breathe, breathe)
-
-	# 5. Twinkling Golden Star Sparkles on the Logo
-	if _sparkle_1 != null and is_instance_valid(_sparkle_1):
-		var sp1_t := fmod(_anim_time * 1.6, 3.2)
-		var a1 := sin(sp1_t * PI) if sp1_t < 1.0 else 0.0
-		a1 = maxf(0.0, a1)
-		_sparkle_1.scale = Vector2.ONE * (a1 * 0.95)
-		_sparkle_1.rotation += delta * 1.8
-		_sparkle_1.modulate.a = a1
-
-	if _sparkle_2 != null and is_instance_valid(_sparkle_2):
-		var sp2_t := fmod(_anim_time * 1.6 + 1.6, 3.2)
-		var a2 := sin(sp2_t * PI) if sp2_t < 1.0 else 0.0
-		a2 = maxf(0.0, a2)
-		_sparkle_2.scale = Vector2.ONE * (a2 * 0.85)
-		_sparkle_2.rotation -= delta * 1.5
-		_sparkle_2.modulate.a = a2
-
-	# 6. Play Button Breathing CTA Pulse
-	if _play_btn != null and is_instance_valid(_play_btn) and not _is_play_pressed:
-		var btn_pulse := 1.0 + sin(_anim_time * 2.8) * 0.038
-		_play_btn.scale = Vector2(btn_pulse, btn_pulse)
-
-	# 7. Periodic Specular Light Sheen sweep across candy logo (every 3.5s)
-	_sheen_timer += delta
-	if _sheen_timer >= 3.5:
-		_sheen_timer = 0.0
-		_trigger_specular_sheen()
-
-	# 8. Settings Button Gear subtle wiggle (every 6.0s)
-	_gear_timer += delta
-	if _gear_timer >= 6.0:
-		_gear_timer = 0.0
-		_trigger_gear_wiggle()
-
-
-func _trigger_specular_sheen() -> void:
-	if _logo_rect != null and is_instance_valid(_logo_rect) and _logo_rect.material is ShaderMaterial:
-		var mat := _logo_rect.material as ShaderMaterial
-		var tw = create_tween()
-		tw.tween_method(
-			func(v: float): mat.set_shader_parameter("shine_progress", v),
-			-0.5, 1.5, 0.75
-		).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-		tw.tween_callback(func():
-			if is_instance_valid(mat):
-				mat.set_shader_parameter("shine_progress", -1.0)
-		)
-
-
-func _trigger_gear_wiggle() -> void:
 	if _settings_btn != null and is_instance_valid(_settings_btn):
-		var tw = create_tween()
-		tw.tween_property(_settings_btn, "rotation_degrees", 15.0, 0.15).set_trans(Tween.TRANS_SINE)
-		tw.tween_property(_settings_btn, "rotation_degrees", -10.0, 0.15).set_trans(Tween.TRANS_SINE)
-		tw.tween_property(_settings_btn, "rotation_degrees", 0.0, 0.12).set_trans(Tween.TRANS_SINE)
+		_settings_btn.rotation = 0.0
 
 
 func _play_logo_entrance_animation() -> void:
-	if _logo_wrapper == null or not is_instance_valid(_logo_wrapper):
-		return
-	if _logo_tween != null and _logo_tween.is_valid():
-		_logo_tween.kill()
+	# Entire home screen is static - ensure all elements are at neutral transform and fully opaque
+	if _logo_wrapper != null and is_instance_valid(_logo_wrapper):
+		_logo_wrapper.scale = Vector2.ONE
+		_logo_wrapper.rotation = 0.0
+		_logo_wrapper.modulate.a = 1.0
+	if _play_btn != null and is_instance_valid(_play_btn):
+		_play_btn.scale = Vector2.ONE
+		_play_btn.rotation = 0.0
+	if _settings_btn != null and is_instance_valid(_settings_btn):
+		_settings_btn.rotation = 0.0
 
-	# Juicy dynamic entrance: scales up from 0.7 with bouncy overshoot
-	_logo_wrapper.scale = Vector2(0.7, 0.7)
-	_logo_wrapper.modulate.a = 0.0
-
-	_logo_tween = create_tween().set_parallel(true)
-	_logo_tween.tween_property(_logo_wrapper, "scale", Vector2.ONE, 0.65).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_logo_tween.tween_property(_logo_wrapper, "modulate:a", 1.0, 0.40).set_trans(Tween.TRANS_SINE)
-
-	# Trigger initial specular sheen glint
-	_logo_tween.chain().tween_callback(_trigger_specular_sheen)
 
 
 
