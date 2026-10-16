@@ -488,7 +488,7 @@ func _make_bus_node(v: Vehicle) -> Node2D:
 	var v_len: int = 1
 	if "length" in v:
 		v_len = v.length
-	elif v.data != null and "length" in v.data:
+	elif v.data != null:
 		v_len = v.data.length
 
 	var bw: float = CELL * 0.82 if is_vert else CELL * (0.86 if v_len <= 1 else 1.84)
@@ -508,7 +508,7 @@ func _draw_25d_bus(draw_node: Node2D, v: Vehicle, color: Color) -> void:
 	var v_len: int = 1
 	if v != null and "length" in v:
 		v_len = v.length
-	elif v != null and v.data != null and "length" in v.data:
+	elif v != null and v.data != null:
 		v_len = v.data.length
 
 	var bw: float = CELL * 0.80 if is_vert else CELL * (0.84 if v_len <= 1 else 1.82)
@@ -800,7 +800,7 @@ func _on_request_blocked_shake(vehicle_index: int) -> void:
 # ANIMATIONS: VEHICLE ESCAPE, BOARDING STREAM, DEPARTURE
 # -----------------------------------------------------------------
 
-func _on_request_move_animation(vehicle_index: int, _from_cell: Vector2i, _to_cell: Vector2i, target_bay_index: int, _bus_color: String = "", _bus_id: String = "") -> void:
+func _on_request_move_animation(vehicle_index: int, _from_cell: Vector2i, target_bay_index: int, _bus_color: String = "", _bus_id: String = "") -> void:
 	_play_sfx("move")
 	var gc := _get_game_controller()
 	if gc != null and gc.has_method("haptic_selection"):

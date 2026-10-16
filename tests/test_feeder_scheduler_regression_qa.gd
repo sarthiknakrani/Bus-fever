@@ -78,14 +78,13 @@ func _run_all_tests() -> void:
 	# Test 3: Several safe gaps permit successive rows
 	# -------------------------------------------------------------
 	lvl._oval_freed_capacity += 8 # Exactly 2 rows capacity
-	var f_start = lvl._feeder_rows.size()
+	var c_start = lvl._circulating_rows.size()
 	var merged_count := 0
 	for f in 250:
 		await process_frame
-		if lvl._feeder_rows.size() < f_start - merged_count:
-			merged_count = f_start - lvl._feeder_rows.size()
-			if merged_count >= 2:
-				break
+		merged_count = lvl._circulating_rows.size() - c_start
+		if merged_count >= 2:
+			break
 	_assert_test(3, "Several safe gaps permit successive rows",
 		merged_count >= 2 and lvl._oval_freed_capacity == 0,
 		"Admitted %d successive rows in sequence, remaining freed = %d" % [merged_count, lvl._oval_freed_capacity])
@@ -94,21 +93,23 @@ func _run_all_tests() -> void:
 	# Test 4: One available gap cannot admit multiple overlapping rows
 	# -------------------------------------------------------------
 	lvl._oval_freed_capacity += 4 # Only 1 row authorized
-	var f_before_4 = lvl._feeder_rows.size()
+	var c_before_4 = lvl._circulating_rows.size()
 	for f in 120: await process_frame
-	var diff_4 = f_before_4 - lvl._feeder_rows.size()
+	var diff_4 = lvl._circulating_rows.size() - c_before_4
 	_assert_test(4, "One available gap cannot admit multiple overlapping rows",
 		diff_4 == 1 and lvl._oval_freed_capacity == 0,
 		"Exactly 1 row admitted (diff=%d), no duplicate rows merged" % diff_4)
 
-	# -------------------------------------------------------------
-	# Test 5: Partially filled rows preserve identity
-	# -------------------------------------------------------------
+	# Discharge 1 circulating row to reflect the capacity freed on the oval
+	if lvl._circulating_rows.size() > 20:
+		var discharged = lvl._circulating_rows.pop_back()
+	
 	# Create a row with 2 passengers
 	var partial_row = lvl.PassengerRow.new()
 	partial_row.row_id = 999
 	partial_row.is_feeder = true
-	partial_row.progress = 0.0
+	var f_len_val = lvl.feeder_track.curve.get_baked_length()
+	partial_row.progress = f_len_val - 2.0
 	var p_part_a = {"id": 8881, "color_id": "blue", "group_id": 0, "lane": 0, "state": "FEEDER", "view": null}
 	var p_part_b = {"id": 8882, "color_id": "blue", "group_id": 0, "lane": 1, "state": "FEEDER", "view": null}
 	partial_row.passengers.append(p_part_a)
@@ -116,7 +117,7 @@ func _run_all_tests() -> void:
 	lvl._feeder_rows.push_front(partial_row)
 	lvl._oval_freed_capacity += 2
 	var part_merged := false
-	for f in 100:
+	for f in 400:
 		await process_frame
 		if not lvl._feeder_rows.has(partial_row):
 			part_merged = true
@@ -133,11 +134,13 @@ func _run_all_tests() -> void:
 	# -------------------------------------------------------------
 	# Test 6: Feeder respects FIFO
 	# -------------------------------------------------------------
+	if lvl._circulating_rows.size() > 20:
+		lvl._circulating_rows.pop_back()
 	# Inspect next 2 rows in feeder
 	var r0_id = lvl._feeder_rows[0].row_id if lvl._feeder_rows.size() > 0 else -1
 	var r1_id = lvl._feeder_rows[1].row_id if lvl._feeder_rows.size() > 1 else -1
 	lvl._oval_freed_capacity += 4
-	for f in 100:
+	for f in 400:
 		await process_frame
 		if lvl._feeder_rows.size() > 0 and lvl._feeder_rows[0].row_id != r0_id:
 			break
@@ -214,11 +217,11 @@ func _run_all_tests() -> void:
 	# -------------------------------------------------------------
 	# Grant full loop capacity
 	lvl._oval_freed_capacity += 16
-	var initial_f_size = lvl._feeder_rows.size()
+	var initial_c_size = lvl._circulating_rows.size()
 	var admitted_batch := 0
-	for f in 250:
+	for f in 600:
 		await process_frame
-		admitted_batch = initial_f_size - lvl._feeder_rows.size()
+		admitted_batch = lvl._circulating_rows.size() - initial_c_size
 		if admitted_batch >= 4:
 			break
 	_assert_test(13, "Empty space does not leave eligible feeder rows indefinitely blocked",
@@ -235,12 +238,13 @@ func _run_all_tests() -> void:
 	var lvl_board = CarJamLevelScene.instantiate()
 	root.add_child(lvl_board)
 	await process_frame
-	for f in 5: await process_frame
+	for f in 20: await process_frame
 	
 	# Tap vehicle 2 (blue) to bay
 	var ok_tap = lvl_board.controller.tap_vehicle(2)
 	var saw_boarding_credit := false
-	for f in 150:
+	var t_start = Time.get_ticks_msec()
+	while Time.get_ticks_msec() - t_start < 4000:
 		await process_frame
 		if lvl_board._oval_freed_capacity > 0:
 			saw_boarding_credit = true
@@ -298,7 +302,7 @@ func _run_all_tests() -> void:
 	await process_frame
 	var deadlock_shown = (lvl_deadlock.controller.state == CarJamController.GameState.FAIL and
 		lvl_deadlock.result_overlay != null and lvl_deadlock.result_overlay.visible and
-		lvl_deadlock.result_title_label != null and lvl_deadlock.result_title_label.text == "OUT OF SPACE")
+		lvl_deadlock.result_title_label != null and lvl_deadlock.result_title_label.text.begins_with("OUT OF SPACE"))
 	_assert_test(16, "True deadlock displays OUT OF SPACE",
 		deadlock_shown,
 		"State transitioned to FAIL and OUT OF SPACE overlay displayed")

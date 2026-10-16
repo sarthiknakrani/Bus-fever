@@ -12,8 +12,6 @@ func build() -> LevelData:
 	lvl.board_size = Vector2i(8, 8)
 	lvl.standard_bay_count = 5
 	lvl.cell_size = 90.0
-	lvl.board_origin = Vector2(40, 310)
-	lvl.bay_panel_origin = Vector2(40, 1080)
 	lvl.vehicles = [
 		{"id": "A", "color": "blue",   "capacity": 4, "position": Vector2i(1, 1), "initial_position": Vector2i(1, 1), "direction": VehicleData.Direction.NORTH},
 		{"id": "B", "color": "red",    "capacity": 4, "position": Vector2i(1, 3), "initial_position": Vector2i(1, 3), "direction": VehicleData.Direction.NORTH},
@@ -50,5 +48,4 @@ func build() -> LevelData:
 		"purple", "purple", "purple", "purple", # K
 		"yellow", "yellow", "yellow", "yellow", # I
 	]
-	lvl.tutorial_triggers = []
 	return lvl

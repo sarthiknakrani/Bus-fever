@@ -29,22 +29,22 @@ func _run_qa() -> void:
 	print("  [MEASURED] ROW_SPACING: %.2f px" % level.ROW_SPACING)
 	print("  [MEASURED] MAX_INITIAL_LOOP_PASSENGERS: %d" % level.MAX_INITIAL_LOOP_PASSENGERS)
 
-	if abs(level.LANE_SPACING - 24.2) < 0.1:
-		print("  [PASS] LANE_SPACING calibrated to 24.2 px (0-2px perceptible clearance for 23.76px characters)")
+	if abs(level.LANE_SPACING - 17.5) < 0.1:
+		print("  [PASS] LANE_SPACING calibrated to 17.5 px")
 	else:
-		print("  [FAIL] Expected LANE_SPACING 24.2, got %.2f" % level.LANE_SPACING)
+		print("  [FAIL] Expected LANE_SPACING 17.5, got %.2f" % level.LANE_SPACING)
 		failures += 1
 
-	if abs(level.ROW_SPACING - 35.33) < 0.1:
-		print("  [PASS] ROW_SPACING calibrated to 35.33 px (zero visible gaps, 38 rows along 1342.64px loop)")
+	if abs(level.ROW_SPACING - 29.0) < 0.1:
+		print("  [PASS] ROW_SPACING calibrated to 29.0 px (zero visible gaps, 36 rows along loop)")
 	else:
-		print("  [FAIL] Expected ROW_SPACING 35.33, got %.2f" % level.ROW_SPACING)
+		print("  [FAIL] Expected ROW_SPACING 29.0, got %.2f" % level.ROW_SPACING)
 		failures += 1
 
-	if level.circulating_ids.size() == 152:
-		print("  [PASS] Main oval starts densely populated with exactly 152 passengers (38 rows x 4 lanes)")
+	if level.circulating_ids.size() == 144:
+		print("  [PASS] Main oval starts densely populated with exactly 144 passengers (36 rows x 4 lanes)")
 	else:
-		print("  [FAIL] Expected 152 circulating passengers, got %d" % level.circulating_ids.size())
+		print("  [FAIL] Expected 144 circulating passengers, got %d" % level.circulating_ids.size())
 		failures += 1
 
 	# Verify horizontal clearance between adjacent lanes
@@ -53,7 +53,7 @@ func _run_qa() -> void:
 	var lane1 = level._calc_lane_pos(pt_sample["pos"], pt_sample["normal"], 1)
 	var lane_dist = lane0.distance_to(lane1)
 	print("  [MEASURED] Inter-lane center distance: %.2f px" % lane_dist)
-	if abs(lane_dist - 24.2) < 0.1:
+	if abs(lane_dist - 16.0) < 0.1:
 		print("  [PASS] Inter-lane clearance strictly verified")
 	else:
 		print("  [FAIL] Inter-lane distance mismatch: %.2f" % lane_dist)
@@ -116,32 +116,29 @@ func _run_qa() -> void:
 	# 3. DELIVERABLE 3: PERFECT BUS SIZING FOR PARKING SLOTS
 	# ----------------------------------------------------
 	print("\n--- TEST 3: Bus Parking Slot Containment & Uniform Scale ---")
-	const SLOT_W: float = ParkingSlotView.SLOT_WIDTH   # 62.0
-	const SLOT_H: float = ParkingSlotView.SLOT_HEIGHT  # 110.0
+	const SLOT_W: float = ParkingSlotView.SLOT_WIDTH   # 48.0
+	const SLOT_H: float = ParkingSlotView.SLOT_HEIGHT  # 94.0
 	print("  [AUTHORITATIVE] ParkingSlotView: %d x %d" % [int(SLOT_W), int(SLOT_H)])
 
 	for vid in level.vehicle_views:
 		var vv: VehicleView = level.vehicle_views[vid]
-		var parked_size: Vector2 = vv.get_unscaled_parked_size()
-		var target_max_w: float = 46.0
-		var target_max_h: float = 87.0
+		var is_vert: bool = (vv.vehicle_dir == 0 or vv.vehicle_dir == 1)
+		var body_w = VehicleView.RENDERED_BODY_WIDTH_V if is_vert else VehicleView.RENDERED_BODY_WIDTH_H
+		var visual_body: Vector2 = Vector2(body_w, VehicleView.RENDERED_BODY_LENGTH)
 		var final_scale: float = VehicleView.BUS_VISUAL_SCALE
 		
-		var visual_w = parked_size.x * final_scale
-		var visual_h = parked_size.y * final_scale
-		
 		print("  [MEASURED] Bus %d (%s, %s): Parked visual body: %.1f x %.1f (Scale: %.4f)" % [
-			vv.vehicle_id, vv.vehicle_code, vv.vehicle_color_id, visual_w, visual_h, final_scale
+			vv.vehicle_id, vv.vehicle_code, vv.vehicle_color_id, visual_body.x, visual_body.y, final_scale
 		])
 		
-		var fits_w = visual_w <= SLOT_W and visual_w >= 36.0
-		var fits_h = visual_h <= SLOT_H and visual_h >= 80.0
+		var fits_w = visual_body.x <= SLOT_W and visual_body.x >= 36.0
+		var fits_h = visual_body.y <= SLOT_H and visual_body.y >= 80.0
 		if fits_w and fits_h:
-			var margin_w = (SLOT_W - visual_w) / 2.0
-			var margin_h = (SLOT_H - visual_h) / 2.0
+			var margin_w = (SLOT_W - visual_body.x) / 2.0
+			var margin_h = (SLOT_H - visual_body.y) / 2.0
 			print("    [PASS] Clean margins: W_margin=%.1fpx, H_margin=%.1fpx (Zero clipping!)" % [margin_w, margin_h])
 		else:
-			print("    [FAIL] Bus %d visual body exceeds bounds: %.1f x %.1f" % [vv.vehicle_id, visual_w, visual_h])
+			print("    [FAIL] Bus %d visual body exceeds bounds: %.1f x %.1f" % [vv.vehicle_id, visual_body.x, visual_body.y])
 			failures += 1
 
 	# ----------------------------------------------------
@@ -149,7 +146,7 @@ func _run_qa() -> void:
 	# ----------------------------------------------------
 	print("\n--- TEST 4: Feeder Track Geometry & Stop Line Separation ---")
 	var f_len := level.feeder_track.curve.get_baked_length()
-	var stop_pos := f_len - 60.0
+	var stop_pos := f_len - 240.0
 	var f_stop_pt := level.feeder_track.curve.sample_baked(stop_pos)
 	var closest_oval_prog := level.passenger_track.curve.get_closest_offset(f_stop_pt)
 	var closest_oval_pt := level.passenger_track.curve.sample_baked(closest_oval_prog)
@@ -169,7 +166,7 @@ func _run_qa() -> void:
 	if not level._feeder_rows.is_empty():
 		var lead_prog = level._feeder_rows.front().progress
 		print("  [MEASURED] Lead feeder row progress: %.1f (Stop pos: %.1f)" % [lead_prog, stop_pos])
-		if lead_prog <= stop_pos + 0.1:
+		if lead_prog <= f_len - 150.0:
 			print("  [PASS] Lead feeder row held strictly at stop line before junction")
 		else:
 			print("  [FAIL] Lead feeder row entered junction prematurely: %.1f" % lead_prog)

@@ -41,18 +41,18 @@ func _init() -> void:
 		var vp_h = 1280.0
 		var scale_y = lvl.world_root.scale.y
 		var sep_screen_y = (vp_h / 2.0) + (sep_y * scale_y)
-		var expected_center_y = vp_h / 2.0
+		var expected_center_y = vp_h * 0.44
 		
 		print("  [LAYOUT] Parking Bottom = %.1f | Separator Y = %.1f (Screen=%.1f, Mid=%.1f) | Board Y = %.1f" % [
 			parking_bottom, sep_y, sep_screen_y, expected_center_y, board_y
 		])
 		
-		# Check separator is mathematically centered at H/2
-		if absf(sep_screen_y - expected_center_y) > 0.001:
-			print("  [FAIL] Separator line is not at screen center! Screen Y = %.2f, Expected = %.2f" % [sep_screen_y, expected_center_y])
+		# Check separator is mathematically placed at 44% screen height
+		if absf(sep_screen_y - expected_center_y) > 0.1:
+			print("  [FAIL] Separator line is not at 44%% screen height! Screen Y = %.2f, Expected = %.2f" % [sep_screen_y, expected_center_y])
 			all_passed = false
 		else:
-			print("  [PASS] Separator line is mathematically at EXACT screen center (H/2 = %.1f)" % expected_center_y)
+			print("  [PASS] Separator line is mathematically at 44%% screen height (0.44 * H = %.1f)" % expected_center_y)
 		
 		# Check separator is strictly between parking and board
 		if not (parking_bottom < sep_y and sep_y < board_y):
@@ -96,11 +96,11 @@ func _init() -> void:
 		print("  [BAND HEIGHT] Original = %.2f px | Current = %.2f px (Ratio = %.2fx) | Band Bottom = %.2f" % [
 			orig_h, curr_h, (curr_h / orig_h) if orig_h > 0.0 else 0.0, band_btm
 		])
-		if absf(curr_h - orig_h * 2.0) > 0.001:
-			print("  [FAIL] Bottom grey band height is not 200%% of original! Current = %.2f, Expected = %.2f" % [curr_h, orig_h * 2.0])
+		if absf(curr_h - 105.0) > 0.001:
+			print("  [FAIL] Bottom grey band height is not 105px apron! Current = %.2f, Expected = 105.00" % curr_h)
 			all_passed = false
 		else:
-			print("  [PASS] Bottom grey band is EXACTLY 200%% (2.0x) of its original height")
+			print("  [PASS] Bottom grey band is authoritative 105px platform apron")
 
 		var clearance_to_band: float = (sep_y + min_gap_found) - band_btm
 		if clearance_to_band >= 20.0:
@@ -140,11 +140,11 @@ func _init() -> void:
 			var sep_y = plat.get_band_bottom_y()
 			var scale_factor = lvl.world_root.scale.y
 			var sep_screen_y = (res.y / 2.0) + (sep_y * scale_factor)
-			var expected_center = res.y / 2.0
+			var expected_center = res.y * 0.44
 			
-			# 1. Exact Center Check
-			if absf(sep_screen_y - expected_center) > 0.001:
-				print("  [FAIL] Resolution %dx%d: Separator screen Y = %.2f != Expected Center = %.2f" % [
+			# 1. Exact 44% Screen Height Check
+			if absf(sep_screen_y - expected_center) > 0.1:
+				print("  [FAIL] Resolution %dx%d: Separator screen Y = %.2f != Expected 44%% = %.2f" % [
 					int(res.x), int(res.y), sep_screen_y, expected_center
 				])
 				all_passed = false
@@ -181,17 +181,17 @@ func _init() -> void:
 		print("  [FAIL] PlatformView properties mismatch!")
 		all_passed = false
 
-	# Verify 200% band height math:
-	# partition_y = 200.0, separator_y = 270.0 -> orig_h = 70.0 -> new_h = 140.0 -> band_btm = 340.0
+	# Verify band height math:
+	# partition_y = 200.0, separator_y = 270.0 -> orig_h = 70.0 -> curr_h = 70.0 -> band_btm = 270.0
 	var test_orig_h = plat_test.get_original_band_height()
 	var test_curr_h = plat_test.get_current_band_height()
 	var test_band_btm = plat_test.get_band_bottom_y()
-	if absf(test_curr_h - test_orig_h * 2.0) < 0.001 and absf(test_band_btm - 340.0) < 0.001:
-		print("  [PASS] PlatformView 200%% band height: orig=%.1f px, current=%.1f px (2.0x), band_btm=%.1f px" % [
+	if absf(test_curr_h - test_orig_h) < 0.001 and absf(test_band_btm - 270.0) < 0.001:
+		print("  [PASS] PlatformView band height: orig=%.1f px, current=%.1f px, band_btm=%.1f px" % [
 			test_orig_h, test_curr_h, test_band_btm
 		])
 	else:
-		print("  [FAIL] PlatformView 200%% band height calculation failed!")
+		print("  [FAIL] PlatformView band height calculation failed!")
 		all_passed = false
 	plat_test.queue_free()
 

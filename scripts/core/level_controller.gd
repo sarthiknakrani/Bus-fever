@@ -10,7 +10,7 @@ signal board_occupancy_changed()
 signal bay_state_changed()
 signal passenger_state_changed()
 signal game_state_changed(new_state: int)
-signal request_move_animation(vehicle_index: int, from_cell: Vector2i, to_cell: Vector2i, bay_index: int, bus_color: String, bus_id: String)
+signal request_move_animation(vehicle_index: int, from_cell: Vector2i, bay_index: int, bus_color: String, bus_id: String)
 signal request_board_animation(vehicle_index: int, count: int)
 signal request_depart_animation(vehicle_index: int, bay_index: int)
 signal request_hint_pulse(vehicle_index: int)
@@ -234,7 +234,7 @@ func tap_vehicle(vehicle_index: int) -> bool:
 	emit_signal("bay_state_changed")
 	# Hand off animation. The animation handler is responsible for
 	# calling _on_arrived_at_bay when the bus reaches the bay.
-	emit_signal("request_move_animation", vehicle_index, from_cell, v.position, bay_index, v.color, v.id)
+	emit_signal("request_move_animation", vehicle_index, from_cell, bay_index, v.color, v.id)
 	_interaction_locked = true
 	return true
 
@@ -252,7 +252,8 @@ func _on_arrived_at_bay(vehicle_index: int, bay_index: int) -> void:
 	# newly-wrong-color bus from earlier may now have something to do.
 	_recheck_all_waiting()
 	_check_win_fail()
-	_interaction_locked = false
+	if game_state == GameState.PLAYING:
+		_interaction_locked = false
 
 ## Board or leave waiting: if active_color matches, board as many as
 ## possible; else, set state WAITING.

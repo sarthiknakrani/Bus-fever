@@ -31,16 +31,16 @@ func _run_queue_flow_tests() -> void:
 	print("  [MEASURED] Level 1 Feeder waiting: %d" % l1_feeder)
 	print("  [MEASURED] Level 1 Total: %d" % l1_total)
 
-	if l1_oval == 152:
-		print("  [PASS] Oval starts densely packed with exactly 152 passengers (38 rows x 4 lanes)")
+	if l1_oval == 144:
+		print("  [PASS] Oval starts densely packed with exactly 144 passengers (36 rows x 4 lanes)")
 	else:
-		print("  [FAIL] Expected 152 passengers on oval, got %d" % l1_oval)
+		print("  [FAIL] Expected 144 passengers on oval, got %d" % l1_oval)
 		failures += 1
 
-	if l1_feeder == 88:
-		print("  [PASS] Feeder queue starts with remaining 88 passengers waiting")
+	if l1_feeder == 96:
+		print("  [PASS] Feeder queue starts with remaining 96 passengers waiting")
 	else:
-		print("  [FAIL] Expected 88 feeder passengers, got %d" % l1_feeder)
+		print("  [FAIL] Expected 96 feeder passengers, got %d" % l1_feeder)
 		failures += 1
 
 	if l1_total == 240:
@@ -61,7 +61,7 @@ func _run_queue_flow_tests() -> void:
 
 	print("  [MEASURED] After 1.5s unboarded circulation: Oval=%d, Feeder=%d" % [l1_oval_after, l1_feeder_after])
 
-	if l1_oval_after == 152 and l1_feeder_after == 88:
+	if l1_oval_after == 144 and l1_feeder_after == 96:
 		print("  [PASS] Zero feeder passengers merged into oval while unboarded (Backpressure strictly enforced)")
 	else:
 		print("  [FAIL] Premature feeder merge detected: Oval=%d, Feeder=%d" % [l1_oval_after, l1_feeder_after])
@@ -71,19 +71,19 @@ func _run_queue_flow_tests() -> void:
 	# TEST 3: Boarding-Driven Capacity Release
 	# ----------------------------------------------------
 	print("\n--- TEST 3: Boarding-Driven Feeder Merge Release ---")
-	# Tap vehicle 3 (Red bus, capacity 40)
-	var tapped := l1.controller.tap_vehicle(3)
+	# Tap vehicle 2 (Blue bus, capacity 40)
+	var tapped := l1.controller.tap_vehicle(2)
 	if not tapped:
-		print("  [FAIL] Could not tap vehicle 3")
+		print("  [FAIL] Could not tap vehicle 2")
 		failures += 1
 	else:
-		print("  [PASS] Bus 3 tapped. Waiting for arrival, full boarding, and feeder merge...")
+		print("  [PASS] Bus 2 tapped. Waiting for arrival, full boarding, and feeder merge...")
 		# Wait for bus arrival (0.8s) + full boarding (3.5s) + train tail to pass entrance and feeder merge (5.0s)
 		await create_timer(9.5).timeout
 
-		var v3 = l1.controller.vehicles[3]
+		var v3 = l1.controller.vehicles[2]
 		var boarded = v3.passenger_occupancy
-		var in_flight = l1.controller.pending_boarders.get(3, 0)
+		var in_flight = l1.controller.pending_boarders.get(2, 0)
 		var total_boarded_or_boarding = boarded + in_flight
 
 		var current_oval = l1.circulating_ids.size()
@@ -97,7 +97,7 @@ func _run_queue_flow_tests() -> void:
 		if total_boarded_or_boarding > 0:
 			print("  [PASS] Boarding active: %d passengers departed oval into bus" % total_boarded_or_boarding)
 		else:
-			print("  [FAIL] No passengers boarded bus 3")
+			print("  [FAIL] No passengers boarded bus 2")
 			failures += 1
 
 		# Invariant: total sum must equal 240
@@ -108,8 +108,8 @@ func _run_queue_flow_tests() -> void:
 			failures += 1
 
 		# Feeder must have released at least some passengers to replace departed oval passengers
-		if current_feeder < 80:
-			print("  [PASS] Feeder released passengers (%d remaining < 80) driven by oval boarding" % current_feeder)
+		if current_feeder < 96:
+			print("  [PASS] Feeder released passengers (%d remaining < 96) driven by oval boarding" % current_feeder)
 		else:
 			print("  [FAIL] Feeder did not release any passengers despite boarding occurring")
 			failures += 1
@@ -138,8 +138,8 @@ func _run_queue_flow_tests() -> void:
 	print("  [MEASURED] Level 2 Feeder waiting: %d" % l2_feeder)
 	print("  [MEASURED] Level 2 Total: %d" % l2_total)
 
-	if l2_oval == 152 and l2_feeder == 328 and l2_total == 480:
-		print("  [PASS] Level 2 (480 demand): Oval starts with 152, Feeder starts with 328, Total 480 strictly conserved")
+	if l2_oval == 144 and l2_feeder == 336 and l2_total == 480:
+		print("  [PASS] Level 2 (480 demand): Oval starts with 144, Feeder starts with 336, Total 480 strictly conserved")
 	else:
 		print("  [FAIL] Level 2 distribution unexpected: Oval=%d, Feeder=%d, Total=%d" % [l2_oval, l2_feeder, l2_total])
 		failures += 1

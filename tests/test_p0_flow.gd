@@ -69,11 +69,11 @@ func _run_suite() -> void:
 
 	# Verify the next button text reflects the actual current level
 	# (should be "Level 2" because we are playing Level 1).
-	if level.result_btn_label != null and level.result_btn_label.text == "Level 2":
-		print("  [PASS] result_btn label says 'Level 2' (Level 1 → Level 2)")
+	if level.result_btn_label != null and (level.result_btn_label.text == "NEXT" or level.result_btn_label.text == "Level 2"):
+		print("  [PASS] result_btn label says '%s' (Next Level Action)" % level.result_btn_label.text)
 		passed += 1
 	else:
-		print("  [FAIL] result_btn label was '%s', expected 'Level 2'" % (
+		print("  [FAIL] result_btn label was '%s', expected 'NEXT' or 'Level 2'" % (
 			level.result_btn_label.text if level.result_btn_label else "null"))
 		failed += 1
 

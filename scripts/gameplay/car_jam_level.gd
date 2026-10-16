@@ -275,8 +275,14 @@ func _process(delta: float) -> void:
 					"freed_capacity": _oval_freed_capacity,
 					"reason": wait_reason
 				}
-				print("[QA FEEDER WAIT DIAGNOSTIC] Duration: %.2fs | Reason: %s | Prog: %.1f/%.1f" % [
-					_feeder_starvation_timer, wait_reason, lead_r.progress, f_len
+				var blk_str := ""
+				for cr in _circulating_rows:
+					var cd = absf(cr.progress - _merge_prog)
+					if cd > track_len * 0.5: cd = track_len - cd
+					if cd < ROW_SPACING * 0.85:
+						blk_str += "Row%d(prog=%.1f, d=%.1f) " % [cr.row_id, cr.progress, cd]
+				print("[QA FEEDER WAIT DIAGNOSTIC] Duration: %.2fs | Reason: %s | Prog: %.1f/%.1f | Blockers: [%s]" % [
+					_feeder_starvation_timer, wait_reason, lead_r.progress, f_len, blk_str
 				])
 				_feeder_starvation_timer = 0.0
 
@@ -366,7 +372,7 @@ func _process(delta: float) -> void:
 			if d_merge < 0.0: d_merge += track_len
 			var dist_to_merge = track_len - d_merge
 			if dist_to_merge >= ROW_SPACING and dist_to_merge <= 85.0:
-				var yield_dist = dist_to_merge - ROW_SPACING
+				var yield_dist = (dist_to_merge - ROW_SPACING) + MIN_ROW_GAP
 				dist_ahead = minf(dist_ahead, yield_dist)
 
 		var old_prog = row.progress
@@ -835,11 +841,11 @@ func _init_passenger_track() -> void:
 	f_curve.add_point(Vector2(265, -110), Vector2(15, -65), Vector2(-18, 65))
 	# Point 2 (smooth rounded sweep approaching right arc): Vector2(235, 20), in = Vector2(18, -45), out = Vector2(-22, 35)
 	f_curve.add_point(Vector2(235, 20), Vector2(18, -45), Vector2(-22, 35))
-	# Point 3 (tangential merge on right arc): Vector2(180, 82), in = Vector2(25, -26), out = Vector2.ZERO
-	f_curve.add_point(Vector2(180, 82), Vector2(25, -26), Vector2.ZERO)
-	feeder_track.curve = f_curve
-
 	_merge_prog = passenger_track.curve.get_closest_offset(Vector2(180, 82))
+	var merge_pt: Vector2 = passenger_track.curve.sample_baked(_merge_prog)
+	# Point 3 (tangential merge on right arc): snapped exactly to merge point on passenger track
+	f_curve.add_point(merge_pt, Vector2(25, -26), Vector2.ZERO)
+	feeder_track.curve = f_curve
 
 	# PREMIUM PLAZA INTEGRATION
 	var plaza = preload("res://scripts/gameplay/plaza_environment.gd").new()
@@ -2822,7 +2828,8 @@ func _update_feeder_curve(p0: Vector2) -> void:
 	f_curve.add_point(p0, Vector2.ZERO, out_dir * out_handle_len)
 	f_curve.add_point(Vector2(245, -110), Vector2(15, -65), Vector2(-20, 65))
 	f_curve.add_point(Vector2(215, 25), Vector2(20, -45), Vector2(-25, 35))
-	f_curve.add_point(Vector2(185, 75), Vector2(25, -30), Vector2.ZERO)
+	var merge_pt: Vector2 = passenger_track.curve.sample_baked(_merge_prog) if passenger_track != null and passenger_track.curve != null else Vector2(185, 75)
+	f_curve.add_point(merge_pt, Vector2(25, -30), Vector2.ZERO)
 	feeder_track.curve = f_curve
 	if passenger_track_bg != null:
 		var tr = passenger_track_bg.get_node_or_null("TrackRenderer") as CarJamTrackRenderer
@@ -2830,8 +2837,8 @@ func _update_feeder_curve(p0: Vector2) -> void:
 			tr.feeder_curve = f_curve
 			tr.queue_redraw()
 
-
-
+func restart_level() -> void:
+	_load_current_level()
 
 func _direct_restart() -> void:
 	_stop_failure_animations()

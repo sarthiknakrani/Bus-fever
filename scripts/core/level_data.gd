@@ -10,10 +10,7 @@ class_name LevelData
 @export var standard_bay_count: int = 5
 @export var vehicles: Array[Dictionary] = []
 @export var passenger_order: Array[String] = []
-@export var board_origin: Vector2 = Vector2.ZERO
 @export var cell_size: float = 96.0
-@export var bay_panel_origin: Vector2 = Vector2.ZERO
-@export var tutorial_triggers: Array[Dictionary] = []
 
 func validate() -> Dictionary:
 	# Returns {ok: bool, errors: Array[String]}

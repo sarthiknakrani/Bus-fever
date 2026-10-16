@@ -36,7 +36,7 @@ class Snapshot:
 		v.current_passengers = current_passengers
 
 @export var index: int = -1
-var data
+var data: VehicleData = null
 var state: int = State.IDLE
 var position: Vector2i = Vector2i.ZERO
 var initial_position: Vector2i = Vector2i.ZERO

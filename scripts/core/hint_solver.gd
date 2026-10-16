@@ -72,15 +72,6 @@ func _can_escape(state: SimState, v: SimVehicle) -> bool:
 		p += d
 	return true
 
-func _all_path_cells(v: VehicleData) -> Array:
-	var d: Vector2i = VehicleDataScript.dir_to_vector(v.direction)
-	var path: Array = []
-	var p: Vector2i = v.position + d
-	while p.x >= 0 and p.y >= 0:
-		path.append(p)
-		p += d
-	return path
-
 func build_initial_state(level: LevelData, extra_bay: bool) -> SimState:
 	var st := SimState.new()
 	st.board_size = level.board_size
@@ -286,7 +277,9 @@ func _is_pure_dead_end(state: SimState) -> bool:
 	# Now check: if every bus that can still escape is wrong-color, AND every
 	# parked bus that matches active has no free bay to swap into, dead.
 	# Simpler: if no on-board match AND no parked match, dead.
-	return active == ""  # shouldn't happen since _is_win caught
+	if active == "":
+		push_warning("HintSolver: _is_pure_dead_end called with empty active color on non-win state")
+	return false
 
 ## Run BFS from initial state. Returns an Array of moves leading to WIN,
 ## or empty if unsolvable.
@@ -343,12 +336,12 @@ func find_hint(state: SimState) -> Dictionary:
 	return {"vehicle": m.vehicle, "bay": int(m.bay)}
 
 ## Detect dead-end state: no moves, not yet won, and from this state no
-## sequence leads to WIN. We approximate by re-running BFS from this
-## state with a smaller node budget.
+## sequence leads to WIN. Re-runs BFS from this state with node budget.
 func is_dead_end(state: SimState, max_nodes: int = 1500) -> bool:
 	if _is_win(state):
 		return false
 	var moves := enumerate_moves(state)
-	if moves.size() > 0:
-		return false
-	return true  # immediate dead node
+	if moves.is_empty():
+		return true  # immediate dead node
+	var sol := find_solution(state, max_nodes)
+	return sol.is_empty()

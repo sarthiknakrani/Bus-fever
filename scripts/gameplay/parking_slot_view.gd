@@ -5,8 +5,8 @@ var slot_id: int = 0
 var slot_state: int = CarJamParkingManager.SlotState.EMPTY
 var is_unlocked: bool = true
 
-const SLOT_WIDTH: float = 46.0
-const SLOT_HEIGHT: float = 88.0
+const SLOT_WIDTH: float = 48.0
+const SLOT_HEIGHT: float = 94.0
 
 var _vip_label: Label
 var _draw_node: Node2D
