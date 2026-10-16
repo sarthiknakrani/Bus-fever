@@ -67,13 +67,14 @@ func _build_ui() -> void:
 	_logo_rect.texture = load("res://assets/ui/logo/bus_fever_party_logo.png")
 	_logo_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_logo_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_logo_rect.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	_logo_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	var shine_mat := ShaderMaterial.new()
 	shine_mat.shader = load("res://assets/shaders/logo_gloss_shine.gdshader")
-	shine_mat.set_shader_parameter("cycle_duration", 2.0)
-	shine_mat.set_shader_parameter("sweep_duration", 0.65)
-	shine_mat.set_shader_parameter("use_time_cycle", true)
+	shine_mat.set_shader_parameter("cycle_duration", 3.0)
+	shine_mat.set_shader_parameter("sweep_duration", 1.4)
+	shine_mat.set_shader_parameter("use_time_cycle", false)
 	_logo_rect.material = shine_mat
 
 	_logo_wrapper.add_child(_logo_rect)
@@ -516,13 +517,13 @@ func _start_logo_shine_animation() -> void:
 	sm.set_shader_parameter("manual_progress", -0.5)
 
 	_logo_shine_tween = create_tween().set_loops()
-	# 0.7s smooth diagonal gloss sweep across the title text
-	_logo_shine_tween.tween_property(sm, "shader_parameter/manual_progress", 1.5, 0.7)\
+	# Slow, smooth, luxurious diagonal gloss sweep across the title text
+	_logo_shine_tween.tween_property(sm, "shader_parameter/manual_progress", 1.5, 1.4)\
 		.from(-0.5)\
 		.set_trans(Tween.TRANS_QUAD)\
 		.set_ease(Tween.EASE_IN_OUT)
-	# 1.3s rest before the next sweep (total 0.7s + 1.3s = exactly 2.0s period)
-	_logo_shine_tween.tween_interval(1.3)
+	# 1.6s calm rest before the next sweep (total 1.4s + 1.6s = 3.0s cycle)
+	_logo_shine_tween.tween_interval(1.6)
 
 
 

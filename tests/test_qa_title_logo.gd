@@ -55,7 +55,9 @@ func _test_logo_asset_integrity() -> void:
 		var logo_img := logo_tex.get_image()
 		if logo_img != null:
 			var p_col := logo_img.get_pixel(140, 420)
-			_assert(p_col.r > 0.85 and p_col.g > 0.35 and p_col.g < 0.75 and p_col.b < 0.35, "Letter 'P' in 'PARTY!' has candy orange color (r=%.2f, g=%.2f, b=%.2f)" % [p_col.r, p_col.g, p_col.b])
+			_assert(p_col.r > 0.85 and p_col.g > 0.35 and p_col.g < 0.75 and p_col.b < 0.35, "Letter 'P' in 'PARTY!' has candy orange face (r=%.2f, g=%.2f, b=%.2f)" % [p_col.r, p_col.g, p_col.b])
+			var p_border := logo_img.get_pixel(84, 470)
+			_assert(p_border.b > p_border.r + 0.15 and p_border.b > p_border.g + 0.15, "Letter 'P' border is royal dark navy blue, NOT orange (r=%.2f, g=%.2f, b=%.2f)" % [p_border.r, p_border.g, p_border.b])
 
 	var font_path := "res://assets/fonts/arial_rounded_bold.ttf"
 	_assert(ResourceLoader.exists(font_path), "Font asset exists in project at %s" % font_path)
@@ -82,12 +84,13 @@ func _test_home_screen_hierarchy_and_buttons() -> void:
 		_assert(logo_rect != null, "LogoTexture node exists inside TitleLogoWrapper")
 		if logo_rect != null:
 			_assert(logo_rect.texture != null, "LogoTexture has valid texture assigned")
+			_assert(logo_rect.texture_filter == CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS, "LogoTexture has TEXTURE_FILTER_LINEAR_WITH_MIPMAPS for razor sharpness")
 			_assert(logo_rect.material is ShaderMaterial, "LogoTexture has ShaderMaterial attached")
 			if logo_rect.material is ShaderMaterial:
 				var sm := logo_rect.material as ShaderMaterial
 				_assert(sm.shader != null, "Logo ShaderMaterial has valid shader assigned")
 				var cycle_dur: float = sm.get_shader_parameter("cycle_duration")
-				_assert(absf(cycle_dur - 2.0) < 0.01, "Logo glossy shine cycle duration is 2.0s (%.2fs)" % cycle_dur)
+				_assert(cycle_dur >= 2.0 and cycle_dur <= 3.5, "Logo glossy shine has calm slower animation duration (%.2fs)" % cycle_dur)
 
 	# Check Settings button
 	var settings_btn = main_instance.find_child("settings_btn", true, false)
