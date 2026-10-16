@@ -418,6 +418,8 @@ func _create_close_button(on_close: Callable) -> Button:
 func _exit_tree() -> void:
 	if _logo_tween != null and _logo_tween.is_valid():
 		_logo_tween.kill()
+	if _logo_shine_tween != null and _logo_shine_tween.is_valid():
+		_logo_shine_tween.kill()
 
 func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 	if _logo_wrapper == null or not is_instance_valid(_logo_wrapper):

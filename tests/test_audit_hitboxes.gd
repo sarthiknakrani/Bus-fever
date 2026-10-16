@@ -18,16 +18,15 @@ func _init() -> void:
 		gc_node.current_level_number = lvl_num
 		var lvl = CarJamLevelScene.instantiate()
 		root.add_child(lvl)
-		
-		await process_frame
-		await process_frame
-		await physics_frame
-		await physics_frame
+		if not lvl.is_node_ready():
+			lvl._ready()
 		
 		var polys: Array[PackedVector2Array] = []
 		var v_ids: Array[int] = []
 		for vid in lvl.vehicle_views:
 			var vv: VehicleView = lvl.vehicle_views[vid]
+			if not vv.is_node_ready():
+				vv._ready()
 			var ta: Area2D = vv.get_node_or_null("TouchArea")
 			var cs: CollisionShape2D = ta.get_child(0)
 			var rs: RectangleShape2D = cs.shape
@@ -58,7 +57,6 @@ func _init() -> void:
 		total_overlaps += overlap_count
 		
 		lvl.queue_free()
-		await process_frame
 		
 	if total_overlaps == 0:
 		print("\n=== SUCCESS: ALL LEVELS HAVE EXACTLY 0 HITBOX OVERLAPS ===")

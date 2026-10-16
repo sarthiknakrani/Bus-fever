@@ -19,10 +19,16 @@ uniform float secondary_offset : hint_range(0.05, 0.4) = 0.09;
 uniform float secondary_width : hint_range(0.01, 0.3) = 0.025;
 uniform float secondary_alpha : hint_range(0.1, 1.0) = 0.55;
 
+varying vec2 sweep_dir;
+
+void vertex() {
+	float rad = radians(shine_angle);
+	sweep_dir = vec2(cos(rad), sin(rad));
+}
+
 void fragment() {
 	vec4 tex = texture(TEXTURE, UV);
 
-	// Only process non-transparent pixels of the logo
 	if (tex.a > 0.01) {
 		float progress = manual_progress;
 		if (use_time_cycle) {
@@ -37,47 +43,48 @@ void fragment() {
 			}
 		}
 
-		// Calculate projection along the tilted normal
-		float rad = radians(shine_angle);
-		vec2 dir = vec2(cos(rad), sin(rad));
-		float proj = dot(UV - vec2(0.5), dir) + 0.5;
+		// Only compute beam projection and lighting when beam is in visible range
+		if (progress >= -0.35 && progress <= 1.45) {
+			// Calculate projection along precomputed sweep direction (zero per-pixel trigonometry)
+			float proj = dot(UV - vec2(0.5), sweep_dir) + 0.5;
 
-		// Main glossy beam intensity (safe ascending smoothstep for Metal/Vulkan)
-		float dist_main = abs(proj - progress);
-		float inner_main = max(0.0, shine_width - shine_softness);
-		float outer_main = shine_width;
-		float intensity_main = 1.0 - smoothstep(inner_main, outer_main, dist_main);
+			// Main glossy beam intensity (safe ascending smoothstep for Metal/Vulkan)
+			float dist_main = abs(proj - progress);
+			float inner_main = max(0.0, shine_width - shine_softness);
+			float outer_main = shine_width;
+			float intensity_main = 1.0 - smoothstep(inner_main, outer_main, dist_main);
 
-		// Secondary trailing beam intensity
-		float intensity_sec = 0.0;
-		if (enable_secondary_beam) {
-			float dist_sec = abs(proj - (progress - secondary_offset));
-			float inner_sec = max(0.0, secondary_width - shine_softness * 0.7);
-			float outer_sec = secondary_width;
-			intensity_sec = (1.0 - smoothstep(inner_sec, outer_sec, dist_sec)) * secondary_alpha;
-		}
-
-		float total_shine = clamp(intensity_main + intensity_sec, 0.0, 1.0);
-
-		if (total_shine > 0.001) {
-			// Calculate saturation and luminance to focus shine specifically on the text letters
-			float max_c = max(tex.r, max(tex.g, tex.b));
-			float min_c = min(tex.r, min(tex.g, tex.b));
-			float sat = max_c - min_c;
-			float lum = dot(tex.rgb, vec3(0.299, 0.587, 0.114));
-
-			// Dark neutral road ribbon has low saturation and low luminance
-			float text_mask = 1.0;
-			if (sat < 0.18) {
-				text_mask = 1.0 - smoothstep(0.20, 0.40, 0.40 - lum);
+			// Secondary trailing beam intensity
+			float intensity_sec = 0.0;
+			if (enable_secondary_beam) {
+				float dist_sec = abs(proj - (progress - secondary_offset));
+				float inner_sec = max(0.0, secondary_width - shine_softness * 0.7);
+				float outer_sec = secondary_width;
+				intensity_sec = (1.0 - smoothstep(inner_sec, outer_sec, dist_sec)) * secondary_alpha;
 			}
 
-			// Gloss glint factor: candy letters glint brilliantly
-			float glint_factor = (0.6 + 0.6 * lum) * text_mask;
+			float total_shine = clamp(intensity_main + intensity_sec, 0.0, 1.0);
 
-			// Additive glossy glint sheen
-			vec3 sheen = shine_color.rgb * (total_shine * shine_color.a * glint_factor);
-			tex.rgb = clamp(tex.rgb + sheen * tex.a, 0.0, 1.0);
+			if (total_shine > 0.001) {
+				// Calculate saturation and luminance to focus shine specifically on the text letters
+				float max_c = max(tex.r, max(tex.g, tex.b));
+				float min_c = min(tex.r, min(tex.g, tex.b));
+				float sat = max_c - min_c;
+				float lum = dot(tex.rgb, vec3(0.299, 0.587, 0.114));
+
+				// Dark neutral road ribbon has low saturation and low luminance
+				float text_mask = 1.0;
+				if (sat < 0.18) {
+					text_mask = 1.0 - smoothstep(0.20, 0.40, 0.40 - lum);
+				}
+
+				// Gloss glint factor: candy letters glint brilliantly
+				float glint_factor = (0.6 + 0.6 * lum) * text_mask;
+
+				// Additive glossy glint sheen
+				vec3 sheen = shine_color.rgb * (total_shine * shine_color.a * glint_factor);
+				tex.rgb = clamp(tex.rgb + sheen * tex.a, 0.0, 1.0);
+			}
 		}
 	}
 

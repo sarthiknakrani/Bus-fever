@@ -26,7 +26,7 @@ while IFS= read -r test_path; do
     TOTAL=$((TOTAL + 1))
     printf "[%2d] Running tests/%-36s " "$TOTAL" "$test_file..."
 
-    if godot --headless --path "$PROJECT_DIR" --script "res://tests/$test_file" > /tmp/godot_test_last.log 2>&1; then
+    if godot --headless --path "$PROJECT_DIR" --script "res://tests/$test_file" < /dev/null > /tmp/godot_test_last.log 2>&1; then
         echo "PASS"
         PASSED=$((PASSED + 1))
     else
