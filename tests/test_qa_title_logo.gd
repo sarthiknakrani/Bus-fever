@@ -54,9 +54,13 @@ func _test_logo_asset_integrity() -> void:
 		_assert(aspect > 0.85 and aspect < 1.45, "Logo aspect ratio is balanced casual badge standard (%.3f)" % aspect)
 		var logo_img := logo_tex.get_image()
 		if logo_img != null:
-			var p_col := logo_img.get_pixel(140, 420)
+			var p_x: int = int(round(logo_img.get_width() * (215.0 / 954.0))) if logo_img.get_width() > 800 else 140
+			var p_y: int = int(round(logo_img.get_height() * (650.0 / 922.0))) if logo_img.get_height() > 800 else 420
+			var p_col := logo_img.get_pixel(p_x, p_y)
 			_assert(p_col.r > 0.85 and p_col.g > 0.35 and p_col.g < 0.75 and p_col.b < 0.35, "Letter 'P' in 'PARTY!' has candy orange face (r=%.2f, g=%.2f, b=%.2f)" % [p_col.r, p_col.g, p_col.b])
-			var p_border := logo_img.get_pixel(84, 470)
+			var pb_x: int = int(round(logo_img.get_width() * (135.0 / 954.0))) if logo_img.get_width() > 800 else 84
+			var pb_y: int = int(round(logo_img.get_height() * (650.0 / 922.0))) if logo_img.get_height() > 800 else 470
+			var p_border := logo_img.get_pixel(pb_x, pb_y)
 			_assert(p_border.b > p_border.r + 0.15 and p_border.b > p_border.g + 0.15, "Letter 'P' border is royal dark navy blue, NOT orange (r=%.2f, g=%.2f, b=%.2f)" % [p_border.r, p_border.g, p_border.b])
 
 	var font_path := "res://assets/fonts/arial_rounded_bold.ttf"
