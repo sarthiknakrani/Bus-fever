@@ -18,6 +18,7 @@ var _settings_btn: TextureButton
 var _logo_wrapper: Control
 var _logo_rect: TextureRect
 var _logo_tween: Tween
+var _logo_shine_tween: Tween
 var _play_btn: TextureButton
 
 
@@ -67,6 +68,14 @@ func _build_ui() -> void:
 	_logo_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_logo_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_logo_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var shine_mat := ShaderMaterial.new()
+	shine_mat.shader = load("res://assets/shaders/logo_gloss_shine.gdshader")
+	shine_mat.set_shader_parameter("cycle_duration", 2.0)
+	shine_mat.set_shader_parameter("sweep_duration", 0.65)
+	shine_mat.set_shader_parameter("use_time_cycle", true)
+	_logo_rect.material = shine_mat
+
 	_logo_wrapper.add_child(_logo_rect)
 
 	# C. Top-right Settings button (Glossy Blue SVG - static)
@@ -106,6 +115,8 @@ func _build_ui() -> void:
 
 
 func _on_play_pressed() -> void:
+	if _logo_shine_tween != null and _logo_shine_tween.is_valid():
+		_logo_shine_tween.kill()
 	AudioManager.play(AudioManager.SFX_UI)
 	GameController.start_level(GameController.current_level_number)
 
@@ -476,7 +487,7 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 
 
 func _play_logo_entrance_animation() -> void:
-	# Entire home screen is static - ensure all elements are at neutral transform and fully opaque
+	# Keep home screen UI stationary
 	if _logo_wrapper != null and is_instance_valid(_logo_wrapper):
 		_logo_wrapper.scale = Vector2.ONE
 		_logo_wrapper.rotation = 0.0
@@ -486,6 +497,33 @@ func _play_logo_entrance_animation() -> void:
 		_play_btn.rotation = 0.0
 	if _settings_btn != null and is_instance_valid(_settings_btn):
 		_settings_btn.rotation = 0.0
+
+	# Start periodic 2.0-second glossy shine animation across the title text
+	_start_logo_shine_animation()
+
+
+func _start_logo_shine_animation() -> void:
+	if _logo_rect == null or not is_instance_valid(_logo_rect):
+		return
+	var sm := _logo_rect.material as ShaderMaterial
+	if sm == null:
+		return
+
+	if _logo_shine_tween != null and _logo_shine_tween.is_valid():
+		_logo_shine_tween.kill()
+
+	sm.set_shader_parameter("use_time_cycle", false)
+	sm.set_shader_parameter("manual_progress", -0.5)
+
+	_logo_shine_tween = create_tween().set_loops()
+	# 0.7s smooth diagonal gloss sweep across the title text
+	_logo_shine_tween.tween_property(sm, "shader_parameter/manual_progress", 1.5, 0.7)\
+		.from(-0.5)\
+		.set_trans(Tween.TRANS_QUAD)\
+		.set_ease(Tween.EASE_IN_OUT)
+	# 1.3s rest before the next sweep (total 0.7s + 1.3s = exactly 2.0s period)
+	_logo_shine_tween.tween_interval(1.3)
+
 
 
 

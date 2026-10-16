@@ -52,9 +52,16 @@ func _test_logo_asset_integrity() -> void:
 		_assert(logo_tex.get_width() >= 700 and logo_tex.get_height() >= 500, "Logo has high retina resolution (%dx%d px)" % [logo_tex.get_width(), logo_tex.get_height()])
 		var aspect: float = float(logo_tex.get_width()) / float(logo_tex.get_height())
 		_assert(aspect > 0.85 and aspect < 1.45, "Logo aspect ratio is balanced casual badge standard (%.3f)" % aspect)
+		var logo_img := logo_tex.get_image()
+		if logo_img != null:
+			var p_col := logo_img.get_pixel(140, 420)
+			_assert(p_col.r > 0.85 and p_col.g > 0.35 and p_col.g < 0.75 and p_col.b < 0.35, "Letter 'P' in 'PARTY!' has candy orange color (r=%.2f, g=%.2f, b=%.2f)" % [p_col.r, p_col.g, p_col.b])
 
 	var font_path := "res://assets/fonts/arial_rounded_bold.ttf"
 	_assert(ResourceLoader.exists(font_path), "Font asset exists in project at %s" % font_path)
+
+	var shader_path := "res://assets/shaders/logo_gloss_shine.gdshader"
+	_assert(ResourceLoader.exists(shader_path), "Glossy shine shader exists at %s" % shader_path)
 
 func _test_home_screen_hierarchy_and_buttons() -> void:
 	print("\n--- TEST GROUP 2: Home Screen Hierarchy, Logo Nodes & Button Usability ---")
@@ -71,10 +78,16 @@ func _test_home_screen_hierarchy_and_buttons() -> void:
 	var logo_wrapper = main_instance.find_child("TitleLogoWrapper", true, false)
 	_assert(logo_wrapper != null, "TitleLogoWrapper exists in HUD hierarchy")
 	if logo_wrapper != null:
-		var logo_rect = logo_wrapper.get_node_or_null("LogoTexture")
+		var logo_rect: TextureRect = logo_wrapper.get_node_or_null("LogoTexture")
 		_assert(logo_rect != null, "LogoTexture node exists inside TitleLogoWrapper")
 		if logo_rect != null:
 			_assert(logo_rect.texture != null, "LogoTexture has valid texture assigned")
+			_assert(logo_rect.material is ShaderMaterial, "LogoTexture has ShaderMaterial attached")
+			if logo_rect.material is ShaderMaterial:
+				var sm := logo_rect.material as ShaderMaterial
+				_assert(sm.shader != null, "Logo ShaderMaterial has valid shader assigned")
+				var cycle_dur: float = sm.get_shader_parameter("cycle_duration")
+				_assert(absf(cycle_dur - 2.0) < 0.01, "Logo glossy shine cycle duration is 2.0s (%.2fs)" % cycle_dur)
 
 	# Check Settings button
 	var settings_btn = main_instance.find_child("settings_btn", true, false)
@@ -157,14 +170,15 @@ func _test_responsive_resolutions_and_captures() -> void:
 		for f in range(15):
 			await process_frame
 
-		# Save full-screen capture
-		var img = vp.get_texture().get_image()
-		var out_path = "%s/qa_home_%s.png" % [ARTIFACT_DIR, tag]
-		if img != null:
-			img.save_png(out_path)
-			print("  [CAPTURE] Saved %s (%dx%d)" % [out_path, img.get_width(), img.get_height()])
-		else:
-			printerr("  [CAPTURE FAIL] Failed to get viewport image for %s" % out_path)
+		# Save full-screen capture if not headless dummy renderer
+		if DisplayServer.get_name() != "headless":
+			var tex := vp.get_texture()
+			if tex != null:
+				var img := tex.get_image()
+				var out_path := "%s/qa_home_%s.png" % [ARTIFACT_DIR, tag]
+				if img != null:
+					img.save_png(out_path)
+					print("  [CAPTURE] Saved %s (%dx%d)" % [out_path, img.get_width(), img.get_height()])
 
 		vp.queue_free()
 		await process_frame
