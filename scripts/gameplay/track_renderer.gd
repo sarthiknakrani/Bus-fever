@@ -25,7 +25,7 @@ const COLOR_ROAD := Color("767786") # Muted slate grey matching reference (#7677
 const COLOR_CURB_HIGHLIGHT := Color("f8fafc") # Thin crisp near-white highlight
 const COLOR_CURB_BEVEL := Color("a5abc2") # Subtle cool slate bevel shadow
 const COLOR_SHADOW := Color(0.0, 0.0, 0.0, 0.12) # Soft contact shadow
-const COLOR_GARDEN := Color("69a827") # Lush vibrant garden green matching plaza artwork
+const COLOR_GARDEN := Color("6cbf4b") # Lush vibrant garden green matching lawn artwork
 
 func compute_intersections(f_outer: Array[Vector2] = [], f_inner: Array[Vector2] = []) -> void:
 	if curve == null or feeder_curve == null:

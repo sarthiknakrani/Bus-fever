@@ -72,8 +72,12 @@ func _build_ui() -> void:
 
 	var shine_mat := ShaderMaterial.new()
 	shine_mat.shader = load("res://assets/shaders/logo_gloss_shine.gdshader")
-	shine_mat.set_shader_parameter("cycle_duration", 3.0)
-	shine_mat.set_shader_parameter("sweep_duration", 1.4)
+	shine_mat.set_shader_parameter("cycle_duration", 3.5)
+	shine_mat.set_shader_parameter("sweep_duration", 2.2)
+	shine_mat.set_shader_parameter("shine_width", 0.08)
+	shine_mat.set_shader_parameter("shine_softness", 0.04)
+	shine_mat.set_shader_parameter("secondary_width", 0.025)
+	shine_mat.set_shader_parameter("secondary_offset", 0.09)
 	shine_mat.set_shader_parameter("use_time_cycle", false)
 	_logo_rect.material = shine_mat
 
@@ -517,13 +521,13 @@ func _start_logo_shine_animation() -> void:
 	sm.set_shader_parameter("manual_progress", -0.5)
 
 	_logo_shine_tween = create_tween().set_loops()
-	# Slow, smooth, luxurious diagonal gloss sweep across the title text
-	_logo_shine_tween.tween_property(sm, "shader_parameter/manual_progress", 1.5, 1.4)\
+	# Slower, calm, thin, luxurious diagonal gloss sweep across the title text
+	_logo_shine_tween.tween_property(sm, "shader_parameter/manual_progress", 1.5, 2.2)\
 		.from(-0.5)\
-		.set_trans(Tween.TRANS_QUAD)\
+		.set_trans(Tween.TRANS_SINE)\
 		.set_ease(Tween.EASE_IN_OUT)
-	# 1.6s calm rest before the next sweep (total 1.4s + 1.6s = 3.0s cycle)
-	_logo_shine_tween.tween_interval(1.6)
+	# 1.3s calm rest before the next sweep (total 2.2s + 1.3s = 3.5s cycle)
+	_logo_shine_tween.tween_interval(1.3)
 
 
 

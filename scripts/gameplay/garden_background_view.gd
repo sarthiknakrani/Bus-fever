@@ -10,7 +10,8 @@ class_name GardenBackgroundView
 ## - Guaranteed clean margins away from track, feeder, and HUD buttons
 ## 100% cohesive, zero photo stickers, zero clutter, zero seams.
 
-const COLOR_STRIPE_LIGHT := Color(1.0, 1.0, 1.0, 0.035) # Subtle lawn mower stripe
+const COLOR_LAWN_LIGHT := Color("6cbf4b") # Light grass green #6CBF4B matching reference
+const COLOR_LAWN_DARK := Color("63b544")  # Medium lawn green #63B544 matching reference
 const COLOR_BUSH_SHADOW := Color("2a500e") # Cartoon bush dark base/crevice
 const COLOR_BUSH_BODY := Color("4e9018")   # Cartoon bush rich foliage
 const COLOR_BUSH_LIGHT := Color("72b826")  # Cartoon bush sunlit top lobe
@@ -54,17 +55,23 @@ func _draw() -> void:
 
 	var div_y = divider_screen_y if divider_screen_y > 0.0 else (0.40 * h)
 
-	# 1. Base Seamless Stylized Lawn Tiling across the entire upper 40%
+	# 1. Base 45-Degree Diagonal Striped Manicured Lawn across the entire upper 40%
 	if lawn_tex != null:
 		draw_texture_rect(lawn_tex, Rect2(0, 0, w, div_y), true)
 	else:
-		# Fallback gradient
-		var steps = 16
-		var step_h = div_y / float(steps)
-		for i in range(steps):
-			var t = float(i) / float(steps - 1)
-			var c = Color("6bb22b").lerp(Color("589420"), t)
-			draw_rect(Rect2(0, float(i) * step_h, w, step_h + 1.0), c)
+		# Procedural 45-degree diagonal lawn stripes matching reference (#6CBF4B and #63B544)
+		draw_rect(Rect2(0, 0, w, div_y), COLOR_LAWN_DARK)
+		var stripe_w: float = 56.5 # Horizontal stripe span for 40px perpendicular width at 45 deg
+		var num_stripes: int = int((w + div_y) / stripe_w) + 4
+		for i in range(-2, num_stripes, 2):
+			var x0 = float(i) * stripe_w
+			var pts = PackedVector2Array([
+				Vector2(x0, 0),
+				Vector2(x0 + stripe_w, 0),
+				Vector2(x0 + stripe_w + div_y, div_y),
+				Vector2(x0 + div_y, div_y)
+			])
+			draw_colored_polygon(pts, COLOR_LAWN_LIGHT)
 
 	# 2. Subtle Sunlit Ambient Light Overlay (warm sun on top edge, soft depth towards divider)
 	var light_pts = PackedVector2Array([
@@ -72,24 +79,10 @@ func _draw() -> void:
 		Vector2(w, div_y), Vector2(0, div_y)
 	])
 	var light_cols = PackedColorArray([
-		Color(1.0, 0.98, 0.88, 0.07), Color(1.0, 0.98, 0.88, 0.07),
-		Color(0.2, 0.45, 0.1, 0.05), Color(0.2, 0.45, 0.1, 0.05)
+		Color(1.0, 0.98, 0.88, 0.04), Color(1.0, 0.98, 0.88, 0.04),
+		Color(0.2, 0.45, 0.1, 0.03), Color(0.2, 0.45, 0.1, 0.03)
 	])
 	draw_polygon(light_pts, light_cols)
-
-	# 3. Subtle Manicured Lawn Striping (soft diagonal bands across upper 40%)
-	var stripe_w: float = 48.0
-	var total_diag = w + div_y
-	var num_stripes = int(total_diag / stripe_w) + 2
-	for i in range(0, num_stripes, 2):
-		var x_start = float(i) * stripe_w - div_y * 0.45
-		var stripe_pts = PackedVector2Array([
-			Vector2(x_start, 0),
-			Vector2(x_start + stripe_w, 0),
-			Vector2(x_start + stripe_w + div_y * 0.45, div_y),
-			Vector2(x_start + div_y * 0.45, div_y)
-		])
-		draw_colored_polygon(stripe_pts, COLOR_STRIPE_LIGHT)
 
 	# 4. Stylized Cartoon Hedge & Bush Clusters
 	# Coordinated with track and HUD geometry:
