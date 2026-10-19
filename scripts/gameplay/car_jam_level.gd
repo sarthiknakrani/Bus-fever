@@ -128,7 +128,7 @@ func set_passenger_state_local(pid: int, new_state: String) -> void:
 
 const LANE_SPACING := 24.0
 const LANE_SPACING_CURVE := 24.0
-const ROW_SPACING := 26.0
+const ROW_SPACING := 20.8
 const MIN_ROW_GAP := 22.0
 const NUM_LANES := 4
 const PASSENGER_SPACING := 24.0
@@ -813,28 +813,27 @@ func _init_passenger_track() -> void:
 	feeder_track = Path2D.new()
 	feeder_track.name = "FeederTrack"
 	var f_curve := Curve2D.new()
-	f_curve.add_point(Vector2(350, -850), Vector2.ZERO, Vector2(-10, 80))
+	f_curve.add_point(Vector2(360, -950), Vector2.ZERO, Vector2(-10, 80))
 	f_curve.add_point(Vector2(335, -520), Vector2(15, -120), Vector2(-15, 120))
-	f_curve.add_point(Vector2(290, -280), Vector2(15, -65), Vector2(-20, 65))
-	f_curve.add_point(Vector2(245, -130), Vector2(15, -65), Vector2(-20, 65))
-	f_curve.add_point(Vector2(200, -100), Vector2(30, -30), Vector2(-30, -10))
-	f_curve.add_point(Vector2(105, -115), Vector2(40, 0), Vector2.ZERO)
+	f_curve.add_point(Vector2(290, -280), Vector2(15, -65), Vector2(-18, 65))
+	f_curve.add_point(Vector2(265, -110), Vector2(15, -65), Vector2(-18, 65))
+	f_curve.add_point(Vector2(235, 20), Vector2(18, -45), Vector2(-22, 35))
+	f_curve.add_point(Vector2(180, 82), Vector2(25, -26), Vector2.ZERO)
 	feeder_track.curve = f_curve
 
-	# Authoritative Unified 1D Non-Intersecting Spline for all 60 passenger queue rows
+	# Authoritative Unified 1D Spline for all 60 passenger queue rows
 	# Distance = 0.0 is the Exit Gate (0, 115).
-	# Spline traces backward along bottom straight -> left curve -> top straight -> feeder ramp.
+	# Queue extends strictly EASTWARD (x > 0) along bottom straight, right curve, and feeder ramp.
+	# Passenger flow along bottom straight is strictly RIGHT TO LEFT (<-) into the Exit Gate!
 	var unified_curve := Curve2D.new()
-	unified_curve.add_point(Vector2(0, 115), Vector2.ZERO, Vector2(-40, 0))
-	unified_curve.add_point(Vector2(-105, 115), Vector2(40, 0), Vector2(-h, 0))
-	unified_curve.add_point(Vector2(-220, 0), Vector2(0, 60), Vector2(0, -60))
-	unified_curve.add_point(Vector2(-105, -115), Vector2(-h, 0), Vector2(60, 0))
-	unified_curve.add_point(Vector2(105, -115), Vector2(-60, 0), Vector2(40, 0))
-	unified_curve.add_point(Vector2(200, -100), Vector2(-30, -10), Vector2(30, -30))
-	unified_curve.add_point(Vector2(245, -130), Vector2(-20, 65), Vector2(15, -65))
-	unified_curve.add_point(Vector2(290, -280), Vector2(-20, 65), Vector2(15, -65))
+	unified_curve.add_point(Vector2(0, 115), Vector2.ZERO, Vector2(40, 0))
+	unified_curve.add_point(Vector2(105, 115), Vector2(-40, 0), Vector2(40, -10))
+	unified_curve.add_point(Vector2(180, 82), Vector2(-25, 26), Vector2(25, -26))
+	unified_curve.add_point(Vector2(235, 20), Vector2(-22, 35), Vector2(18, -45))
+	unified_curve.add_point(Vector2(265, -110), Vector2(-18, 65), Vector2(15, -65))
+	unified_curve.add_point(Vector2(290, -280), Vector2(-15, 65), Vector2(15, -65))
 	unified_curve.add_point(Vector2(335, -520), Vector2(-15, 120), Vector2(15, -120))
-	unified_curve.add_point(Vector2(350, -850), Vector2(-10, 80), Vector2.ZERO)
+	unified_curve.add_point(Vector2(360, -950), Vector2(-10, 80), Vector2.ZERO)
 	passenger_track.curve = unified_curve
 
 	_platform_start_prog = 0.0

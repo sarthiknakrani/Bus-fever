@@ -13,3 +13,10 @@ Thumbs.db
 .user_save.cfg
 *.pem
 serve_iphone.py
+
+# Scratch / exploration directory (each file already has Godot-side .gdignore)
+scratch/
+
+# Godot editor auto-backup directories (timestamped, regenerated per session)
+.godot_backup*/
+
