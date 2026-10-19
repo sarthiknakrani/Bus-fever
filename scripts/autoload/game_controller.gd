@@ -12,7 +12,13 @@ const GAMEPLAY_SCENE := "res://scenes/level1.tscn"
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	current_level_number = SaveManager.get_current_level()
+	# Always open the game at Level 1 on fresh launch. Player progression through the
+	# levels is still recorded in SaveManager (per-level completion, max-unlocked), but
+	# `current_level_number` deliberately does NOT auto-load from the saved state —
+	# otherwise every launch skipped ahead to wherever the player last completed. The
+	# play button (main.gd) reads this field when the user taps PLAY, so it stays at 1
+	# until the user explicitly advances via the result panel's NEXT button or restarts.
+	current_level_number = 1
 
 func start_level(level_num: int) -> void:
 	current_level_number = level_num
