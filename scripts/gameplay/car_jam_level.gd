@@ -57,14 +57,14 @@ var result_overlay: Control
 # Feature C: VIP Slot Booster UI. Created programmatically in _setup_vip_overlay();
 # visible only when the controller's vip_available_changed(true) signal fires.
 var vip_overlay: Control
-var vip_button: Button
+var vip_button: TextureButton
 
 # Bottom power-up bar: Arrange (bus-swap) + Jumble (random-permute) + VIP together.
 # Created as a separate canvas layer anchored to the bottom of the screen; matches the
 # layout seen in user's gameplay video where all 3 boosters sit in a row at the bottom.
 var powerup_overlay: Control
-var arrange_button: Button
-var jumble_button: Button
+var arrange_button: TextureButton
+var jumble_button: TextureButton
 
 # Arrange state: when the player has tapped Arrange, they're in "select pair" mode and
 # the next two bus taps swap them. We track _arrange_pending + the first picked vid.
@@ -353,7 +353,6 @@ func _ready() -> void:
 	_setup_controller()
 	_load_current_level()
 	_setup_vip_overlay()
-	_setup_powerup_overlay()
 
 	var vp := get_viewport()
 	if vp != null:
@@ -478,8 +477,6 @@ func _setup_controller() -> void:
 	controller.puzzle_failed.connect(_on_puzzle_failed)
 	controller.mystery_revealed.connect(_on_mystery_revealed)
 	controller.vip_available_changed.connect(_on_vip_available_changed)
-	controller.arrange_available_changed.connect(_on_arrange_available_changed)
-	controller.jumble_available_changed.connect(_on_jumble_available_changed)
 	controller.level_scored.connect(_on_level_scored)
 
 # Feature C: build the VIP booster overlay (Button + Container) and parent it to a
@@ -564,8 +561,29 @@ func _play_audio(sfx_name: String) -> void:
 	if not is_inside_tree() or get_tree() == null or get_tree().root == null:
 		return
 	var am = get_tree().root.get_node_or_null("AudioManager")
+
 	if am != null and am.has_method("play"):
 		am.call("play", sfx_name)
+
+## Arrange button handler: sets the controller's arrange-pending state. The
+## _on_vehicle_tapped handler routes the next two bus taps through _handle_arrange_pick
+## to commit the swap. Cancelled by tapping the same bus twice.
+func _on_arrange_button_pressed() -> void:
+	if not controller.is_arrange_available():
+		return
+	_arrange_pending = true
+	_arrange_first_vehicle_id = -1
+	_play_audio("ui")
+
+## Jumble button handler: triggers a random permutation of ON_BOARD buses.
+func _on_jumble_button_pressed() -> void:
+	if not controller.is_jumble_available():
+		return
+	if controller.try_jumble_buses():
+		_play_audio("booster")
+	else:
+		# No ON_BOARD buses to permute (e.g. all parked already); surface a toast.
+		_show_parking_full_toast()
 
 ## Pick any PARKED vehicle whose color matches the queue head color (the "stuck"
 ## bus the VIP booster is designed to free). Falls back to the first PARKED bus
@@ -589,105 +607,6 @@ func _find_stuck_parked_bus() -> int:
 
 ## Bottom power-up bar: three buttons in a row mirroring the user's gameplay video.
 ## Arrange: enters "pick a pair" mode (next two bus taps are swapped). Jumble: random-
-## permutes all ON_BOARD buses. VIP: existing slot-bypass logic.
-func _setup_powerup_overlay() -> void:
-	if powerup_overlay != null and is_instance_valid(powerup_overlay):
-		powerup_overlay.queue_free()
-	var layer := CanvasLayer.new()
-	layer.name = "PowerupBarLayer"
-	layer.layer = 24  # just below the VIP-top overlay
-	add_child(layer)
-
-	powerup_overlay = Control.new()
-	powerup_overlay.name = "PowerupBar"
-	powerup_overlay.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	powerup_overlay.custom_minimum_size = Vector2(0, 120)
-	powerup_overlay.offset_top = -120.0
-	powerup_overlay.offset_bottom = 0.0
-	powerup_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	layer.add_child(powerup_overlay)
-
-	var hbox := HBoxContainer.new()
-	hbox.name = "PowerupRow"
-	hbox.anchor_left = 0.5
-	hbox.anchor_right = 0.5
-	hbox.anchor_top = 0.0
-	hbox.anchor_bottom = 1.0
-	hbox.offset_left = -160.0
-	hbox.offset_right = 160.0
-	hbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	powerup_overlay.add_child(hbox)
-
-	arrange_button = _make_powerup_button("🔀 Arrange", "ARRANGE_PRESSED")
-	arrange_button.pressed.connect(_on_arrange_button_pressed)
-	hbox.add_child(arrange_button)
-
-	jumble_button = _make_powerup_button("🎲 Jumble", "JUMBLE_PRESSED")
-	jumble_button.pressed.connect(_on_jumble_button_pressed)
-	hbox.add_child(jumble_button)
-
-	# VIP button goes here too so all 3 boosters share the same row.
-	vip_button = _make_powerup_button("⭐ VIP", "VIP_PRESSED")
-	vip_button.pressed.connect(_on_vip_button_pressed)
-	hbox.add_child(vip_button)
-
-## Build a single power-up button with a consistent dark-blue styling.
-func _make_powerup_button(label_text: String, _tag: String) -> Button:
-	var btn := Button.new()
-	btn.custom_minimum_size = Vector2(96, 96)
-	btn.text = label_text
-	btn.add_theme_font_size_override("font_size", 20)
-	btn.add_theme_color_override("font_color", Color("facc15"))
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color("1d4ed8")
-	style.border_width_left = 2
-	style.border_width_top = 2
-	style.border_width_right = 2
-	style.border_width_bottom = 2
-	style.border_color = Color("3b82f6")
-	style.set_corner_radius_all(16)
-	style.content_margin_left = 12
-	style.content_margin_right = 12
-	style.content_margin_top = 14
-	style.content_margin_bottom = 14
-	btn.add_theme_stylebox_override("normal", style)
-	var pressed_style := style.duplicate()
-	pressed_style.bg_color = Color("1e3a8a")
-	btn.add_theme_stylebox_override("pressed", pressed_style)
-	return btn
-
-func _on_arrange_available_changed(available: bool) -> void:
-	if arrange_button == null or not is_instance_valid(arrange_button):
-		return
-	arrange_button.disabled = not available
-	arrange_button.modulate.a = 1.0 if available else 0.4
-
-func _on_jumble_available_changed(available: bool) -> void:
-	if jumble_button == null or not is_instance_valid(jumble_button):
-		return
-	jumble_button.disabled = not available
-	jumble_button.modulate.a = 1.0 if available else 0.4
-
-## Arrange button handler: sets the controller's arrange-pending state. Subsequent
-## tap_vehicle() calls are intercepted in _on_vehicle_dispatch_started_callback to
-## collect the first pick and commit the swap on the second pick.
-func _on_arrange_button_pressed() -> void:
-	if not controller.is_arrange_available():
-		return
-	_arrange_pending = true
-	_arrange_first_vehicle_id = -1
-	_play_audio("ui")
-
-## Jumble button handler: triggers a random permutation of ON_BOARD buses.
-func _on_jumble_button_pressed() -> void:
-	if not controller.is_jumble_available():
-		return
-	if controller.try_jumble_buses():
-		_play_audio("booster")
-	else:
-		# No ON_BOARD buses to permute (e.g. all parked already); surface a toast.
-		_show_parking_full_toast()
-
 func _load_current_level() -> void:
 	var lvl_num = 1
 	var gc = null
@@ -2308,6 +2227,20 @@ func _build_hud() -> void:
 		plus.size = Vector2(18, 18)
 		plus.position = Vector2(40, -4)
 		btn_container.add_child(plus)
+
+		# Wire the existing premium booster button to the controller-side logic for
+		# VIP / Arrange / Jumble. Each is single-use per level; the button stays in the
+		# same row so the player's existing BoosterBar UI gets real behavior.
+		match b_info["name"]:
+			"VIP":
+				vip_button = btn
+				btn.pressed.connect(_on_vip_button_pressed)
+			"Arrange":
+				arrange_button = btn
+				btn.pressed.connect(_on_arrange_button_pressed)
+			"Jumble":
+				jumble_button = btn
+				btn.pressed.connect(_on_jumble_button_pressed)
 		
 		vbox.add_child(btn_container)
 		
