@@ -5,6 +5,19 @@ class_name CarJamLevelFactory
 ## 12 vehicles (4 Blue, 4 Red, 4 Yellow), 48 passengers, exactly 4 parking slots.
 
 static func create_level_1() -> CarJamLevelData:
+	var lvl := _build_level_1([])
+	return lvl
+
+## Build Level 1 with selected vehicle IDs marked as "?" mystery buses.
+## `mystery_ids` is an Array[int] of vehicle IDs (e.g., [1, 5] to hide bus 1 yellow
+## and bus 5 blue). Returns a fresh CarJamLevelData resource. Mystery buses keep
+## their true color_id in the data — the controller's tap_vehicle() simply
+## intercepts the first tap and emits mystery_revealed instead of dispatching.
+static func create_level_1_with_mystery(mystery_ids: Array[int] = [1]) -> CarJamLevelData:
+	var lvl := _build_level_1(mystery_ids)
+	return lvl
+
+static func _build_level_1(mystery_ids: Array[int]) -> CarJamLevelData:
 	var lvl := CarJamLevelData.new()
 	lvl.level_id = 1
 	lvl.title = "Level 1"
@@ -37,6 +50,8 @@ static func create_level_1() -> CarJamLevelData:
 		for p in cfg["footprint"]:
 			fp.append(p)
 		v.footprint = fp
+		# Mark mystery buses per the caller's selection.
+		v.is_mystery = cfg["id"] in mystery_ids
 		lvl.vehicles.append(v)
 
 	# Ordered passenger groups: 6 groups of 40 passengers = 240 total
@@ -60,5 +75,15 @@ static func save_level_1_tres(path: String = "res://levels/level_001.tres") -> b
 	var err := ResourceSaver.save(lvl, path)
 	if err != OK:
 		push_error("Failed to save level to %s (error %d)" % [path, err])
+		return false
+	return true
+
+## Save a Level 1 variant with the given vehicle IDs marked as mystery buses.
+## Used to author persistent level files for QA / tutorial / showcase levels.
+static func save_level_1_with_mystery_tres(path: String, mystery_ids: Array[int] = [1]) -> bool:
+	var lvl := create_level_1_with_mystery(mystery_ids)
+	var err := ResourceSaver.save(lvl, path)
+	if err != OK:
+		push_error("Failed to save mystery level to %s (error %d)" % [path, err])
 		return false
 	return true

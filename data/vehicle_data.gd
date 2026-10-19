@@ -29,6 +29,9 @@ const COLOR_PINK := "pink"
 @export var color_id: String = COLOR_BLUE
 @export var capacity: int = 40
 @export var vehicle_type: String = "bus"
+## Authored mystery flag: if true, the bus's color_id stays hidden until the player
+## taps it. After reveal (handled by the controller), color_id is exposed normally.
+@export var is_mystery: bool = false
 
 static func dir_to_vector(dir: int) -> Vector2i:
 	match dir:
@@ -79,6 +82,7 @@ func clone() -> CarJamVehicleData:
 	copy.color_id = color_id
 	copy.capacity = capacity
 	copy.vehicle_type = vehicle_type
+	copy.is_mystery = is_mystery
 	return copy
 
 func to_dict() -> Dictionary:
@@ -94,7 +98,8 @@ func to_dict() -> Dictionary:
 		"direction": direction,
 		"color_id": color_id,
 		"capacity": capacity,
-		"vehicle_type": vehicle_type
+		"vehicle_type": vehicle_type,
+		"is_mystery": is_mystery
 	}
 
 func from_dict(d: Dictionary) -> void:
@@ -108,6 +113,7 @@ func from_dict(d: Dictionary) -> void:
 	color_id = String(d.get("color_id", COLOR_BLUE))
 	capacity = int(d.get("capacity", 4))
 	vehicle_type = String(d.get("vehicle_type", "bus"))
+	is_mystery = bool(d.get("is_mystery", false))
 	footprint.clear()
 	var raw_fp = d.get("footprint", [[0, 0]])
 	for p in raw_fp:

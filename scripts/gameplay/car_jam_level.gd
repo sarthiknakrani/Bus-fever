@@ -53,6 +53,11 @@ var top_bar: Control
 var booster_bar: Control
 var pause_overlay: Control
 var result_overlay: Control
+
+# Feature C: VIP Slot Booster UI. Created programmatically in _setup_vip_overlay();
+# visible only when the controller's vip_available_changed(true) signal fires.
+var vip_overlay: Control
+var vip_button: Button
 var restart_confirm_overlay: Control
 var _was_paused_before_confirm: bool = false
 
@@ -295,6 +300,7 @@ func _ready() -> void:
 	_build_scene_hierarchy()
 	_setup_controller()
 	_load_current_level()
+	_setup_vip_overlay()
 
 	var vp := get_viewport()
 	if vp != null:
@@ -418,6 +424,119 @@ func _setup_controller() -> void:
 	controller.level_completed.connect(_on_level_completed)
 	controller.puzzle_failed.connect(_on_puzzle_failed)
 	controller.mystery_revealed.connect(_on_mystery_revealed)
+	controller.vip_available_changed.connect(_on_vip_available_changed)
+
+# Feature C: build the VIP booster overlay (Button + Container) and parent it to a
+# canvas layer so it floats above the gameplay. Hidden by default — only surfaced
+# when the controller's vip_available_changed(true) signal fires.
+func _setup_vip_overlay() -> void:
+	if vip_overlay != null and is_instance_valid(vip_overlay):
+		vip_overlay.queue_free()
+	var vip_layer := CanvasLayer.new()
+	vip_layer.name = "VIPLayer"
+	vip_layer.layer = 25  # Above the gameplay layer; below the pause/result overlays.
+	add_child(vip_layer)
+
+	vip_overlay = Control.new()
+	vip_overlay.name = "VIPOverlay"
+	vip_overlay.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	vip_overlay.custom_minimum_size = Vector2(0, 96)
+	vip_overlay.offset_top = 24
+	vip_overlay.offset_bottom = 120
+	vip_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vip_layer.add_child(vip_overlay)
+
+	var vip_panel := PanelContainer.new()
+	vip_panel.name = "VIPPanel"
+	vip_panel.anchor_left = 0.5
+	vip_panel.anchor_right = 0.5
+	vip_panel.anchor_top = 0.0
+	vip_panel.anchor_bottom = 0.0
+	vip_panel.offset_left = -110.0
+	vip_panel.offset_right = 110.0
+	vip_panel.offset_top = 0.0
+	vip_panel.offset_bottom = 78.0
+	vip_overlay.add_child(vip_panel)
+
+	var vip_panel_style := StyleBoxFlat.new()
+	vip_panel_style.bg_color = Color("facc15")  # gold accent
+	vip_panel_style.border_width_left = 3
+	vip_panel_style.border_width_top = 3
+	vip_panel_style.border_width_right = 3
+	vip_panel_style.border_width_bottom = 3
+	vip_panel_style.border_color = Color("854d0e")
+	vip_panel_style.set_corner_radius_all(14)
+	vip_panel_style.shadow_color = Color(0, 0, 0, 0.35)
+	vip_panel_style.shadow_size = 6
+	vip_panel_style.content_margin_left = 18
+	vip_panel_style.content_margin_right = 18
+	vip_panel_style.content_margin_top = 10
+	vip_panel_style.content_margin_bottom = 10
+	vip_panel.add_theme_stylebox_override("panel", vip_panel_style)
+
+	vip_button = Button.new()
+	vip_button.name = "VIPBoosterButton"
+	vip_button.text = "⭐ VIP BOOSTER"
+	vip_button.add_theme_font_size_override("font_size", 22)
+	vip_button.add_theme_color_override("font_color", Color("1f2937"))
+	vip_button.add_theme_color_override("font_outline_color", Color("fef3c7"))
+	vip_button.add_theme_constant_override("outline_size", 2)
+	vip_button.pressed.connect(_on_vip_button_pressed)
+	vip_panel.add_child(vip_button)
+
+	vip_overlay.visible = false
+
+## Handler: controller tells us the VIP booster is available or used. Toggle the overlay.
+func _on_vip_available_changed(available: bool) -> void:
+	if vip_overlay == null or not is_instance_valid(vip_overlay):
+		return
+	vip_overlay.visible = available
+	if available:
+		_play_audio("ui")
+
+## Handler: player tapped the VIP button. Try to extract a stuck matching-color
+## parked bus via the controller. If nothing is parked, show a brief toast.
+func _on_vip_button_pressed() -> void:
+	if controller == null:
+		return
+	var stuck_bus_id: int = _find_stuck_parked_bus()
+	if stuck_bus_id == -1:
+		_show_parking_full_toast()
+		return
+	var ok: bool = controller.try_extract_vip(stuck_bus_id)
+	if ok:
+		_play_audio("booster")
+	else:
+		_show_parking_full_toast()
+
+## Resolve the AudioManager autoload and play a sound effect by name. No-op if the
+## autoload isn't reachable (e.g., running outside the main scene tree).
+func _play_audio(sfx_name: String) -> void:
+	if not is_inside_tree() or get_tree() == null or get_tree().root == null:
+		return
+	var am = get_tree().root.get_node_or_null("AudioManager")
+	if am != null and am.has_method("play"):
+		am.call("play", sfx_name)
+
+## Pick any PARKED vehicle whose color matches the queue head color (the "stuck"
+## bus the VIP booster is designed to free). Falls back to the first PARKED bus
+## if no color match exists — useful in degenerate cases.
+func _find_stuck_parked_bus() -> int:
+	if controller == null or controller.queue == null:
+		return -1
+	var head_color: String = controller.queue.get_head_color()
+	var first_parked: int = -1
+	for vid in controller.vehicles:
+		var v = controller.vehicles[vid]
+		if v == null:
+			continue
+		if v.state != VehicleModel.VehicleState.PARKED:
+			continue
+		if first_parked == -1:
+			first_parked = int(vid)
+		if head_color != "" and v.color_id == head_color:
+			return int(vid)
+	return first_parked
 
 func _load_current_level() -> void:
 	var lvl_num = 1

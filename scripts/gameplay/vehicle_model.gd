@@ -45,7 +45,7 @@ func setup_from_data(vd: CarJamVehicleData) -> void:
 	passenger_occupancy = 0
 	state = VehicleState.ON_BOARD
 	reserved_slot = -1
-	is_mystery = false
+	is_mystery = vd.is_mystery
 
 ## Mark this vehicle as a mystery bus. Called by the level factory when authoring
 ## a level that includes "?" buses; the controller's tap_vehicle() also flips
