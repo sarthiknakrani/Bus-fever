@@ -30,6 +30,13 @@ signal vip_extracted(vehicle_id: int, slot_id: int)
 ## Emitted when the level is completed successfully. Args: stars (1..3), move_count, ideal_moves.
 ## Stars are computed from move_count vs ideal_moves authored on the level resource.
 signal level_scored(stars: int, move_count: int, ideal_moves: int)
+## Power-up availability signals (mirror Feature C's pattern). True = ready to use,
+## false = consumed this level or unavailable. Arrange swaps two buses' positions;
+## Jumble random-permutes all bus positions on the board.
+signal arrange_available_changed(available: bool)
+signal jumble_available_changed(available: bool)
+## Fires when the player activates the Arrange or Jumble booster. Args: kind ("arrange"|"jumble")
+signal powerup_used(kind: String)
 
 enum GameState {
 	PLAYING,
@@ -74,12 +81,20 @@ var _dispatch_count_this_level: int = 0
 
 # Feature C: VIP Slot Booster state. Single-use per level; resets on load_level / restart_level.
 var _vip_used_this_level: bool = false
+# Arrange / Jumble power-ups: single-use per level, reset on load_level/restart_level.
+var _arrange_used_this_level: bool = false
+var _jumble_used_this_level: bool = false
 
 func load_level(lvl: CarJamLevelData) -> void:
 	# Feature C: reset VIP booster availability BEFORE the rest of load_level runs so any
 	# early listeners see the right state when board/parking signals emit.
 	_vip_used_this_level = false
 	vip_available_changed.emit(true)
+	# Reset Arrange + Jumble availability on level load
+	_arrange_used_this_level = false
+	_jumble_used_this_level = false
+	arrange_available_changed.emit(true)
+	jumble_available_changed.emit(true)
 	move_count = 0
 
 	session_token += 1
@@ -198,6 +213,71 @@ func try_extract_vip(vehicle_id: int) -> bool:
 	v.reserved_slot = -1
 	vehicle_departed.emit(vehicle_id, slot_id)
 	_check_terminal_states()
+	return true
+
+## Arrange / Jumble booster API.
+func is_arrange_available() -> bool:
+	return not _arrange_used_this_level
+
+func is_jumble_available() -> bool:
+	return not _jumble_used_this_level
+
+## Swap two vehicles' positions on the board so the player can rearrange their
+## parking layout. Both vehicles must currently be ON_BOARD (not already in
+## motion or parked). Returns true on success, false otherwise (also false if
+## Arrange has already been used this level).
+func try_arrange_swap(vehicle_id_a: int, vehicle_id_b: int) -> bool:
+	if _arrange_used_this_level:
+		return false
+	if vehicle_id_a == vehicle_id_b:
+		return false
+	var va: VehicleModel = vehicles.get(vehicle_id_a, null)
+	var vb: VehicleModel = vehicles.get(vehicle_id_b, null)
+	if va == null or vb == null:
+		return false
+	if va.state != VehicleModel.VehicleState.ON_BOARD:
+		return false
+	if vb.state != VehicleModel.VehicleState.ON_BOARD:
+		return false
+	# Swap board positions and reset anchors. Both vehicles keep their original
+	# initial_anchor; only the live anchor changes so escape checks re-evaluate.
+	var tmp_anchor: Vector2i = va.anchor
+	va.anchor = vb.anchor
+	vb.anchor = tmp_anchor
+	_arrange_used_this_level = true
+	arrange_available_changed.emit(false)
+	powerup_used.emit("arrange")
+	board_updated.emit()
+	print("[CarJamController] Arrange used: swapped bus %d (new anchor %s) with bus %d (new anchor %s)" %
+		[vehicle_id_a, str(va.anchor), vehicle_id_b, str(vb.anchor)])
+	return true
+
+## Random-permute the ON_BOARD vehicles' positions. Single-use per level (same as
+## Arrange / VIP). Useful when the only remaining dispatch is blocked and the
+## player wants to roll the dice on a fresh escape-route layout.
+func try_jumble_buses() -> bool:
+	if _jumble_used_this_level:
+		return false
+	var on_board_ids: Array[int] = []
+	for vid in vehicles:
+		var v: VehicleModel = vehicles[vid]
+		if v != null and v.state == VehicleModel.VehicleState.ON_BOARD:
+			on_board_ids.append(vid)
+	if on_board_ids.size() < 2:
+		return false
+	# Snapshot original anchors and shuffle by swapping pairs.
+	var anchors_snapshot: Array[Vector2i] = []
+	for vid in on_board_ids:
+		anchors_snapshot.append(vehicles[vid].anchor)
+	# Fisher-Yates-ish shuffle: pick pairs and swap.
+	anchors_snapshot.shuffle()
+	for i in on_board_ids.size():
+		vehicles[on_board_ids[i]].anchor = anchors_snapshot[i]
+	_jumble_used_this_level = true
+	jumble_available_changed.emit(false)
+	powerup_used.emit("jumble")
+	board_updated.emit()
+	print("[CarJamController] Jumble used: random-permuted %d ON_BOARD vehicles" % on_board_ids.size())
 	return true
 
 ## Unlock the next locked PLUS bay when the player has sustained enough dispatch progress.
