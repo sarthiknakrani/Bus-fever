@@ -21,12 +21,36 @@ var t_start: float = 0.0
 var t_cleared: float = 0.0
 var t_corridor_enter: float = 0.0
 
+# White departure trail: rendered behind the bus as a fading Line2D.
+# Lives in the bus's parent so it can outlast this controller and complete its fade tween.
+var _trail: Line2D = null
+const TRAIL_WIDTH: float = 8.0
+const TRAIL_COLOR := Color(0.96, 0.97, 1.0, 0.7)
+const TRAIL_FADE_DURATION: float = 0.9
+
 static var active: Array[Node] = []
 
 func _ready():
 	active.append(self)
 	t_start = Time.get_ticks_msec() / 1000.0
 	print("[QA] Bus %d DEPARTURE START at %.2f" % [vehicle_id, t_start])
+
+	# Initialize white departure trail parented to the bus's container so it survives
+	# past this controller's queue_free (we fade it after the bus leaves the screen).
+	if vehicle != null and is_instance_valid(vehicle):
+		var bus_parent := vehicle.get_parent()
+		if bus_parent != null:
+			_trail = Line2D.new()
+			_trail.name = "DepartureTrail_Bus%d" % vehicle_id
+			_trail.width = TRAIL_WIDTH
+			_trail.default_color = TRAIL_COLOR
+			_trail.modulate = Color(1.0, 1.0, 1.0, 1.0)
+			_trail.z_index = -1
+			_trail.joint_mode = Line2D.LINE_JOINT_ROUND
+			_trail.begin_cap_mode = Line2D.LINE_CAP_ROUND
+			_trail.end_cap_mode = Line2D.LINE_CAP_ROUND
+			_trail.add_point(vehicle.position)
+			bus_parent.add_child(_trail)
 
 func _exit_tree():
 	active.erase(self)
@@ -37,7 +61,11 @@ func _process(delta: float):
 	if not is_instance_valid(vehicle):
 		queue_free()
 		return
-		
+
+	# Extend trail each frame while the bus is still visible to the camera.
+	if _trail != null and is_instance_valid(_trail) and vehicle.visible:
+		_trail.add_point(vehicle.position)
+
 	if state == 0:
 		# Faster reversing
 		speed = move_toward(speed, 750.0, 1800.0 * delta)
@@ -116,5 +144,16 @@ func _process(delta: float):
 				
 				if vehicle.position.x > exit_local.x:
 					vehicle.visible = false
+					if vehicle.get_parent() != null:
+						vehicle.get_parent().remove_child(vehicle)
+					vehicle.queue_free()
 					controller.on_vehicle_departed_from_slot(vehicle_id, slot_id, token)
+
+					# Fade the white departure trail, then free it independently of the controller.
+					if _trail != null and is_instance_valid(_trail):
+						var fade := _trail.create_tween()
+						fade.tween_property(_trail, "modulate:a", 0.0, TRAIL_FADE_DURATION).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+						fade.tween_callback(_trail.queue_free)
+					_trail = null
+
 					queue_free()

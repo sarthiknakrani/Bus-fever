@@ -12,6 +12,7 @@ var vehicle_capacity: int = 4
 var vehicle_footprint: Array[Vector2i] = [Vector2i.ZERO]
 var passenger_occupancy: int = 0
 var is_in_parking: bool = false
+var is_mystery: bool = false
 
 const CELL_SIZE: float = 78.0
 
@@ -46,6 +47,15 @@ var _badge_node: Node2D
 var _badge_label: Label
 var _touch_area: Area2D
 
+# Mystery "?" reveal UI: large centered "?" mark + dark scrim. Both fade out
+# when the player taps the bus for the first time (handled by reveal_mystery()).
+var _mystery_overlay: Label = null
+var _mystery_scrim: ColorRect = null
+var _mystery_reveal_tween: Tween = null
+var _badge_tween: Tween = null
+var _pop_tween: Tween = null
+var _arrow_cover: ColorRect = null
+
 # Sprite nodes for modular art replacement
 var _shadow_sprite: Sprite2D
 var _base_sprite: Sprite2D
@@ -56,7 +66,13 @@ var _wheels: Array[Sprite2D] = []
 var boarding_anchor: Marker2D
 var boarding_layer: Node2D
 
-func setup(p_id: int, p_code: String, p_col_id: String, p_dir: int, p_cap: int, p_footprint: Array[Vector2i] = [Vector2i.ZERO]) -> void:
+func _update_mystery_visuals() -> void:
+	if _mystery_overlay == null or _mystery_scrim == null:
+		return
+	_mystery_overlay.visible = is_mystery
+	_mystery_scrim.visible = is_mystery
+
+func setup(p_id: int, p_code: String, p_col_id: String, p_dir: int, p_cap: int, p_footprint: Array[Vector2i] = [Vector2i.ZERO], p_is_mystery: bool = false) -> void:
 	vehicle_id = p_id
 	vehicle_code = p_code
 	vehicle_color_id = p_col_id.to_lower()
@@ -66,8 +82,9 @@ func setup(p_id: int, p_code: String, p_col_id: String, p_dir: int, p_cap: int, 
 	vehicle_footprint = p_footprint
 	passenger_occupancy = 0
 	is_in_parking = false
+	is_mystery = p_is_mystery
 	name = "Vehicle_%s" % p_code
-	
+
 	_build_visuals()
 
 func _ready() -> void:
@@ -86,6 +103,8 @@ func set_parking_mode(in_parking: bool) -> void:
 	if _badge_node != null:
 		_badge_node.visible = in_parking
 		if in_parking:
+			var rear_native := -Vector2(CarJamVehicleData.dir_to_vector(vehicle_dir))
+			_badge_node.global_position = global_position + (rear_native * 38.0).rotated(global_rotation)
 			_badge_node.global_rotation = 0.0
 	if in_parking and _base_sprite != null:
 		_base_sprite.position = Vector2.ZERO
@@ -93,9 +112,9 @@ func set_parking_mode(in_parking: bool) -> void:
 
 func _process(_delta: float) -> void:
 	if _badge_node != null and _badge_node.visible:
+		var rear_native := -Vector2(CarJamVehicleData.dir_to_vector(vehicle_dir))
+		_badge_node.global_position = global_position + (rear_native * 38.0).rotated(global_rotation)
 		_badge_node.global_rotation = 0.0
-		if is_in_parking:
-			_badge_node.global_position = global_position + Vector2(0.0, 38.0)
 
 func _build_visuals() -> void:
 	# Clear existing interim visuals
@@ -162,6 +181,42 @@ func _build_visuals() -> void:
 	boarding_layer.add_child(boarding_anchor)
 	boarding_anchor.position = Vector2(0, 0)
 
+	# Mystery "?" overlay + scrim: shown while is_mystery, hidden permanently after reveal_mystery().
+	if _mystery_overlay == null:
+		_mystery_overlay = Label.new()
+		_mystery_overlay.name = "MysteryBadge"
+		_mystery_overlay.text = "?"
+		_mystery_overlay.add_theme_font_size_override("font_size", 72)
+		_mystery_overlay.add_theme_color_override("font_color", Color("fef3c7"))
+		_mystery_overlay.add_theme_color_override("font_outline_color", Color("0f172a"))
+		_mystery_overlay.add_theme_constant_override("outline_size", 8)
+		_mystery_overlay.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_mystery_overlay.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_mystery_overlay.position = Vector2(-40.0, -64.0)
+		_mystery_overlay.size = Vector2(80.0, 128.0)
+		_mystery_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if not _mystery_overlay.is_inside_tree():
+		add_child(_mystery_overlay)
+
+	if _mystery_scrim == null:
+		_mystery_scrim = ColorRect.new()
+		_mystery_scrim.name = "MysteryScrim"
+		_mystery_scrim.color = Color(0.16, 0.18, 0.24, 0.78)
+		_mystery_scrim.custom_minimum_size = Vector2(120.0, 200.0)
+		_mystery_scrim.size = Vector2(120.0, 200.0)
+		_mystery_scrim.position = Vector2(-60.0, -100.0)
+		_mystery_scrim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if not _mystery_scrim.is_inside_tree():
+		add_child(_mystery_scrim)
+	# Scrim sits under the bus sprite but above any background so it tints the body visibly.
+	if _base_sprite != null:
+		move_child(_mystery_scrim, _base_sprite.get_index() + 1)
+		# Overlay always renders on top of scrim and bus sprite.
+	if _mystery_overlay.is_inside_tree():
+		move_child(_mystery_overlay, get_child_count() - 1)
+
+	_update_mystery_visuals()
+
 ## Computes uniform scale so the bus visible body occupies ~74px of the 78px cell
 ## (leaves ~4px gap between parallel neighbors) and anchors the bus front towards
 ## the leading edge along its escape direction.
@@ -210,6 +265,9 @@ func _update_touch_shape(rect_shape: RectangleShape2D, col_shape: CollisionShape
 		col_shape.position = _base_sprite.position
 
 var is_dispatched: bool = false
+var _shake_tween: Tween
+var _orig_board_pos: Vector2 = Vector2.ZERO
+var _is_shaking: bool = false
 
 func _on_touch_input(_viewport: Node, event: InputEvent, _shape_idx: int) -> void:
 	if is_dispatched or is_in_parking:
@@ -224,68 +282,153 @@ func _on_touch_input(_viewport: Node, event: InputEvent, _shape_idx: int) -> voi
 			tapped.emit(vehicle_id)
 
 func play_blocked_shake() -> void:
+	if not _is_shaking:
+		_orig_board_pos = position
+		_is_shaking = true
+	elif _shake_tween != null and _shake_tween.is_valid():
+		_shake_tween.kill()
+		position = _orig_board_pos
+
 	var nudge_vec := Vector2(CarJamVehicleData.dir_to_vector(vehicle_dir)) * 14.0
-	var tw := create_tween()
-	tw.tween_property(self, "position", position + nudge_vec, 0.07).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw.tween_property(self, "position", position, 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_shake_tween = create_tween()
+	_shake_tween.tween_property(self, "position", _orig_board_pos + nudge_vec, 0.07).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_shake_tween.tween_property(self, "position", _orig_board_pos, 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_shake_tween.tween_callback(func():
+		position = _orig_board_pos
+		_is_shaking = false
+	)
 
 func play_angry_shake() -> void:
-	var orig_pos := position
-	var tw := create_tween()
+	if not _is_shaking:
+		_orig_board_pos = position
+		_is_shaking = true
+	elif _shake_tween != null and _shake_tween.is_valid():
+		_shake_tween.kill()
+		position = _orig_board_pos
+
+	_shake_tween = create_tween()
 	# Two extra-strong horizontal shakes (10px, 0.18s each, EASE_BACK)
-	tw.tween_property(self, "position", orig_pos + Vector2(10.0, 0), 0.045).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tw.tween_property(self, "position", orig_pos - Vector2(10.0, 0), 0.09).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN_OUT)
-	tw.tween_property(self, "position", orig_pos, 0.045).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw.tween_property(self, "position", orig_pos + Vector2(10.0, 0), 0.045).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tw.tween_property(self, "position", orig_pos - Vector2(10.0, 0), 0.09).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN_OUT)
-	tw.tween_property(self, "position", orig_pos, 0.045).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_shake_tween.tween_property(self, "position", _orig_board_pos + Vector2(10.0, 0), 0.045).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_shake_tween.tween_property(self, "position", _orig_board_pos - Vector2(10.0, 0), 0.09).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN_OUT)
+	_shake_tween.tween_property(self, "position", _orig_board_pos, 0.045).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_shake_tween.tween_property(self, "position", _orig_board_pos + Vector2(10.0, 0), 0.045).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_shake_tween.tween_property(self, "position", _orig_board_pos - Vector2(10.0, 0), 0.09).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN_OUT)
+	_shake_tween.tween_property(self, "position", _orig_board_pos, 0.045).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_shake_tween.tween_callback(func():
+		position = _orig_board_pos
+		_is_shaking = false
+	)
+
+func set_arrow_visible(p_vis: bool) -> void:
+	if _arrow_sprite != null:
+		_arrow_sprite.visible = p_vis
+	if not p_vis:
+		if _arrow_cover == null:
+			_arrow_cover = ColorRect.new()
+			_arrow_cover.color = vehicle_color
+			_arrow_cover.custom_minimum_size = Vector2(22.0, 32.0)
+			_arrow_cover.size = Vector2(22.0, 32.0)
+			_arrow_cover.position = Vector2(-11.0, -16.0)
+			if _base_sprite != null:
+				_base_sprite.add_child(_arrow_cover)
+			else:
+				add_child(_arrow_cover)
+		_arrow_cover.visible = true
+	else:
+		if _arrow_cover != null:
+			_arrow_cover.visible = false
+
+## Called by the controller after a successful tap on a mystery bus. Animates the
+## "?" overlay and dark scrim out, then flips is_mystery=false so the bus's true
+## color is exposed. Safe to call from a non-mystery bus (no-op).
+func reveal_mystery() -> void:
+	if not is_mystery:
+		return
+	is_mystery = false
+	if _mystery_reveal_tween != null and _mystery_reveal_tween.is_valid():
+		_mystery_reveal_tween.kill()
+	if _mystery_overlay != null and is_instance_valid(_mystery_overlay):
+		_mystery_reveal_tween = create_tween()
+		_mystery_reveal_tween.set_parallel(true)
+		_mystery_reveal_tween.tween_property(_mystery_overlay, "modulate:a", 0.0, 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		_mystery_reveal_tween.tween_property(_mystery_scrim, "modulate:a", 0.0, 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		# Pop the ? badge inward as it fades for a satisfying reveal moment.
+		_mystery_reveal_tween.tween_property(_mystery_overlay, "scale", Vector2(0.4, 0.4), 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+		_mystery_reveal_tween.tween_callback(_on_reveal_complete)
+
+func _on_reveal_complete() -> void:
+	if _mystery_overlay != null and is_instance_valid(_mystery_overlay):
+		_mystery_overlay.visible = false
+		_mystery_overlay.modulate.a = 1.0
+		_mystery_overlay.scale = Vector2.ONE
+	if _mystery_scrim != null and is_instance_valid(_mystery_scrim):
+		_mystery_scrim.visible = false
+		_mystery_scrim.modulate.a = 1.0
+	_mystery_reveal_tween = null
 
 func play_badge_pulse() -> void:
 	if _badge_node != null:
-		var tw := create_tween()
-		tw.tween_property(_badge_node, "scale", Vector2(1.25, 1.25), 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-		tw.tween_property(_badge_node, "scale", Vector2(1.0, 1.0), 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		if _badge_tween != null and _badge_tween.is_valid():
+			_badge_tween.kill()
+		_badge_node.scale = Vector2.ONE
+		_badge_tween = create_tween()
+		_badge_tween.tween_property(_badge_node, "scale", Vector2(1.15, 1.15), 0.04).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		_badge_tween.tween_property(_badge_node, "scale", Vector2(1.0, 1.0), 0.06).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+
+func play_boarding_pop() -> void:
+	play_badge_pulse()
+	if _base_sprite != null:
+		if _pop_tween != null and _pop_tween.is_valid():
+			_pop_tween.kill()
+		_base_sprite.scale = Vector2(1.06, 1.06)
+		_pop_tween = create_tween()
+		_pop_tween.tween_property(_base_sprite, "scale", Vector2.ONE, 0.05).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 func _setup_capacity_badge() -> void:
 	if _badge_node != null: return
 	
-	# Bottom-anchored capacity pill at the rear bumper of the parked bus (matching reference '40' badge).
+	# Rounded-rectangle badge (75 x 42 px) matching bus color, styled with white border and bold white text
 	_badge_node = Node2D.new()
 	_badge_node.name = "CapacityBadge"
-	_badge_node.position = Vector2(0, 42.0)
+	_badge_node.position = Vector2(0, 52.0)
 	_badge_node.visible = false
 	_badge_node.z_index = 10
 
 	var badge_draw := Node2D.new()
 	badge_draw.draw.connect(func():
-		var bw: float = 38.0
-		var bh: float = 22.0
+		var bw: float = 75.0
+		var bh: float = 42.0
 		var rect := Rect2(-bw / 2.0, -bh / 2.0, bw, bh)
 		var ci = badge_draw.get_canvas_item()
 
 		var sb_shadow = StyleBoxFlat.new()
 		sb_shadow.bg_color = Color(0, 0, 0, 0.35)
-		sb_shadow.set_corner_radius_all(7)
-		sb_shadow.draw(ci, Rect2(-bw / 2.0, -bh / 2.0 + 3, bw, bh))
+		sb_shadow.set_corner_radius_all(10)
+		sb_shadow.draw(ci, Rect2(-bw / 2.0, -bh / 2.0 + 3.0, bw, bh))
 		
 		var sb_face = StyleBoxFlat.new()
 		sb_face.bg_color = vehicle_color
-		sb_face.set_corner_radius_all(7)
+		sb_face.set_corner_radius_all(10)
+		sb_face.border_width_left = 3
+		sb_face.border_width_top = 3
+		sb_face.border_width_right = 3
+		sb_face.border_width_bottom = 3
+		sb_face.border_color = Color.WHITE
 		sb_face.draw(ci, rect)
 	)
 	_badge_node.add_child(badge_draw)
 
 	_badge_label = Label.new()
 	_badge_label.text = str(vehicle_capacity)
-	_badge_label.add_theme_font_size_override("font_size", 15)
+	_badge_label.add_theme_font_size_override("font_size", 22)
 	_badge_label.add_theme_color_override("font_color", Color.WHITE)
-	_badge_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.7))
+	_badge_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.85))
 	_badge_label.add_theme_constant_override("shadow_offset_x", 0)
 	_badge_label.add_theme_constant_override("shadow_offset_y", 2)
 	_badge_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_badge_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_badge_label.position = Vector2(-19, -11)
-	_badge_label.size = Vector2(38, 22)
+	_badge_label.position = Vector2(-37.5, -21.0)
+	_badge_label.size = Vector2(75.0, 42.0)
 	_badge_node.add_child(_badge_label)
 
 	add_child(_badge_node)

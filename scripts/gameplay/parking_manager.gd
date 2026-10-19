@@ -2,8 +2,9 @@ extends RefCounted
 class_name CarJamParkingManager
 
 ## Manages the parking bays where dispatched vehicles wait to board passengers.
-## Exactly 4 slots for Level 1, supporting atomic reservations, double-reservation
-## prevention, and clean arrival/release lifecycles.
+## Supports three bay kinds: REGULAR (unlocked working bay), PLUS (locked green-bordered
+## bay that unlocks mid-level via dispatch threshold), and VIP (slot 0, reserved for the
+## VIP booster feature). Atomic reservations and arrival/release lifecycles preserved.
 
 enum SlotState {
 	FREE = 0,
@@ -12,6 +13,14 @@ enum SlotState {
 	OCCUPIED = 2,
 	DEPARTING = 3,
 	RELEASING = 3
+}
+
+## Bay kind taxonomy. Slot 0 is implicitly VIP per the default setup().
+## Plus bays start locked and unlock in-level via dispatch threshold.
+enum BayKind {
+	REGULAR = 0,
+	PLUS = 1,
+	VIP = 2
 }
 
 # Compatibility aliases on class level
@@ -23,13 +32,23 @@ class ParkingSlot:
 	var state: int = SlotState.FREE
 	var vehicle_id: int = -1
 	var is_unlocked: bool = false
+	var bay_kind: int = BayKind.REGULAR
 
-	func _init(id: int) -> void:
+	func _init(id: int, kind: int = BayKind.REGULAR) -> void:
 		slot_id = id
+		bay_kind = kind
 		state = SlotState.FREE
 		vehicle_id = -1
-		# Default unlock rule: Slot 0 is VIP (locked for regular buses), Slots 1+ are normal working bays (unlocked)
-		if id >= 1:
+		# Default unlock rule:
+		#  - SLOT 0        → VIP bay, stays locked (only the VIP Booster can unlock it)
+		#  - PLUS bay      → starts locked; unlock in-level via unlock_plus_bay()
+		#  - everything    → unlocked by default
+		if slot_id == 0:
+			bay_kind = BayKind.VIP
+			is_unlocked = false
+		elif bay_kind == BayKind.PLUS:
+			is_unlocked = false
+		elif slot_id >= 1:
 			is_unlocked = true
 		else:
 			is_unlocked = false
@@ -37,13 +56,16 @@ class ParkingSlot:
 	func is_available() -> bool:
 		return state == SlotState.FREE and is_unlocked
 
+	func is_plus_locked() -> bool:
+		return bay_kind == BayKind.PLUS and not is_unlocked
 
 	func snapshot() -> Dictionary:
 		return {
 			"slot_id": slot_id,
 			"state": state,
 			"vehicle_id": vehicle_id,
-			"is_unlocked": is_unlocked
+			"is_unlocked": is_unlocked,
+			"bay_kind": bay_kind
 		}
 
 	func restore(d: Dictionary) -> void:
@@ -52,14 +74,23 @@ class ParkingSlot:
 		vehicle_id = int(d["vehicle_id"])
 		if d.has("is_unlocked"):
 			is_unlocked = bool(d["is_unlocked"])
+		if d.has("bay_kind"):
+			bay_kind = int(d["bay_kind"])
 
 var _slots: Array[ParkingSlot] = []
 
-func setup(slot_count: int = 4, custom_unlocked_ids: Array[int] = []) -> void:
+func setup(slot_count: int = 4, custom_unlocked_ids: Array[int] = [], plus_slot_ids: Array[int] = []) -> void:
 	_slots.clear()
 	for i in slot_count:
-		var slot := ParkingSlot.new(i)
-		if not custom_unlocked_ids.is_empty():
+		# Default to REGULAR; upgrade specific IDs to PLUS when listed.
+		var kind: int = BayKind.REGULAR
+		if i in plus_slot_ids:
+			kind = BayKind.PLUS
+		var slot := ParkingSlot.new(i, kind)
+		# Custom unlock list is the legacy way to mark specific slots as unlocked.
+		# PLUS bays deliberately stay locked until unlock_plus_bay() is called via
+		# in-level progression; we do NOT honor them in custom_unlocked_ids.
+		if not custom_unlocked_ids.is_empty() and slot.bay_kind != BayKind.PLUS:
 			slot.is_unlocked = custom_unlocked_ids.has(i)
 		_slots.append(slot)
 
@@ -96,6 +127,42 @@ func is_slot_unlocked(slot_id: int) -> bool:
 func unlock_slot(slot_id: int) -> void:
 	if slot_id >= 0 and slot_id < _slots.size():
 		_slots[slot_id].is_unlocked = true
+
+## Unlock a PLUS bay by slot_id. Idempotent: returns false if not a PLUS bay, already
+## unlocked, or out of range. Caller is responsible for emitting parking_updated.
+func unlock_plus_bay(slot_id: int) -> bool:
+	if slot_id < 0 or slot_id >= _slots.size():
+		return false
+	var slot: ParkingSlot = _slots[slot_id]
+	if slot.bay_kind != BayKind.PLUS:
+		return false
+	if slot.is_unlocked:
+		return false
+	slot.is_unlocked = true
+	return true
+
+## Returns true when slot_id refers to a PLUS bay that hasn't been unlocked yet.
+func is_plus_locked(slot_id: int) -> bool:
+	if slot_id < 0 or slot_id >= _slots.size():
+		return false
+	return _slots[slot_id].is_plus_locked()
+
+## Returns the count of PLUS bays still locked. Used by the controller to decide when
+## to award the next green "+" bay as a reward for sustained progress.
+func get_plus_locked_count() -> int:
+	var n: int = 0
+	for s in _slots:
+		if s.is_plus_locked():
+			n += 1
+	return n
+
+## Returns the count of PLUS bays already unlocked.
+func get_plus_unlocked_count() -> int:
+	var n: int = 0
+	for s in _slots:
+		if s.bay_kind == BayKind.PLUS and s.is_unlocked:
+			n += 1
+	return n
 
 func get_available_slot_count() -> int:
 	var count := 0

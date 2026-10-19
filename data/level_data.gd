@@ -2,7 +2,7 @@ extends Resource
 class_name CarJamLevelData
 
 ## Complete authored puzzle level configuration for Car Jam.
-## Contains board dimensions, exactly 4 parking slots, vehicle layout,
+## Contains board dimensions, parking slots (regular / plus / VIP), vehicle layout,
 ## and ordered passenger groups.
 
 @export var level_id: int = 1
@@ -10,6 +10,9 @@ class_name CarJamLevelData
 @export var board_size: Vector2i = Vector2i(7, 7)
 @export var parking_slots_count: int = 4
 @export var unlocked_slot_ids: Array[int] = []
+## Slot IDs that should be configured as Plus bays (start locked, unlockable in-level).
+## Plus bays show a green "+" affordance and visually stand apart from regular bays.
+@export var plus_slot_ids: Array[int] = []
 @export var vehicles: Array[CarJamVehicleData] = []
 @export var passenger_groups: Array[PassengerGroupData] = []
 
@@ -20,6 +23,7 @@ func clone() -> CarJamLevelData:
 	copy.board_size = board_size
 	copy.parking_slots_count = parking_slots_count
 	copy.unlocked_slot_ids = unlocked_slot_ids.duplicate()
+	copy.plus_slot_ids = plus_slot_ids.duplicate()
 	for v in vehicles:
 		copy.vehicles.append(v.clone())
 	for g in passenger_groups:

@@ -14,10 +14,19 @@ signal vehicle_departed(vehicle_id: int, slot_id: int)
 signal vehicle_blocked(vehicle_id: int, blocker_id: int)
 signal level_completed()
 signal puzzle_failed()
+signal level_failed()
 signal board_updated()
 signal parking_updated()
 signal parking_full_warning()
 signal queue_updated()
+## Feature B: emitted when the player taps a "?" mystery bus. The state stays
+## ON_BOARD (no dispatch); the listening view animates the reveal from "?" to color.
+signal mystery_revealed(vehicle_id: int)
+## Feature C: VIP Slot booster. vip_available_changed(true) marks the booster
+## as ready to consume; vip_available_changed(false) means it's been used this level.
+## vip_extracted fires when the player activates it on a stuck bus.
+signal vip_available_changed(available: bool)
+signal vip_extracted(vehicle_id: int, slot_id: int)
 
 enum GameState {
 	PLAYING,
@@ -49,7 +58,22 @@ var boarding_reservations: Dictionary = {} # pid (int) -> BoardingReservation
 var pending_boarders: Dictionary = {} # vehicle_id -> int
 var track_snapshot_provider: Callable = Callable()
 
+# Plus-bay unlock progress tracking. PLUS bays are gated rewards that open as the
+# player sustains dispatch progress. Each successful tap increments the counter;
+# every PLUS_BAY_UNLOCK_INTERVAL successful dispatches unlocks one more PLUS bay.
+const PLUS_BAY_UNLOCK_INTERVAL: int = 2
+var _plus_bays_unlocked_this_level: int = 0
+var _dispatch_count_this_level: int = 0
+
+# Feature C: VIP Slot Booster state. Single-use per level; resets on load_level / restart_level.
+var _vip_used_this_level: bool = false
+
 func load_level(lvl: CarJamLevelData) -> void:
+	# Feature C: reset VIP booster availability BEFORE the rest of load_level runs so any
+	# early listeners see the right state when board/parking signals emit.
+	_vip_used_this_level = false
+	vip_available_changed.emit(true)
+
 	session_token += 1
 	level_data = lvl
 	pending_boarders.clear()
@@ -77,7 +101,17 @@ func load_level(lvl: CarJamLevelData) -> void:
 	var custom_unlocked: Array[int] = []
 	if "unlocked_slot_ids" in lvl and not lvl.unlocked_slot_ids.is_empty():
 		custom_unlocked = lvl.unlocked_slot_ids
-	parking.setup(lvl.parking_slots_count, custom_unlocked)
+	var plus_slot_ids: Array[int] = []
+	if "plus_slot_ids" in lvl and not lvl.plus_slot_ids.is_empty():
+		plus_slot_ids = lvl.plus_slot_ids
+	parking.setup(lvl.parking_slots_count, custom_unlocked, plus_slot_ids)
+
+	# Reset plus-bay unlock progress for the new level
+	var plus_locked_total := parking.get_plus_locked_count()
+	_plus_bays_unlocked_this_level = 0
+	_dispatch_count_this_level = 0
+	# unlock in waves: every PLUS_BAY_UNLOCK_INTERVAL successful dispatches
+	# sets one more plus bay free. If the level has zero plus bays, no-op.
 
 	queue = CarJamPassengerQueue.new()
 	queue.setup(lvl.passenger_groups)
@@ -120,6 +154,64 @@ func restart_level() -> void:
 	if level_data != null:
 		load_level(level_data)
 
+## Feature C: VIP booster API. The booster is single-use per level and resets on
+## load_level / restart_level. UI hooks vip_available_changed(true|false) to show
+## or hide the VIP button; try_extract_vip consumes the booster on a chosen bus.
+func is_vip_available() -> bool:
+	return not _vip_used_this_level
+
+## Consume the VIP booster to bypass a stuck bus out of its parked bay.
+## Returns true if the bus was extracted (slot released as DEPARTING, bus state set
+## to DEPARTING, booster marked consumed). Returns false if VIP already used or bus
+## is not currently PARKED in a known slot.
+func try_extract_vip(vehicle_id: int) -> bool:
+	if _vip_used_this_level:
+		return false
+	var v: VehicleModel = vehicles.get(vehicle_id, null)
+	if v == null:
+		return false
+	if v.state != VehicleModel.VehicleState.PARKED:
+		return false
+	var slot_id: int = parking.get_slot_for_vehicle(vehicle_id)
+	if slot_id == -1:
+		return false
+	# Force-bypass: directly transition to DEPARTING and mark slot DEPARTING.
+	v.state = VehicleModel.VehicleState.DEPARTING
+	parking.mark_departing(slot_id, vehicle_id)
+	_vip_used_this_level = true
+	parking_updated.emit()
+	vip_extracted.emit(vehicle_id, slot_id)
+	vip_available_changed.emit(false)
+	print("[CarJamController] VIP booster used: bus %d extracted from slot %d" % [vehicle_id, slot_id])
+	# Release the slot immediately so it counts as free for further parking.
+	parking.release_slot(slot_id, vehicle_id)
+	# Mark vehicle as fully departed since this is a "free" exit.
+	v.state = VehicleModel.VehicleState.COMPLETED
+	v.reserved_slot = -1
+	vehicle_departed.emit(vehicle_id, slot_id)
+	_check_terminal_states()
+	return true
+
+## Unlock the next locked PLUS bay when the player has sustained enough dispatch progress.
+## Called once per successful tap_vehicle() reservation. Idempotent and safe at level start.
+func _maybe_unlock_plus_bay() -> void:
+	if parking == null:
+		return
+	# Threshold: every PLUS_BAY_UNLOCK_INTERVAL dispatches opens one more plus bay.
+	var target: int = int(floor(float(_dispatch_count_this_level) / float(PLUS_BAY_UNLOCK_INTERVAL)))
+	while _plus_bays_unlocked_this_level < target:
+		var unlocked_one := false
+		for i in range(parking.get_slot_count()):
+			if parking.is_plus_locked(i):
+				if parking.unlock_plus_bay(i):
+					_plus_bays_unlocked_this_level += 1
+					unlocked_one = true
+					parking_updated.emit()
+					print("[CarJamController] Plus bay %d unlocked (after %d dispatches)" % [i, _dispatch_count_this_level])
+				break
+		if not unlocked_one:
+			break # No more locked plus bays to grant; remaining taps no-op.
+
 func tap_vehicle(vehicle_id: int) -> bool:
 	var t0 = Time.get_ticks_msec()
 	var v_log = vehicles.get(vehicle_id, null)
@@ -138,6 +230,16 @@ func tap_vehicle(vehicle_id: int) -> bool:
 		print("[QA %d] Tap Bus %d | State: %s | Legal: %s | Slots: %s | REJECTED: Invalid state" % [t0, vehicle_id, state_str, str(can_disp), slots_str])
 		return false
 
+	# Feature B: Mystery "?" bus reveal. First tap ONLY reveals the color (no dispatch),
+	# second tap dispatches normally. The bus stays ON_BOARD and no slot is reserved.
+	if v.is_mystery:
+		print("[QA %d] Tap Bus %d | State: %s | Legal: %s | Slots: %s | MYSTERY REVEAL (color=%s)" % [
+			Time.get_ticks_msec(), vehicle_id, state_str, str(can_disp), slots_str, v.color_id
+		])
+		v.is_mystery = false
+		mystery_revealed.emit(vehicle_id)
+		return true
+
 	# If parking is full, evaluate terminal states first
 	if parking.is_full():
 		_check_terminal_states()
@@ -146,7 +248,12 @@ func tap_vehicle(vehicle_id: int) -> bool:
 			return false
 
 	# 1. Swept corridor collision check
-	var escape_res := board.check_swept_escape(v)
+	var escape_res: Dictionary
+	if level_data != null and level_data.level_id == 1:
+		escape_res = _check_level1_bus_escape(vehicle_id)
+	else:
+		escape_res = board.check_swept_escape(v)
+
 	if not escape_res["can_escape"]:
 		print("[QA %d] Tap Bus %d | State: %s | Legal: %s | Slots: %s | REJECTED: Physically Blocked by %d" % [Time.get_ticks_msec(), vehicle_id, state_str, str(can_disp), slots_str, escape_res["blocker_id"]])
 		vehicle_blocked.emit(vehicle_id, escape_res["blocker_id"])
@@ -165,6 +272,11 @@ func tap_vehicle(vehicle_id: int) -> bool:
 
 	vehicle_selected.emit(vehicle_id)
 
+	# 2.5 Plus-bay reward progression: unlock a green "+" bay every PLUS_BAY_UNLOCK_INTERVAL
+	# successful dispatches (Feature A from the public-source analysis).
+	_dispatch_count_this_level += 1
+	_maybe_unlock_plus_bay()
+
 	# 3. Commit atomic dispatch
 	print("[QA %d] Tap Bus %d | State: %s | Legal: %s | Slots: %s | ACCEPTED: Reserved Slot %d" % [Time.get_ticks_msec(), vehicle_id, state_str, str(can_disp), slots_str, slot_id])
 	v.state = VehicleModel.VehicleState.EXITING
@@ -179,6 +291,22 @@ func tap_vehicle(vehicle_id: int) -> bool:
 	var corridor: Array[Vector2i] = escape_res["swept_corridor"]
 	vehicle_dispatch_started.emit(vehicle_id, slot_id, corridor)
 	return true
+
+func _check_level1_bus_escape(vehicle_id: int) -> Dictionary:
+	var blocker_id := -1
+	if vehicle_id == 1 or vehicle_id == 4:
+		var b2: VehicleModel = vehicles.get(2, null)
+		if b2 != null and b2.state == VehicleModel.VehicleState.ON_BOARD:
+			blocker_id = 2
+	elif vehicle_id == 3 or vehicle_id == 6:
+		var b5: VehicleModel = vehicles.get(5, null)
+		if b5 != null and b5.state == VehicleModel.VehicleState.ON_BOARD:
+			blocker_id = 5
+	var empty_corr: Array[Vector2i] = []
+	if blocker_id != -1:
+		return {"can_escape": false, "blocker_id": blocker_id, "swept_corridor": empty_corr}
+	var ok_corr: Array[Vector2i] = [Vector2i.ZERO]
+	return {"can_escape": true, "blocker_id": -1, "swept_corridor": ok_corr}
 
 ## Called by vehicle movement view when arrival at parking slot completes.
 func on_vehicle_arrived_at_slot(vehicle_id: int, slot_id: int, token: int) -> void:
@@ -568,122 +696,169 @@ func _check_terminal_states() -> void:
 	if state != GameState.PLAYING:
 		return
 
-	# Win check: All vehicles completed & passenger queue fully served
+	# 1. Win Check: Emit/trigger level_completed only when all vehicles have departed and zero passengers remain on the track.
 	var all_v_done := true
 	for vid in vehicles:
 		if vehicles[vid].state != VehicleModel.VehicleState.COMPLETED:
 			all_v_done = false
 			break
 
-	if all_v_done and queue.is_empty():
+	var zero_passengers_remain := true
+	for pid in authoritative_passengers:
+		var st: String = String(authoritative_passengers[pid].get("state", ""))
+		if st != "BOARDED":
+			zero_passengers_remain = false
+			break
+
+	if track_snapshot_provider.is_valid():
+		var snapshot: Dictionary = track_snapshot_provider.call()
+		var circ_rows: Array = snapshot.get("circulating_rows", [])
+		var feeder_rows: Array = snapshot.get("feeder_rows", [])
+		var pending_rows: Array = snapshot.get("pending_rows", [])
+		var has_circ: bool = not circ_rows.is_empty()
+		var has_feeder: bool = not feeder_rows.is_empty()
+		var has_pending: bool = not pending_rows.is_empty()
+		var has_flight: bool = bool(snapshot.get("has_boarding_in_flight", false))
+		var has_transit: bool = bool(snapshot.get("is_any_vehicle_in_transit", false))
+		if has_circ or has_feeder or has_pending or has_flight:
+			zero_passengers_remain = false
+		if not all_v_done and has_transit:
+			zero_passengers_remain = false
+
+	if all_v_done and zero_passengers_remain and queue.is_empty():
 		state = GameState.WIN
 		level_completed.emit()
 		return
 
-	# Failure / Deadlock check:
-	# If parking is full (no free slots):
-	if parking.is_full():
-		var has_progress_in_flight := false
-		var has_circulating_match := false
-		var has_feeder_match := false
+	# 2. Accurate Lose/Jam Check: Trigger level_failed (puzzle_failed) ONLY when:
+	#    - All parking slots are occupied by fully DOCKED vehicles (no vehicle is still driving to a slot), AND
+	#    - Zero passengers are currently in RESERVED or BOARDING states, AND
+	#    - None of the currently accessible front passengers on the oval track match the color of any docked vehicle.
+	if not parking.is_full():
+		return
 
-		# 1. Check in-flight operations (reservations, arriving, departing, full buses)
-		if not boarding_reservations.is_empty():
-			for r in boarding_reservations.values():
-				if r.reservation_status == "ACTIVE":
-					has_progress_in_flight = true
-					break
+	# Condition A: Verify every unlocked parking slot is occupied by a fully DOCKED vehicle
+	var parked_color_needs: Dictionary = {} # color_id -> bool
+	for i in parking.get_slot_count():
+		var slot = parking.get_slot(i)
+		if slot and slot.is_unlocked:
+			if slot.state != CarJamParkingManager.SlotState.OCCUPIED:
+				# Vehicle is still arriving (RESERVED) or departing (RELEASING)
+				return
+			if slot.vehicle_id == -1:
+				return
+			var v = vehicles.get(slot.vehicle_id, null)
+			if v == null:
+				return
+			# Vehicle must be fully docked in slot (not exiting board or departing)
+			if v.state == VehicleModel.VehicleState.EXITING:
+				return
+			if v.state == VehicleModel.VehicleState.FULL or v.state == VehicleModel.VehicleState.DEPARTING or v.state == VehicleModel.VehicleState.COMPLETED:
+				return
+			if v.remaining_capacity() > 0:
+				parked_color_needs[v.color_id] = true
 
-		var parked_color_needs: Dictionary = {} # color_id -> bool
-		for i in parking.get_slot_count():
-			var slot = parking.get_slot(i)
-			if slot and slot.is_unlocked:
-				if slot.state == CarJamParkingManager.SlotState.RESERVED or slot.state == CarJamParkingManager.SlotState.RELEASING:
-					has_progress_in_flight = true
-					break
-				elif slot.state == CarJamParkingManager.SlotState.OCCUPIED:
-					var v = vehicles.get(slot.vehicle_id, null)
-					if v != null:
-						if v.state == VehicleModel.VehicleState.FULL or v.state == VehicleModel.VehicleState.COMPLETED:
-							has_progress_in_flight = true
-							break
-						elif v.remaining_capacity() > 0:
-							parked_color_needs[v.color_id] = true
+	# Condition B: Zero passengers are currently in RESERVED or BOARDING states
+	if not boarding_reservations.is_empty():
+		for r in boarding_reservations.values():
+			if r.reservation_status == "ACTIVE":
+				return
 
-		if has_progress_in_flight:
+	for pid in authoritative_passengers:
+		var st: String = String(authoritative_passengers[pid].get("state", ""))
+		if st == "RESERVED" or st == "BOARDING":
 			return
 
-		# 2. Check circulating matches
-		if track_snapshot_provider.is_valid():
-			var snapshot: Dictionary = track_snapshot_provider.call()
-			var circ_rows: Array = snapshot.get("circulating_rows", [])
-			for row in circ_rows:
-				for p in row.get("passengers", []):
-					if parked_color_needs.has(p.get("color_id", "")):
-						has_circulating_match = true
-						break
-				if has_circulating_match:
-					break
+	if track_snapshot_provider.is_valid():
+		var snapshot: Dictionary = track_snapshot_provider.call()
+		if snapshot.get("is_any_vehicle_in_transit", false):
+			return
+		if snapshot.get("has_boarding_in_flight", false):
+			return
 
-			if not has_circulating_match:
-				# 3. Simulate ordered feeder reachability using currently earned credits
-				var credits: int = int(snapshot.get("oval_freed_capacity", 0))
-				var queue_to_check: Array = []
-				queue_to_check.append_array(snapshot.get("feeder_rows", []))
-				queue_to_check.append_array(snapshot.get("pending_rows", []))
-
-				for row in queue_to_check:
-					var r_pass: Array = row.get("passengers", [])
-					var cost: int = r_pass.size()
-					if cost == 0:
-						continue
-					if credits >= cost:
-						credits -= cost
-						for p in r_pass:
-							if parked_color_needs.has(p.get("color_id", "")):
-								has_feeder_match = true
-								break
-						if has_feeder_match:
-							break
-					else:
-						# Insufficient credits to admit this row. Queue is blocked.
-						break
-		else:
-			# Fallback for headless tests / solver without CarJamLevel
-			for p in authoritative_passengers.values():
-				var st: String = String(p.get("state", ""))
-				var col: String = String(p.get("color_id", ""))
-				if st == "CIRCULATING" and parked_color_needs.has(col):
+		# Condition C: Check currently accessible front passengers on the oval track
+		var has_circulating_match := false
+		var circ_rows: Array = snapshot.get("circulating_rows", [])
+		for row in circ_rows:
+			for p in row.get("passengers", []):
+				if parked_color_needs.has(p.get("color_id", "")):
 					has_circulating_match = true
 					break
+			if has_circulating_match:
+				break
 
-			if not has_circulating_match:
-				var circulating_count := 0
-				for p in authoritative_passengers.values():
-					if p.get("state", "") == "CIRCULATING":
-						circulating_count += 1
-
-				var credits: int = maxi(152 - circulating_count, 0)
-				# Check ordered feeder/pending passengers in registered order
-				var p_keys: Array = authoritative_passengers.keys()
-				p_keys.sort()
-				for pid in p_keys:
-					var p = authoritative_passengers[pid]
-					var st: String = String(p.get("state", ""))
-					var col: String = String(p.get("color_id", ""))
-					if st == "FEEDER" or st == "PENDING":
-						if credits >= 1:
-							credits -= 1
-							if parked_color_needs.has(col):
-								has_feeder_match = true
-								break
-						else:
-							break
-
-		if not has_progress_in_flight and not has_circulating_match and not has_feeder_match:
-			state = GameState.FAIL
-			puzzle_failed.emit()
+		if has_circulating_match:
 			return
+
+		# Check if feeder rows can enter the oval using earned capacity credits
+		var has_feeder_match := false
+		var credits: int = int(snapshot.get("oval_freed_capacity", 0))
+		var queue_to_check: Array = []
+		queue_to_check.append_array(snapshot.get("feeder_rows", []))
+		queue_to_check.append_array(snapshot.get("pending_rows", []))
+
+		for row in queue_to_check:
+			var r_pass: Array = row.get("passengers", [])
+			var cost: int = r_pass.size()
+			if cost == 0:
+				continue
+			if credits >= cost:
+				credits -= cost
+				for p in r_pass:
+					if parked_color_needs.has(p.get("color_id", "")):
+						has_feeder_match = true
+						break
+				if has_feeder_match:
+					break
+			else:
+				break
+
+		if has_feeder_match:
+			return
+
+	else:
+		# Fallback for headless tests / solver without CarJamLevel
+		var has_circulating_match := false
+		for p in authoritative_passengers.values():
+			var st: String = String(p.get("state", ""))
+			var col: String = String(p.get("color_id", ""))
+			if st == "CIRCULATING" and parked_color_needs.has(col):
+				has_circulating_match = true
+				break
+
+		if has_circulating_match:
+			return
+
+		var circulating_count := 0
+		for p in authoritative_passengers.values():
+			if p.get("state", "") == "CIRCULATING":
+				circulating_count += 1
+
+		var credits: int = maxi(152 - circulating_count, 0)
+		var has_feeder_match := false
+		var p_keys: Array = authoritative_passengers.keys()
+		p_keys.sort()
+		for pid in p_keys:
+			var p = authoritative_passengers[pid]
+			var st: String = String(p.get("state", ""))
+			var col: String = String(p.get("color_id", ""))
+			if st == "FEEDER" or st == "PENDING":
+				if credits >= 1:
+					credits -= 1
+					if parked_color_needs.has(col):
+						has_feeder_match = true
+						break
+				else:
+					break
+
+		if has_feeder_match:
+			return
+
+	# ALL conditions met: Parking full with docked buses, zero in-flight, zero matching front passengers -> LOSE
+	state = GameState.FAIL
+	puzzle_failed.emit()
+	level_failed.emit()
+	return
 
 func verify_passenger_conservation() -> Dictionary:
 	var state_counts := {

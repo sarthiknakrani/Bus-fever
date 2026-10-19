@@ -1,21 +1,32 @@
 extends Node2D
 class_name ParkingSlotView
 
+## 2.5D Recessed Parking Slot View
+## Features an embossed/recessed asphalt bay well with inner shadow,
+## 3D neon stencil border, glowing VIP slot badge, and 3D unlock button.
+
 var slot_id: int = 0
 var slot_state: int = CarJamParkingManager.SlotState.EMPTY
 var is_unlocked: bool = true
+var bay_kind: int = CarJamParkingManager.BayKind.REGULAR
 
 const SLOT_WIDTH: float = 48.0
 const SLOT_HEIGHT: float = 94.0
 
+var custom_width: float = 0.0
+var custom_height: float = 0.0
+
 var _vip_label: Label
 var _draw_node: Node2D
 
-func setup(id: int, p_unlocked: bool = true) -> void:
+func setup(id: int, p_unlocked: bool = true, p_w: float = 0.0, p_h: float = 0.0, p_kind: int = CarJamParkingManager.BayKind.REGULAR) -> void:
 	slot_id = id
 	is_unlocked = p_unlocked
+	custom_width = p_w
+	custom_height = p_h
+	bay_kind = p_kind
 	name = "Slot_%d" % id
-	
+
 	_build_visuals()
 
 func set_state(p_state: int) -> void:
@@ -31,14 +42,17 @@ func _build_visuals() -> void:
 	add_child(_draw_node)
 	_draw_node.draw.connect(_on_draw_lines)
 	
+	var w = custom_width if custom_width > 0.0 else SLOT_WIDTH
 	_vip_label = Label.new()
 	_vip_label.text = "VIP"
-	_vip_label.add_theme_font_size_override("font_size", 13)
-	_vip_label.add_theme_color_override("font_color", Color("facc15"))
+	_vip_label.add_theme_font_size_override("font_size", 16)
+	_vip_label.add_theme_color_override("font_color", Color("fef08a"))
+	_vip_label.add_theme_color_override("font_outline_color", Color("854d0e"))
+	_vip_label.add_theme_constant_override("outline_size", 4)
 	_vip_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_vip_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_vip_label.position = Vector2(-SLOT_WIDTH / 2.0, -13.0)
-	_vip_label.size = Vector2(SLOT_WIDTH, 26.0)
+	_vip_label.position = Vector2(-w / 2.0, -16.0)
+	_vip_label.size = Vector2(w, 32.0)
 	_vip_label.visible = false
 	add_child(_vip_label)
 
@@ -55,33 +69,53 @@ func _update_visual_state() -> void:
 
 func _on_draw_lines() -> void:
 	var is_vip = (slot_id == 0)
+	var is_plus = (bay_kind == CarJamParkingManager.BayKind.PLUS)
 	var is_locked = not is_unlocked and not is_vip
+	var is_unlocked_plus = is_plus and is_unlocked
 	var is_reserved = (slot_state == CarJamParkingManager.SlotState.RESERVED)
 	var is_departing = (slot_state == CarJamParkingManager.SlotState.DEPARTING)
 
-	var w = SLOT_WIDTH
-	var h = SLOT_HEIGHT
+	var w = custom_width if custom_width > 0.0 else SLOT_WIDTH
+	var h = custom_height if custom_height > 0.0 else SLOT_HEIGHT
 	var hw = w / 2.0
 	var hh = h / 2.0
-	var r: float = 6.0
+	var r: float = 8.0
 
-	# 1. Flat recessed asphalt bay polygon (Color("585967") fill, corner_radius = 6)
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color("4b4c59") if is_locked else Color("585967")
-	sb.set_corner_radius_all(int(r))
-	sb.draw(_draw_node.get_canvas_item(), Rect2(-hw, -hh, w, h))
+	# 1. 2.5D Recessed Asphalt Well with Inner Depth Shadow
+	# Outer subtle drop shadow around well
+	var sb_shadow := StyleBoxFlat.new()
+	sb_shadow.bg_color = Color(0.0, 0.0, 0.0, 0.15)
+	sb_shadow.set_corner_radius_all(int(r + 1.0))
+	sb_shadow.draw(_draw_node.get_canvas_item(), Rect2(-hw - 1.0, -hh - 1.0, w + 2.0, h + 2.0))
 
-	# 2. Crisp 2.0px painted stencil outline around the bay with a 10px break gap at bottom edge center
-	var outline_color: Color = Color("facc15") if is_vip else (Color("94a3b8", 0.6) if is_locked else Color("d8dee9"))
+	# Recessed base floor (PLUS-unlocked bays get a green-tinted floor for visual distinctness)
+	var sb_floor := StyleBoxFlat.new()
+	var floor_color_locked := Color("3f404d")
+	var floor_color_vip := Color("4a4635")
+	var floor_color_plus_unlocked := Color("3a5a3a")
+	var floor_color_default := Color("4d4e5c")
+	sb_floor.bg_color = floor_color_locked if is_locked else (floor_color_vip if is_vip else (floor_color_plus_unlocked if is_unlocked_plus else floor_color_default))
+	sb_floor.set_corner_radius_all(int(r))
+	sb_floor.draw(_draw_node.get_canvas_item(), Rect2(-hw, -hh, w, h))
+
+	# Top and left inner shadow for 3D indentation
+	var inner_top_shade = PackedVector2Array([
+		Vector2(-hw + r, -hh), Vector2(hw - r, -hh),
+		Vector2(hw - r, -hh + 3.0), Vector2(-hw + r, -hh + 3.0)
+	])
+	_draw_node.draw_colored_polygon(inner_top_shade, Color(0.0, 0.0, 0.0, 0.28))
+
+	# 2. 3D Painted Stencil Outline with Break Gap at Entrance
+	var outline_color: Color = Color("facc15") if is_vip else (Color("22c55e") if is_unlocked_plus else (Color("4ade80", 0.75) if is_locked else Color("d1d5db")))
 	if is_departing:
 		outline_color = Color("fbbf24")
 
 	var stencil_pts := PackedVector2Array()
-	# Start at bottom right of the 10px break gap
+	# Start at bottom right of 10px break gap
 	stencil_pts.append(Vector2(5.0, hh))
 	stencil_pts.append(Vector2(hw - r, hh))
 
-	# Bottom-right corner arc (from PI/2 to 0)
+	# Bottom-right corner arc
 	var c_br := Vector2(hw - r, hh - r)
 	for k in range(1, 5):
 		var ang: float = PI / 2.0 - (float(k) / 4.0) * (PI / 2.0)
@@ -111,37 +145,47 @@ func _on_draw_lines() -> void:
 	# Bottom edge to bottom left of the 10px break gap
 	stencil_pts.append(Vector2(-5.0, hh))
 
-	_draw_node.draw_polyline(stencil_pts, outline_color, 2.0, true)
+	# Draw subtle glow under stencil
+	if is_vip:
+		_draw_node.draw_polyline(stencil_pts, Color("eab308", 0.35), 4.5, true)
+	elif is_unlocked_plus:
+		_draw_node.draw_polyline(stencil_pts, Color("86efac", 0.30), 4.5, true)
+	_draw_node.draw_polyline(stencil_pts, outline_color, 2.2, true)
 
-	# 3. Locked padlock visuals
+	# Small green "+" indicator on unlocked PLUS bays (top-right of slot)
+	if is_unlocked_plus:
+		var plus_col := Color("86efac")
+		var cx: float = hw - 10.0
+		var cy: float = -hh + 10.0
+		_draw_node.draw_line(Vector2(cx - 3.5, cy), Vector2(cx + 3.5, cy), plus_col, 1.6)
+		_draw_node.draw_line(Vector2(cx, cy - 3.5), Vector2(cx, cy + 3.5), plus_col, 1.6)
+
+	# 3. Locked slot 3D green "+" unlock pill button (matching reference)
 	if is_locked:
-		var lock_c := Color("e2e8f0", 0.8)
-		# Padlock body
-		_draw_node.draw_rect(Rect2(-8, -2, 16, 12), lock_c, true)
-		# Padlock hoop
-		var sb_hoop := StyleBoxFlat.new()
-		sb_hoop.bg_color = Color.TRANSPARENT
-		sb_hoop.border_color = lock_c
-		sb_hoop.border_width_left = 3
-		sb_hoop.border_width_right = 3
-		sb_hoop.border_width_top = 3
-		sb_hoop.set_corner_radius_all(6)
-		sb_hoop.draw(_draw_node.get_canvas_item(), Rect2(-6, -10, 12, 10))
+		var btn_pos := Vector2(0, 0)
+		# Shadow
+		_draw_node.draw_circle(btn_pos + Vector2(0, 2), 11.0, Color(0, 0, 0, 0.3))
+		# Green button face
+		_draw_node.draw_circle(btn_pos, 10.0, Color("15803d"))
+		_draw_node.draw_circle(btn_pos + Vector2(0, -1), 9.0, Color("22c55e"))
+		# White plus sign
+		_draw_node.draw_line(btn_pos + Vector2(-5, -1), btn_pos + Vector2(5, -1), Color.WHITE, 2.4)
+		_draw_node.draw_line(btn_pos + Vector2(0, -6), btn_pos + Vector2(0, 4), Color.WHITE, 2.4)
 
 	# 4. Reserved chevrons when bus is incoming
 	if is_reserved:
-		var chev_c = Color("bae6fd", 0.95)
-		var chev_dim = Color("bae6fd", 0.50)
-		_draw_node.draw_line(Vector2(-8, -6), Vector2(0, -14), chev_c, 2.0)
-		_draw_node.draw_line(Vector2(0, -14), Vector2(8, -6), chev_c, 2.0)
-		_draw_node.draw_line(Vector2(-8, 4), Vector2(0, -4), chev_c, 2.0)
-		_draw_node.draw_line(Vector2(0, -4), Vector2(8, 4), chev_c, 2.0)
-		_draw_node.draw_line(Vector2(-8, 14), Vector2(0, 6), chev_dim, 1.8)
-		_draw_node.draw_line(Vector2(0, 6), Vector2(8, 14), chev_dim, 1.8)
+		var chev_c = Color("38bdf8", 0.95)
+		var chev_dim = Color("38bdf8", 0.50)
+		_draw_node.draw_line(Vector2(-8, -6), Vector2(0, -14), chev_c, 2.2)
+		_draw_node.draw_line(Vector2(0, -14), Vector2(8, -6), chev_c, 2.2)
+		_draw_node.draw_line(Vector2(-8, 4), Vector2(0, -4), chev_c, 2.2)
+		_draw_node.draw_line(Vector2(0, -4), Vector2(8, 4), chev_c, 2.2)
+		_draw_node.draw_line(Vector2(-8, 14), Vector2(0, 6), chev_dim, 2.0)
+		_draw_node.draw_line(Vector2(0, 6), Vector2(8, 14), chev_dim, 2.0)
 
-	# 4. Departing hatch indicator
+	# 5. Departing hatch indicator
 	if is_departing:
-		var hatch_c: Color = Color("fef3c7", 0.7)
+		var hatch_c: Color = Color("fef08a", 0.75)
 		var hatch_step: float = 8.0
 		var x0: float = -hw + 4.0
 		var y0: float = -hh + 4.0
@@ -156,6 +200,5 @@ func _on_draw_lines() -> void:
 			if cax < cbx:
 				var cay: float = max(y0, (cax - sx) + y0)
 				var cby: float = min(y1, (cbx - sx) + y0)
-				_draw_node.draw_line(Vector2(cax, cay), Vector2(cbx, cby), hatch_c, 1.2)
+				_draw_node.draw_line(Vector2(cax, cay), Vector2(cbx, cby), hatch_c, 1.4)
 			start_x += hatch_step
-
