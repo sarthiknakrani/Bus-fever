@@ -64,7 +64,7 @@ static func animate_dispatch(
 	var P1: Vector2 = start_pos + forward_world * 130.0
 	var P2: Vector2 = corridor_pos
 	if P2.distance_to(start_pos) < 80.0:
-		P2 = Vector2(slot_pos.x, slot_pos.y + 85.0)
+		P2 = slot_pos + Vector2(0.0, 85.0).rotated(slot_rotation)
 
 	if forward_world.y < -0.5:
 		P1.y = maxf(P1.y, P2.y + 10.0)
@@ -111,7 +111,7 @@ static func animate_dispatch(
 		start_scale,
 		true,            # drive_forward
 		front_native,
-		false,           # force_final_rot  (curve geometry handles this)
+		true,            # force_final_rot
 		final_rot_target
 	)
 	tw.tween_method(curve_callable, 0.0, 1.0, duration) \
@@ -289,25 +289,36 @@ static func animate_departure(
 		])
 		if is_instance_valid(vehicle_node):
 			vehicle_node.visible = false
+			if vehicle_node.get_parent() != null:
+				vehicle_node.get_parent().remove_child(vehicle_node)
+			vehicle_node.queue_free()
 		if is_instance_valid(controller):
 			controller.on_vehicle_departed_from_slot(vehicle_id, slot_id, token)
 	)
 
-static func _update_curve(t: float, curve: Curve2D, v_node: Node2D, target_scale: Vector2, start_scale: Vector2, drive_forward: bool, front_native: Vector2, _force_final_rot: bool = false, _final_rot_target: float = 0.0) -> void:
+static func _update_curve(t: float, curve: Curve2D, v_node: Node2D, target_scale: Vector2, start_scale: Vector2, drive_forward: bool, front_native: Vector2, force_final_rot: bool = false, final_rot_target: float = 0.0) -> void:
 	if not is_instance_valid(v_node): return
-	var total_len = curve.get_baked_length()
-	var offset = t * total_len
-	var pos = curve.sample_baked(offset)
+	var total_len: float = curve.get_baked_length()
+	var offset: float = t * total_len
+	var pos: Vector2 = curve.sample_baked(offset)
 	v_node.position = pos
 
-	# Sample slightly ahead for tangent-based rotation
-	var offset_ahead = min(total_len, offset + 2.0)
-	var pos_ahead = curve.sample_baked(offset_ahead)
+	# Central difference for robust, jitter-free tangent calculation
+	var offset_back: float = maxf(0.0, offset - 2.0)
+	var offset_ahead: float = minf(total_len, offset + 2.0)
+	var pos_back: Vector2 = curve.sample_baked(offset_back)
+	var pos_ahead: Vector2 = curve.sample_baked(offset_ahead)
 
-	if pos.distance_to(pos_ahead) > 0.1:
-		var dir = (pos_ahead - pos).normalized()
+	if pos_back.distance_to(pos_ahead) > 0.01:
+		var dir := (pos_ahead - pos_back).normalized()
 		if not drive_forward:
 			dir = -dir
-		v_node.rotation = dir.angle() - front_native.angle()
+		var tangent_rot: float = dir.angle() - front_native.angle()
+		# In final 25% of the curve approach into the parking bay, smoothly blend directly to final_rot_target
+		if force_final_rot and t > 0.75:
+			var blend: float = clampf((t - 0.75) / 0.25, 0.0, 1.0)
+			v_node.rotation = lerp_angle(tangent_rot, final_rot_target, blend)
+		else:
+			v_node.rotation = tangent_rot
 
 	v_node.scale = start_scale.lerp(target_scale, t)

@@ -3,21 +3,21 @@ shader_type canvas_item;
 // Periodic Glossy Shine / Specular Sweep Shader for "BUS FEVER PARTY!" title logo
 // Sweeps a bright glossy diagonal shine across the text letters every 2 seconds.
 
-uniform bool use_time_cycle = false;
-uniform float cycle_duration : hint_range(0.5, 10.0) = 2.0;   // Every 2.0 seconds
-uniform float sweep_duration : hint_range(0.2, 2.0) = 0.70;    // Active sweep time (0.7s sweep + 1.3s pause)
+uniform bool use_time_cycle = true;
+uniform float cycle_duration : hint_range(0.5, 10.0) = 3.2;   // Every 3.2 seconds
+uniform float sweep_duration : hint_range(0.2, 5.0) = 1.8;    // Active smooth sweep time
 uniform float manual_progress : hint_range(-0.6, 1.6) = -0.5; // Manual control override via Tween
 
 uniform float shine_angle : hint_range(0.0, 89.0) = 28.0;     // Diagonal sweep angle in degrees
-uniform float shine_width : hint_range(0.02, 0.5) = 0.08;      // Crisp, thin main glint beam
-uniform float shine_softness : hint_range(0.01, 0.4) = 0.04;   // Sleek edge feathering
+uniform float shine_width : hint_range(0.01, 0.3) = 0.035;    // Crisp, slender main glint beam
+uniform float shine_softness : hint_range(0.005, 0.2) = 0.018; // Sleek edge feathering
 uniform vec4 shine_color : source_color = vec4(1.0, 1.0, 1.0, 1.0); // Crisp pure glossy white shine
 
 // Secondary trailing gloss beam (casual mobile game standard)
 uniform bool enable_secondary_beam = true;
-uniform float secondary_offset : hint_range(0.05, 0.4) = 0.09;
-uniform float secondary_width : hint_range(0.01, 0.3) = 0.025;
-uniform float secondary_alpha : hint_range(0.1, 1.0) = 0.55;
+uniform float secondary_offset : hint_range(0.02, 0.3) = 0.045;
+uniform float secondary_width : hint_range(0.005, 0.2) = 0.012;
+uniform float secondary_alpha : hint_range(0.1, 1.0) = 0.35;
 
 varying vec2 sweep_dir;
 

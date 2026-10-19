@@ -1,7 +1,5 @@
 extends Node
 
-const SimpleStyle := preload("res://scripts/ui/style_helpers.gd")
-
 # ---------- 3D-style helpers ----------
 # A simple "extruded" label: one dark offset duplicate beneath the front label
 # gives the text a clean, raised look without stacked shadows / gloss.
@@ -10,6 +8,8 @@ const BG_COLOR := Color("cfe8ff")
 const PLAY_FRONT := Color("4ade80")
 const PLAY_BACK := Color("15803d")
 
+var _root_ctrl: Control
+var _hud_ctrl: Control
 var _settings_overlay: Control
 var _settings_panel: PanelContainer
 
@@ -20,6 +20,7 @@ var _logo_rect: TextureRect
 var _logo_tween: Tween
 var _logo_shine_tween: Tween
 var _play_btn: TextureButton
+var _is_transitioning: bool = false
 
 
 func _ready() -> void:
@@ -35,32 +36,33 @@ func _build_ui() -> void:
 	for c in get_children():
 		c.queue_free()
 
-	var root := Control.new()
-	root.set_anchors_preset(Control.PRESET_FULL_RECT)
-	root.name = "HomeRoot"
-	add_child(root)
+	_root_ctrl = Control.new()
+	_root_ctrl.name = "HomeRoot"
+	_root_ctrl.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_root_ctrl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_root_ctrl)
 
 	# A. Full portrait 3D isometric town background (static)
 	_bg_rect = TextureRect.new()
 	_bg_rect.name = "Background3D"
-	_bg_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_bg_rect.texture = load("res://assets/home_bg_retina.jpg")
 	_bg_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_bg_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	_bg_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_bg_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.add_child(_bg_rect)
+	_root_ctrl.add_child(_bg_rect)
 
-	var hud := Control.new()
-	hud.name = "HUD"
-	hud.set_anchors_preset(Control.PRESET_FULL_RECT)
-	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.add_child(hud)
+	_hud_ctrl = Control.new()
+	_hud_ctrl.name = "HUD"
+	_hud_ctrl.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_hud_ctrl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root_ctrl.add_child(_hud_ctrl)
 
 	# B. Premium 3D Game Title Logo ("BUS FEVER PARTY!" - static)
 	_logo_wrapper = Control.new()
 	_logo_wrapper.name = "TitleLogoWrapper"
 	_logo_wrapper.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hud.add_child(_logo_wrapper)
+	_hud_ctrl.add_child(_logo_wrapper)
 
 	_logo_rect = TextureRect.new()
 	_logo_rect.name = "LogoTexture"
@@ -72,13 +74,14 @@ func _build_ui() -> void:
 
 	var shine_mat := ShaderMaterial.new()
 	shine_mat.shader = load("res://assets/shaders/logo_gloss_shine.gdshader")
-	shine_mat.set_shader_parameter("cycle_duration", 3.5)
-	shine_mat.set_shader_parameter("sweep_duration", 2.2)
-	shine_mat.set_shader_parameter("shine_width", 0.08)
-	shine_mat.set_shader_parameter("shine_softness", 0.04)
-	shine_mat.set_shader_parameter("secondary_width", 0.025)
-	shine_mat.set_shader_parameter("secondary_offset", 0.09)
-	shine_mat.set_shader_parameter("use_time_cycle", false)
+	shine_mat.set_shader_parameter("cycle_duration", 3.2)
+	shine_mat.set_shader_parameter("sweep_duration", 1.8)
+	shine_mat.set_shader_parameter("shine_width", 0.035)
+	shine_mat.set_shader_parameter("shine_softness", 0.018)
+	shine_mat.set_shader_parameter("secondary_width", 0.012)
+	shine_mat.set_shader_parameter("secondary_offset", 0.045)
+	shine_mat.set_shader_parameter("secondary_alpha", 0.35)
+	shine_mat.set_shader_parameter("use_time_cycle", true)
 	_logo_rect.material = shine_mat
 
 	_logo_wrapper.add_child(_logo_rect)
@@ -90,18 +93,18 @@ func _build_ui() -> void:
 	_settings_btn.texture_pressed = load("res://assets/ui/buttons/settings_gear_pressed.svg")
 	_settings_btn.ignore_texture_size = true
 	_settings_btn.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
-	_settings_btn.anchor_left = 1.0
-	_settings_btn.anchor_right = 1.0
-	_settings_btn.anchor_top = 0.0
-	_settings_btn.anchor_bottom = 0.0
-	_settings_btn.offset_left = -88.0
-	_settings_btn.offset_right = -24.0
-	_settings_btn.offset_top = 28.0
-	_settings_btn.offset_bottom = 92.0
 	_settings_btn.mouse_filter = Control.MOUSE_FILTER_STOP
-	_settings_btn.pivot_offset = Vector2(32, 32)
+	_settings_btn.focus_mode = Control.FOCUS_NONE
 	_settings_btn.pressed.connect(_on_settings_pressed)
-	hud.add_child(_settings_btn)
+	_settings_btn.button_down.connect(func():
+		var tw := _settings_btn.create_tween()
+		tw.tween_property(_settings_btn, "scale", Vector2(0.90, 0.90), 0.06).set_trans(Tween.TRANS_QUAD)
+	)
+	_settings_btn.button_up.connect(func():
+		var tw := _settings_btn.create_tween()
+		tw.tween_property(_settings_btn, "scale", Vector2.ONE, 0.08).set_trans(Tween.TRANS_QUAD)
+	)
+	_hud_ctrl.add_child(_settings_btn)
 
 	# D. Bottom-center Play button (Glossy 3D Candy Orange Button - static)
 	_play_btn = TextureButton.new()
@@ -111,19 +114,33 @@ func _build_ui() -> void:
 	_play_btn.ignore_texture_size = true
 	_play_btn.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
 	_play_btn.mouse_filter = Control.MOUSE_FILTER_STOP
-	_play_btn.pressed.connect(func():
-		if _play_btn.disabled: return
-		_play_btn.disabled = true
-		_on_play_pressed()
+	_play_btn.focus_mode = Control.FOCUS_NONE
+	_play_btn.pressed.connect(_on_play_pressed)
+	_play_btn.button_down.connect(func():
+		var tw := _play_btn.create_tween()
+		tw.tween_property(_play_btn, "scale", Vector2(0.94, 0.94), 0.06).set_trans(Tween.TRANS_QUAD)
 	)
-	hud.add_child(_play_btn)
+	_play_btn.button_up.connect(func():
+		var tw := _play_btn.create_tween()
+		tw.tween_property(_play_btn, "scale", Vector2.ONE, 0.08).set_trans(Tween.TRANS_QUAD)
+	)
+	_hud_ctrl.add_child(_play_btn)
 
 
 func _on_play_pressed() -> void:
+	if _is_transitioning:
+		return
+	_is_transitioning = true
 	if _logo_shine_tween != null and _logo_shine_tween.is_valid():
 		_logo_shine_tween.kill()
 	AudioManager.play(AudioManager.SFX_UI)
 	GameController.start_level(GameController.current_level_number)
+	# Safety re-arm if transition takes a moment or is cancelled
+	var t := get_tree()
+	if t != null:
+		t.create_timer(1.5).timeout.connect(func():
+			_is_transitioning = false
+		)
 
 
 func _on_settings_pressed() -> void:
@@ -134,55 +151,77 @@ func _on_settings_pressed() -> void:
 func _show_settings_overlay() -> void:
 	if _settings_overlay != null and is_instance_valid(_settings_overlay):
 		_settings_overlay.queue_free()
+		_settings_overlay = null
 
 	_settings_overlay = Control.new()
-	_settings_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_settings_overlay.name = "SettingsOverlay"
+	_settings_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	_hud_ctrl.add_child(_settings_overlay)
+	_settings_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 	# Scrim
 	var scrim := ColorRect.new()
+	scrim.name = "Scrim"
 	scrim.color = Color(0, 0, 0, 0.55)
-	scrim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	scrim.mouse_filter = Control.MOUSE_FILTER_STOP
+	var scrim_state := {"pressed": false}
+	scrim.gui_input.connect(func(event: InputEvent):
+		if (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT) or event is InputEventScreenTouch:
+			if event.pressed:
+				scrim_state["pressed"] = true
+			elif scrim_state["pressed"]:
+				AudioManager.play(AudioManager.SFX_UI)
+				if _settings_overlay != null and is_instance_valid(_settings_overlay):
+					_settings_overlay.queue_free()
+					_settings_overlay = null
+	)
 	_settings_overlay.add_child(scrim)
+	scrim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.name = "CenterContainer"
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_settings_overlay.add_child(center)
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 	# Wrapper Control so the close button can anchor freely OUTSIDE the
 	# PanelContainer (PanelContainer forces child layout and ignores anchors).
 	var wrapper := Control.new()
+	wrapper.name = "ModalWrapper"
 	wrapper.custom_minimum_size = Vector2(280, 250)
 	wrapper.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	center.add_child(wrapper)
 
 	_settings_panel = PanelContainer.new()
-	_settings_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_settings_panel.name = "PanelContainer"
 	var ps := StyleBoxFlat.new()
 	ps.bg_color = Color("fcf8ef")
 	ps.border_width_bottom = 4
 	ps.border_color = Color("e0d2b8")
 	ps.set_corner_radius_all(24)
-	ps.shadow_color = Color(0,0,0,0.3)
+	ps.shadow_color = Color(0, 0, 0, 0.3)
 	ps.shadow_size = 9
 	ps.shadow_offset = Vector2(0, 6)
 	_settings_panel.add_theme_stylebox_override("panel", ps)
 	wrapper.add_child(_settings_panel)
+	_settings_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	
 	# Subtle gloss Panel OVER the settings panel
-	var pop_gloss = Panel.new()
-	pop_gloss.set_anchors_preset(Control.PRESET_FULL_RECT)
-	pop_gloss.anchor_bottom = 0.5
+	var pop_gloss := Panel.new()
+	pop_gloss.name = "GlossPanel"
 	pop_gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var pg_style = StyleBoxFlat.new()
+	var pg_style := StyleBoxFlat.new()
 	pg_style.bg_color = Color(1, 1, 1, 0.18) # Clean subtle gloss, does not wash out title
 	pg_style.corner_radius_top_left = 24
 	pg_style.corner_radius_top_right = 24
 	pop_gloss.add_theme_stylebox_override("panel", pg_style)
 	wrapper.add_child(pop_gloss)
+	pop_gloss.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	pop_gloss.anchor_bottom = 0.5
+	pop_gloss.offset_bottom = 0.0
 
 	var margin := MarginContainer.new()
+	margin.name = "MarginContainer"
 	margin.add_theme_constant_override("margin_left", 22)
 	margin.add_theme_constant_override("margin_right", 22)
 	margin.add_theme_constant_override("margin_top", 20)
@@ -190,10 +229,12 @@ func _show_settings_overlay() -> void:
 	_settings_panel.add_child(margin)
 
 	var vbox := VBoxContainer.new()
+	vbox.name = "MainVBox"
 	vbox.add_theme_constant_override("separation", 12)
 	margin.add_child(vbox)
 
 	var title := Label.new()
+	title.name = "SettingsTitle"
 	title.text = "Settings"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 22)
@@ -201,11 +242,13 @@ func _show_settings_overlay() -> void:
 	vbox.add_child(title)
 
 	var line := ColorRect.new()
+	line.name = "DividerLine"
 	line.custom_minimum_size = Vector2(0, 2)
 	line.color = Color("d4c3ad")
 	vbox.add_child(line)
 
 	var toggles := VBoxContainer.new()
+	toggles.name = "TogglesVBox"
 	toggles.add_theme_constant_override("separation", 10)
 	vbox.add_child(toggles)
 
@@ -223,8 +266,11 @@ func _show_settings_overlay() -> void:
 	# --- Professional Vector Close Button (44x44 minimum touch target) ---
 	var close_btn := _create_close_button(func():
 		AudioManager.play(AudioManager.SFX_UI)
-		_settings_overlay.queue_free()
+		if _settings_overlay != null and is_instance_valid(_settings_overlay):
+			_settings_overlay.queue_free()
+			_settings_overlay = null
 	)
+	close_btn.name = "CloseButton"
 	close_btn.anchor_left = 1.0
 	close_btn.anchor_right = 1.0
 	close_btn.anchor_top = 0.0
@@ -234,8 +280,6 @@ func _show_settings_overlay() -> void:
 	close_btn.offset_right = 22.0
 	close_btn.offset_bottom = 30.0
 	wrapper.add_child(close_btn)
-
-	add_child(_settings_overlay)
 
 
 func _create_custom_toggle(text: String, icon_path: String, is_on: bool, on_toggle: Callable) -> Control:
@@ -337,7 +381,7 @@ func _create_custom_toggle(text: String, icon_path: String, is_on: bool, on_togg
 	pill.add_child(hit)
 
 	var state := {"on": is_on}
-	hit.pressed.connect(func():
+	var toggle_fn = func():
 		AudioManager.play(AudioManager.SFX_UI)
 		state["on"] = not state["on"]
 		var on = state["on"]
@@ -345,11 +389,16 @@ func _create_custom_toggle(text: String, icon_path: String, is_on: bool, on_togg
 		pill_style.border_color = Color("14532d") if on else Color("4b5563")
 		knob.position.x = (PILL_W - KNOB - PAD) if on else PAD
 		on_toggle.call(on)
+
+	hit.pressed.connect(toggle_fn)
+	hit.gui_input.connect(func(event: InputEvent):
+		if event is InputEventScreenTouch and not event.pressed:
+			toggle_fn.call()
 	)
 
-	var wrap := CenterContainer.new()
-	wrap.add_child(pill)
-	row.add_child(wrap)
+	var pill_center := CenterContainer.new()
+	pill_center.add_child(pill)
+	row.add_child(pill_center)
 	return row
 
 
@@ -413,6 +462,10 @@ func _create_close_button(on_close: Callable) -> Button:
 	btn.pressed.connect(func():
 		on_close.call()
 	)
+	btn.gui_input.connect(func(event: InputEvent):
+		if event is InputEventScreenTouch and not event.pressed:
+			on_close.call()
+	)
 	return btn
 
 func _exit_tree() -> void:
@@ -429,10 +482,7 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 	if vp_size.x <= 0 or vp_size.y <= 0:
 		vp_size = Vector2(720, 1280)
 
-	# Background wallpaper remains static and rock-solid (no screen-wide motion)
-	if _bg_rect != null and is_instance_valid(_bg_rect):
-		_bg_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
-
+	# root/hud/bg_rect use PRESET_FULL_RECT anchors — no manual size needed
 
 	# Aspect ratio of the master 3D logo
 	var logo_aspect: float = 732.0 / 664.0
@@ -441,38 +491,46 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 		if tex_size.y > 0.0:
 			logo_aspect = tex_size.x / tex_size.y
 
-	# Compact 3D Orange Play Button: 44% width, capped at 260px, elevated higher up (81% height)
-	var btn_w: float = minf(vp_size.x * 0.44, 260.0)
+	# Top-right Settings button (explicit positioning matching visual button)
+	if _settings_btn != null and is_instance_valid(_settings_btn):
+		var s_size: float = 64.0
+		_settings_btn.size = Vector2(s_size, s_size)
+		_settings_btn.position = Vector2(vp_size.x - s_size - 24.0, 28.0)
+		_settings_btn.pivot_offset = Vector2(s_size * 0.5, s_size * 0.5)
+		_settings_btn.rotation = 0.0
+
+	# Compact 3D Orange Play Button: 48% width, capped at 280px, elevated higher up (81% height)
+	var btn_w: float = minf(vp_size.x * 0.48, 280.0)
 	var btn_h: float = btn_w * (590.0 / 1160.0) # aspect ~0.5086
 	var btn_y: float = (vp_size.y * 0.81) - (btn_h * 0.5)
 	if _play_btn != null and is_instance_valid(_play_btn):
 		_play_btn.size = Vector2(btn_w, btn_h)
 		_play_btn.position = Vector2((vp_size.x - btn_w) * 0.5, btn_y)
 		_play_btn.pivot_offset = Vector2(btn_w * 0.5, btn_h * 0.5)
+		_play_btn.scale = Vector2.ONE
+		_play_btn.rotation = 0.0
 
 	# Sky / Cloud Zone constraints:
-	# Top clearance below Settings button
-	var top_clearance: float = 65.0
-	# Background skyline horizon starts at ~0.3706 of screen height (clock tower / palm trees).
-	# Max cloud bottom is 0.355 of screen height to guarantee the logo stays 100% in the clouds
-	# and NEVER overlaps background town buildings, clock tower, or palm trees below.
-	var max_cloud_bottom: float = vp_size.y * 0.355
-	var cloud_zone_h: float = maxf(120.0, max_cloud_bottom - top_clearance)
+	# Top clearance ensures comfortable headroom below status bar / bezel and settings button (bottom at ~92px)
+	var top_clearance: float = maxf(140.0, vp_size.y * 0.18)
+	# Skyline starts at ~43.5% of height (palm trees, clock tower, colorful rooftops)
+	var skyline_top: float = vp_size.y * 0.435
+	var available_sky_h: float = maxf(120.0, skyline_top - top_clearance)
 
-	# Responsive width: prominently enlarged to fill cloud area (up to 75% width, max 540px)
-	var max_w: float = minf(vp_size.x * 0.75, 540.0)
+	# Responsive width: comfortably fills cloud area without stretching across screen edge
+	var max_w: float = minf(vp_size.x * 0.70, 460.0)
 	var logo_w: float = max_w
 	var logo_h: float = logo_w / logo_aspect
 
-	# Ensure logo fits strictly within the cloud zone with 8% vertical cushion
-	var max_cloud_h: float = cloud_zone_h * 0.92
-	if logo_h > max_cloud_h:
-		logo_h = max_cloud_h
+	# Fit within available sky zone so it never overlaps the town buildings or palm trees
+	var max_logo_h: float = available_sky_h * 0.82
+	if logo_h > max_logo_h:
+		logo_h = max_logo_h
 		logo_w = logo_h * logo_aspect
 
-	# Perfectly center horizontally and vertically within the open cloud/sky zone
+	# Horizontally centered, shifted distinctly lower down into the sky zone (user requested: aur thoda niche kar)
 	var logo_x: float = (vp_size.x - logo_w) * 0.5
-	var logo_y: float = top_clearance + (cloud_zone_h - logo_h) * 0.45
+	var logo_y: float = top_clearance + (available_sky_h - logo_h) * 0.82
 
 	_logo_wrapper.position = Vector2(logo_x, logo_y)
 	_logo_wrapper.size = Vector2(logo_w, logo_h)
@@ -484,17 +542,11 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 	if _logo_rect != null and is_instance_valid(_logo_rect):
 		_logo_rect.position = Vector2.ZERO
 		_logo_rect.size = Vector2(logo_w, logo_h)
-
-	if _play_btn != null and is_instance_valid(_play_btn):
-		_play_btn.scale = Vector2.ONE
-		_play_btn.rotation = 0.0
-
-	if _settings_btn != null and is_instance_valid(_settings_btn):
-		_settings_btn.rotation = 0.0
+		_logo_rect.pivot_offset = Vector2(logo_w * 0.5, logo_h * 0.5)
+		_logo_rect.scale = Vector2.ONE
 
 
 func _play_logo_entrance_animation() -> void:
-	# Keep home screen UI stationary
 	if _logo_wrapper != null and is_instance_valid(_logo_wrapper):
 		_logo_wrapper.scale = Vector2.ONE
 		_logo_wrapper.rotation = 0.0
@@ -505,7 +557,6 @@ func _play_logo_entrance_animation() -> void:
 	if _settings_btn != null and is_instance_valid(_settings_btn):
 		_settings_btn.rotation = 0.0
 
-	# Start periodic 2.0-second glossy shine animation across the title text
 	_start_logo_shine_animation()
 
 
@@ -516,20 +567,15 @@ func _start_logo_shine_animation() -> void:
 	if sm == null:
 		return
 
-	if _logo_shine_tween != null and _logo_shine_tween.is_valid():
-		_logo_shine_tween.kill()
-
-	sm.set_shader_parameter("use_time_cycle", false)
-	sm.set_shader_parameter("manual_progress", -0.5)
-
-	_logo_shine_tween = create_tween().set_loops()
-	# Slower, calm, thin, luxurious diagonal gloss sweep across the title text
-	_logo_shine_tween.tween_property(sm, "shader_parameter/manual_progress", 1.5, 2.2)\
-		.from(-0.5)\
-		.set_trans(Tween.TRANS_SINE)\
-		.set_ease(Tween.EASE_IN_OUT)
-	# 1.3s calm rest before the next sweep (total 2.2s + 1.3s = 3.5s cycle)
-	_logo_shine_tween.tween_interval(1.3)
+	# Hardware GPU-accelerated specular sweep via built-in TIME (smooth 60/120fps, zero lag)
+	sm.set_shader_parameter("use_time_cycle", true)
+	sm.set_shader_parameter("cycle_duration", 3.2)
+	sm.set_shader_parameter("sweep_duration", 1.8)
+	sm.set_shader_parameter("shine_width", 0.035)
+	sm.set_shader_parameter("shine_softness", 0.018)
+	sm.set_shader_parameter("secondary_width", 0.012)
+	sm.set_shader_parameter("secondary_offset", 0.045)
+	sm.set_shader_parameter("secondary_alpha", 0.35)
 
 
 

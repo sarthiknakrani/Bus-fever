@@ -18,11 +18,25 @@ var _is_boarding: bool = false
 var _is_waiting: bool = false
 var _last_pos: Vector2 = Vector2.ZERO
 var _facing_right: bool = true
+var _smoothed_speed: float = 0.0
 
-const BASE_SCALE := 0.282
+const BASE_SCALE := 0.30
+const IDLE_FRAME := 6
+const RUN_FRAMES := 6
+const TOTAL_FRAMES := 8
+
+func set_movement_direction(tangent: Vector2) -> void:
+	if absf(tangent.x) > 0.2:
+		_facing_right = (tangent.x > 0.0)
 
 func set_waiting(waiting: bool) -> void:
 	_is_waiting = waiting
+	if _is_waiting:
+		_smoothed_speed = 0.0
+		if _is_animated and _char_sprite != null:
+			_char_sprite.frame = IDLE_FRAME
+			_char_sprite.rotation = 0.0
+			_char_sprite.position.y = 0.0
 
 func setup(p_col_id: String, p_id: int = 0, p_lane: int = 0) -> void:
 	_color_id = p_col_id.to_lower()
@@ -39,7 +53,7 @@ func setup(p_col_id: String, p_id: int = 0, p_lane: int = 0) -> void:
 		_shadow.texture = t_shadow
 	_shadow.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	_shadow.position = Vector2(0, 0)
-	_shadow.scale = Vector2(0.36, 0.19)
+	_shadow.scale = Vector2(0.30, 0.15)
 	_shadow.modulate = Color(0, 0, 0, 0.45)
 	_shadow.z_index = -1
 	add_child(_shadow)
@@ -69,9 +83,9 @@ func setup(p_col_id: String, p_id: int = 0, p_lane: int = 0) -> void:
 	if tex_char != null:
 		_char_sprite.texture = tex_char
 		if tex_char.get_width() >= 192 * 6:
-			_char_sprite.hframes = 8
+			_char_sprite.hframes = TOTAL_FRAMES
 			_char_sprite.vframes = 1
-			_char_sprite.frame = 0
+			_char_sprite.frame = IDLE_FRAME
 			_is_animated = true
 		else:
 			_is_animated = false
@@ -97,41 +111,43 @@ func _process(delta: float) -> void:
 		if _last_pos != Vector2.ZERO:
 			moved_dist = current_pos.distance_to(_last_pos)
 			var dx := current_pos.x - _last_pos.x
-			if dx > 0.4 and not _facing_right:
-				_facing_right = true
-			elif dx < -0.4 and _facing_right:
-				_facing_right = false
+			if absf(dx) > 1.0:
+				_facing_right = (dx > 0.0)
 		_last_pos = current_pos
+
+		if delta > 0.0:
+			var inst_speed = moved_dist / delta
+			_smoothed_speed = lerpf(_smoothed_speed, inst_speed, minf(1.0, 16.0 * delta))
 
 		var facing_sign: float = 1.0 if _facing_right else -1.0
 
-		if _is_waiting or moved_dist < 0.15:
-			# Waiting/Idle state in feeder queue
-			_idle_time += delta * 1.6
-			if _is_animated:
-				var idle_frame: int = 6 + (int(floor(_idle_time)) % 2)
-				_char_sprite.frame = idle_frame
-			_char_sprite.position.y = 0.0
-			_char_sprite.rotation = 0.0
-			_char_sprite.scale = Vector2(facing_sign, 1.0)
+		if _is_waiting or _smoothed_speed < 12.0:
+			# Immediately snap to idle frame when stopped or waiting in queue
+			if _is_animated and _char_sprite != null:
+				_char_sprite.frame = IDLE_FRAME
+			if _char_sprite != null:
+				_char_sprite.position.y = 0.0
+				_char_sprite.rotation = 0.0
+				_char_sprite.scale = Vector2(facing_sign, 1.0)
 			if _shadow != null:
-				_shadow.scale = Vector2(0.36, 0.19)
+				_shadow.scale = Vector2(0.24, 0.12)
 				_shadow.modulate.a = 0.45
 		else:
 			# Real Running Cycle synchronized directly with movement distance
-			# Frame changes smoothly with actual travel speed (stride ~ 75px for brisk pace)
-			_anim_time += moved_dist / 75.0
-			if _is_animated:
-				var run_frame: int = int(floor(fmod(_anim_time + _phase_offset, 1.0) * 6.0)) % 6
+			# Frame changes smoothly across all 8 running frames with actual travel speed (stride ~ 36px)
+			_anim_time += moved_dist / 36.0
+			if _is_animated and _char_sprite != null:
+				var run_frame: int = int(floor(fmod(_anim_time + _phase_offset, 1.0) * float(RUN_FRAMES))) % RUN_FRAMES
 				_char_sprite.frame = run_frame
 			
-			# Subtle forward lean in running direction
-			_char_sprite.rotation = facing_sign * deg_to_rad(2.5)
-			_char_sprite.position.y = 0.0
-			_char_sprite.scale = Vector2(facing_sign, 1.0)
+			if _char_sprite != null:
+				# Subtle forward lean in running direction
+				_char_sprite.rotation = facing_sign * deg_to_rad(2.5)
+				_char_sprite.position.y = 0.0
+				_char_sprite.scale = Vector2(facing_sign, 1.0)
 			
 			if _shadow != null:
-				_shadow.scale = Vector2(0.36, 0.19)
+				_shadow.scale = Vector2(0.30, 0.15)
 				_shadow.modulate.a = 0.45
 
 func animate_jump(delay: float) -> void:
@@ -150,7 +166,7 @@ func animate_jump(delay: float) -> void:
 		tw.tween_interval(delay)
 		
 	# Boarding leap arc
-	tw.tween_property(_char_sprite, "position:y", -24.0, 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(_char_sprite, "position:y", -18.0, 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tw.tween_property(_char_sprite, "position:y", 0.0, 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	
 	var tw2 := create_tween()

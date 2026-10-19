@@ -14,15 +14,16 @@ var p_parking_y: float = -9999.0
 var p_parking_h: float = 94.0
 var p_straight_x: float = 105.0
 
-const GATEWAY_HALF_WIDTH: float = 95.0
+const GATEWAY_HALF_WIDTH: float = 55.0
 
 # Authoritative source-of-truth track grey matching passenger track & connector
-const COLOR_TRACK_GREY := Color("767786")
-const COLOR_ROAD := Color("767786")
-const COLOR_CURB_HIGHLIGHT := Color("f8fafc")
+const COLOR_TRACK_GREY := Color("727382")
+const COLOR_ROAD := Color("727382")
+const COLOR_CURB_FACE := Color("4b4d5a") # Vertical 3D curb wall face
+const COLOR_CURB_HIGHLIGHT := Color("ffffff")
 const COLOR_CURB_BEVEL := Color("a5abc2")
-const COLOR_CURB_BEVEL_OUTER := Color("949ab1")
-const COLOR_SHADOW := Color(0.0, 0.0, 0.0, 0.12)
+const COLOR_CURB_BEVEL_OUTER := Color("868ba0")
+const COLOR_SHADOW := Color(0.04, 0.10, 0.04, 0.22)
 const COLOR_PLAYFIELD := Color("d2d5e4") # Swatch 1 light lavender playfield
 
 func setup_full(
@@ -137,9 +138,10 @@ func _draw() -> void:
 		var omt: float = 1.0 - t
 		left_corner.append(omt * omt * p0_l + 2.0 * omt * t * p1_l + t * t * p2_l)
 
-	# Build station polygon
+	# Build station polygon (seamlessly welded into gateway throat)
 	var station_poly := PackedVector2Array()
-	station_poly.append(Vector2(-gate_hw, top_y))
+	station_poly.append(Vector2(-gate_hw, top_y - 25.0))
+	station_poly.append(Vector2(gate_hw, top_y - 25.0))
 	station_poly.append(Vector2(gate_hw, top_y))
 	station_poly.append(Vector2(top_shoulder_x - 12.0, top_y))
 	for pt in right_corner:
@@ -151,6 +153,7 @@ func _draw() -> void:
 	for i in range(left_corner.size() - 1, -1, -1):
 		station_poly.append(left_corner[i])
 	station_poly.append(Vector2(-top_shoulder_x + 12.0, top_y))
+	station_poly.append(Vector2(-gate_hw, top_y))
 
 	draw_colored_polygon(station_poly, color_track_grey)
 
@@ -158,14 +161,15 @@ func _draw() -> void:
 	var btm_left := Vector2(-fill_hw, plat_btm)
 	var btm_right := Vector2(fill_hw, plat_btm)
 
-	# Drop shadow onto lower lavender playfield (4–6 px height)
-	draw_line(btm_left + Vector2(0.0, 3.0), btm_right + Vector2(0.0, 3.0), color_shadow, 5.0)
+	# Deep 2.5D drop shadow onto lower lavender playfield (6–8 px height)
+	draw_line(btm_left + Vector2(0.0, 4.0), btm_right + Vector2(0.0, 4.0), color_shadow, 8.0)
+	# 3D step face
+	draw_line(btm_left + Vector2(0.0, 2.0), btm_right + Vector2(0.0, 2.0), COLOR_CURB_FACE, 5.5)
 	# Curb bevel & crisp highlight
-	draw_line(btm_left, btm_right, curb_bevel, 3.5)
-	draw_line(btm_left, btm_right, curb_highlight, 2.0)
+	draw_line(btm_left, btm_right, curb_bevel, 5.0)
+	draw_line(btm_left, btm_right, curb_highlight, 3.2)
 
 	# 4. 3D outer curbs along flat top edges, rounded corners, and diagonal side walls
-	# Right outer curb: from throat opening (+gate_hw, top_y) outward and down to (fill_hw, shoulder_bottom_y)
 	var right_curb := PackedVector2Array()
 	right_curb.append(Vector2(gate_hw, top_y))
 	right_curb.append(Vector2(top_shoulder_x - 12.0, top_y))
@@ -173,7 +177,6 @@ func _draw() -> void:
 		right_curb.append(pt)
 	right_curb.append(Vector2(fill_hw, shoulder_bottom_y))
 
-	# Left outer curb: from throat opening (-gate_hw, top_y) outward and down to (-fill_hw, shoulder_bottom_y)
 	var left_curb := PackedVector2Array()
 	left_curb.append(Vector2(-gate_hw, top_y))
 	left_curb.append(Vector2(-top_shoulder_x + 12.0, top_y))
@@ -181,15 +184,30 @@ func _draw() -> void:
 		left_curb.append(pt)
 	left_curb.append(Vector2(-fill_hw, shoulder_bottom_y))
 
-	# 3D outer curb: 6.0px outer bevel (#949AB1), 3.5px inner bevel (#A5ABC2), 2.2px crisp white top highlight (#F8FAFC)
-	# (Does NOT draw across the [-GATEWAY_HALF_WIDTH, +GATEWAY_HALF_WIDTH] throat opening)
-	draw_polyline(right_curb, curb_bevel_outer, 6.0, true)
-	draw_polyline(right_curb, curb_bevel, 3.5, true)
-	draw_polyline(right_curb, curb_highlight, 2.2, true)
+	# Drop shadows onto surrounding lawn
+	var shadow_dy := Vector2(0.0, 5.0)
+	var s_right := PackedVector2Array()
+	for pt in right_curb: s_right.append(pt + shadow_dy)
+	var s_left := PackedVector2Array()
+	for pt in left_curb: s_left.append(pt + shadow_dy)
+	draw_polyline(s_right, color_shadow, 9.0, true)
+	draw_polyline(s_left, color_shadow, 9.0, true)
 
-	draw_polyline(left_curb, curb_bevel_outer, 6.0, true)
-	draw_polyline(left_curb, curb_bevel, 3.5, true)
-	draw_polyline(left_curb, curb_highlight, 2.2, true)
+	# 3D Raised curb wall faces (extruded downwards by 3.5px)
+	var wall_dy := Vector2(0.0, 3.5)
+	var w_right := PackedVector2Array()
+	for pt in right_curb: w_right.append(pt + wall_dy)
+	var w_left := PackedVector2Array()
+	for pt in left_curb: w_left.append(pt + wall_dy)
+	draw_polyline(w_right, COLOR_CURB_FACE, 7.5, true)
+	draw_polyline(w_left, COLOR_CURB_FACE, 7.5, true)
+
+	# PROMINENT THICK 3D WHITE & BEVEL CURBS (4.2px white rim, 6.5px bevel)
+	draw_polyline(right_curb, curb_bevel, 6.5, true)
+	draw_polyline(right_curb, curb_highlight, 4.2, true)
+
+	draw_polyline(left_curb, curb_bevel, 6.5, true)
+	draw_polyline(left_curb, curb_highlight, 4.2, true)
 
 func draw_parking_strip(_top_y: float, _bottom_y: float, _w: float) -> void:
 	pass
