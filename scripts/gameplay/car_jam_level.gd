@@ -145,6 +145,14 @@ var _circulating_rows: Array[PassengerRow] = []
 var _feeder_rows: Array[PassengerRow] = []
 var _pending_feeder_rows: Array[PassengerRow] = []
 var _lead_feeder_committed: bool = false
+
+# Feeder refill pool — decoy passengers (NOT in controller.authoritative_passengers)
+# that visually cycle the queue after the 240 real level-1 passengers have dispatched.
+# Refill passengers board buses but never reach BOARDED state in the authoritative
+# registry, so they cannot stall level completion. Each refill row carries NUM_LANES
+# passengers and a fresh PassengerView, so the queue stays full indefinitely.
+var _refill_pool: Array[Dictionary] = []
+const REFEED_TARGET_ROW_COUNT: int = 60  # how many rows we want visible at all times
 var _speed_logged: bool = false
 var slot_boarding_points: Dictionary = {}
 var _platform_start_prog: float = 160.0
@@ -227,10 +235,16 @@ func _process(delta: float) -> void:
 	var queue_speed: float = passenger_normal_speed
 	
 	# 1. Update row target distances and advance clockwise towards 0.0 (the Exit Gate)
+	# Target is flow-aware: row N keeps ROW_SPACING behind row N-1 so the queue flows
+	# continuously toward the gate, never letting rows pass through each other.
 	for i in range(_circulating_rows.size()):
 		var r := _circulating_rows[i]
-		r.target_dist = float(i) * ROW_SPACING
-		r.progress = move_toward(r.progress, r.target_dist, queue_speed * delta)
+		var target_dist: float = 0.0
+		if i > 0:
+			var prev_progress: float = _circulating_rows[i - 1].progress
+			target_dist = minf(prev_progress + ROW_SPACING, track_len)
+		r.target_dist = target_dist
+		r.progress = move_toward(r.progress, target_dist, queue_speed * delta)
 		r.current_speed = queue_speed if not is_equal_approx(r.progress, r.target_dist) else 0.0
 
 	# 2. Update visual passenger positions along unified spline
@@ -258,24 +272,44 @@ func _process(delta: float) -> void:
 				pv.set_waiting(is_waiting)
 
 	# 3. Strict FIFO Gate Boarding Check
-	# Only Row 0 at the Exit Gate (progress <= 5.0 px) can board
+	# Only Row 0 at the Exit Gate (progress <= 5.0 px) can board.
+	# Filler passengers (from the visual refill pool) skip the controller's authoritative
+	# reservation/commit cycle — they just disappear at the gate so the queue keeps cycling
+	# visually without polluting controller-level state.
 	if not _circulating_rows.is_empty():
 		var row0 := _circulating_rows[0]
 		if row0.progress <= 5.0 and not row0.passengers.is_empty():
 			var front_color: String = row0.passengers[0]["color_id"]
-			var slot_idx: int = _find_leftmost_matching_slot(front_color)
-			if slot_idx != -1:
+			var front_is_filler: bool = row0.passengers[0].get("is_filler", false)
+			var slot_idx: int = -1
+			if not front_is_filler:
+				slot_idx = _find_leftmost_matching_slot(front_color)
+			if front_is_filler or slot_idx != -1:
 				_runner_spawn_timer += delta
 				if _runner_spawn_timer >= RUNNER_SPAWN_INTERVAL:
 					_runner_spawn_timer = 0.0
-					var slot = controller.parking.get_slot(slot_idx)
-					var v = controller.vehicles.get(slot.vehicle_id, null)
 					var p = row0.passengers.pop_front()
-					if controller.try_reserve_boarding(p["id"], v.id, p["color_id"], p.get("group_id", -1)):
-						_vehicle_incoming_runners[v.id] = _vehicle_incoming_runners.get(v.id, 0) + 1
-						_board_circulating_passenger(p, v.id, slot_idx, 0.0)
+					if front_is_filler:
+						# Decoy: skip authoritative tracking, just despawn the view.
+						var fv = p.get("view", null)
+						if is_instance_valid(fv):
+							fv.queue_free()
+						p["view"] = null
+					else:
+						var slot = controller.parking.get_slot(slot_idx)
+						var v = controller.vehicles.get(slot.vehicle_id, null)
+						if controller.try_reserve_boarding(p["id"], v.id, p["color_id"], p.get("group_id", -1)):
+							_vehicle_incoming_runners[v.id] = _vehicle_incoming_runners.get(v.id, 0) + 1
+							_board_circulating_passenger(p, v.id, slot_idx, 0.0)
 					if row0.passengers.is_empty():
 						_circulating_rows.pop_front()
+						# Refill from the visual pool if there are still decoys left.
+						# Each refill row reuses a fresh PassengerView at the feeder end so the
+						# queue always looks fully populated without affecting the level score.
+						if _refill_pool.size() >= NUM_LANES:
+							var new_row := _make_refill_row()
+							if new_row != null:
+								_circulating_rows.push_back(new_row)
 
 	
 	# Isometric manual Y-sorting for buses based on global screen Y
@@ -623,6 +657,7 @@ func _setup_visuals(lvl: CarJamLevelData) -> void:
 	_feeder_rows.clear()
 	_pending_feeder_rows.clear()
 	_lead_feeder_committed = false
+	_refill_pool.clear()
 	if is_instance_valid(passenger_track):
 		passenger_track.queue_free()
 		passenger_track = null
@@ -880,6 +915,7 @@ func _init_passenger_track() -> void:
 	_feeder_rows.clear()
 	_pending_feeder_rows.clear()
 	_lead_feeder_committed = false
+	_refill_pool.clear()
 
 	# Passenger queue sequence
 	var all_queue_p: Array[Dictionary] = []
@@ -927,6 +963,28 @@ func _init_passenger_track() -> void:
 
 	controller.register_passengers(all_queue_p)
 
+	# Build the visual-only refill pool: decoy passengers that cycle through the queue
+	# to keep it visually full after the real 240 passengers have boarded. Each entry
+	# carries color + gid so a refill-row visually shows up at the gate with a matching
+	# color (the dispatch path takes them off the queue without affecting controller state).
+	_refill_pool.clear()
+	if controller != null and controller.level_data != null and controller.level_data.level_id == 1:
+		var refill_batches: Array[Dictionary] = [
+			{"color": "yellow", "count": 40, "gid": 2},
+			{"color": "blue",   "count": 40, "gid": 1},
+			{"color": "red",    "count": 40, "gid": 0},
+			{"color": "red",    "count": 40, "gid": 3},
+			{"color": "blue",   "count": 40, "gid": 4},
+			{"color": "yellow", "count": 40, "gid": 5}
+		]
+		for b in refill_batches:
+			var color_id := String(b["color"])
+			var group_id := int(b["gid"])
+			# Aim for enough decoys to fully refill the queue twice (60 + 60 rows).
+			for _r in 8:
+				for _k in b["count"]:
+					_refill_pool.append({"color_id": color_id, "group_id": group_id})
+
 	# Single continuous 1D clockwise spline:
 	# All 60 rows packed tightly along spline starting from Exit Gate (dist = 0 px):
 	# Row 0: target_dist = 0.0 px (at Exit Gate)
@@ -937,7 +995,10 @@ func _init_passenger_track() -> void:
 		var row = all_rows[r]
 		row.is_feeder = false
 		row.target_dist = float(r) * ROW_SPACING
-		row.progress = row.target_dist
+		# Initialize progress one ROW_SPACING past the equilibrium. With the row-in-front
+		# constraint applied per frame, this gives every row a non-zero delta toward its
+		# target and produces the "queue loading in toward the gate" visual on level start.
+		row.progress = clampf((float(r) + 1.0) * ROW_SPACING, 0.0, track_len)
 		
 		var s: float = clampf(row.progress, 0.0, track_len)
 		var p0: Vector2 = passenger_track.curve.sample_baked(s)
@@ -964,6 +1025,59 @@ func _init_passenger_track() -> void:
 			pv.position = p0 + normal * lane_offset
 			circulating_ids.append(p["id"])
 		_circulating_rows.append(row)
+
+## Build a fresh PassengerRow populated from `_refill_pool` for the visual cycle:
+## these are decoy passengers (is_filler=true) that the controller treats as
+## non-existent. They rejoin the queue at the feeder end with progress = track_len
+## so the row-in-front constraint immediately starts sliding them toward the gate.
+## Returns null if `_refill_pool` doesn't have a full lane's worth of decoys left.
+func _make_refill_row() -> PassengerRow:
+	if _refill_pool.size() < NUM_LANES:
+		return null
+	if passenger_track == null or passenger_track.curve == null:
+		return null
+	var row := PassengerRow.new()
+	row.row_id = _circulating_rows.size()
+	row.is_feeder = true
+	for k in NUM_LANES:
+		var fp: Dictionary = _refill_pool.pop_front()
+		var p_obj := {
+			"id": -1,
+			"color_id": String(fp["color_id"]),
+			"group_id": int(fp["group_id"]),
+			"lane": k,
+			"view": null,
+			"state": "CIRCULATING",
+			"is_filler": true,
+		}
+		row.passengers.append(p_obj)
+
+	var track_len_local := passenger_track.curve.get_baked_length()
+	row.progress = track_len_local
+	row.target_dist = track_len_local
+
+	var s: float = clampf(row.progress, 0.0, track_len_local)
+	var p0_local: Vector2 = passenger_track.curve.sample_baked(s)
+	var prev_s_local: float = maxf(0.0, s - 2.0)
+	var p_prev_local: Vector2 = passenger_track.curve.sample_baked(prev_s_local)
+	if p_prev_local.distance_squared_to(p0_local) < 0.0001 and s + 2.0 <= track_len_local:
+		p_prev_local = p0_local
+		p0_local = passenger_track.curve.sample_baked(s + 2.0)
+	var fwd_local: Vector2 = (p_prev_local - p0_local).normalized()
+	if fwd_local.is_zero_approx():
+		fwd_local = Vector2(-1, 0)
+	var normal_local: Vector2 = Vector2(-fwd_local.y, fwd_local.x)
+
+	for p_dict in row.passengers:
+		var pv := PassengerView.new()
+		pv.setup(String(p_dict["color_id"]), int(p_dict["id"]), int(p_dict["lane"]))
+		pv.set_waiting(true)
+		pv.set_movement_direction(fwd_local)
+		passenger_visuals.add_child(pv)
+		p_dict["view"] = pv
+		var lane_offset_local: float = (float(p_dict["lane"]) - 1.5) * LANE_SPACING
+		pv.position = p0_local + normal_local * lane_offset_local
+	return row
 
 func get_runtime_track_snapshot() -> Dictionary:
 	var circ_rows: Array = []
