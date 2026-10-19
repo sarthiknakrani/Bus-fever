@@ -58,6 +58,12 @@ var result_overlay: Control
 # visible only when the controller's vip_available_changed(true) signal fires.
 var vip_overlay: Control
 var vip_button: Button
+
+# Per-level star rating row + moves/ideal subtitle on the victory result panel.
+# Created lazily by _render_star_row() so a level that fails before the stars signal
+# fires never adds stray labels.
+var _star_row_label: Label
+var _star_subtitle_label: Label
 var restart_confirm_overlay: Control
 var _was_paused_before_confirm: bool = false
 
@@ -459,6 +465,7 @@ func _setup_controller() -> void:
 	controller.puzzle_failed.connect(_on_puzzle_failed)
 	controller.mystery_revealed.connect(_on_mystery_revealed)
 	controller.vip_available_changed.connect(_on_vip_available_changed)
+	controller.level_scored.connect(_on_level_scored)
 
 # Feature C: build the VIP booster overlay (Button + Container) and parent it to a
 # canvas layer so it floats above the gameplay. Hidden by default — only surfaced
@@ -1300,6 +1307,19 @@ func _on_mystery_revealed(vehicle_id: int) -> void:
 	if vv != null and is_instance_valid(vv):
 		vv.reveal_mystery()
 
+# Scoring handler: render the 3-tier star row above the title when a level completes.
+# Stored locally so the result panel can re-read it if dismissed + recalled.
+var _last_level_stars: int = 0
+var _last_level_moves: int = 0
+var _last_level_ideal_moves: int = 0
+
+func _on_level_scored(stars: int, move_count: int, ideal_moves: int) -> void:
+	_last_level_stars = stars
+	_last_level_moves = move_count
+	_last_level_ideal_moves = ideal_moves
+	# The actual rendering happens inside _show_result_panel once the result overlay is up.
+	# Keeping the storage here ensures scores are preserved across the panel reveal/pop.
+
 func _on_boarding_started(vehicle_id: int, _color_id: String, _count: int, _slot_id: int) -> void:
 	_play_sfx("board")
 	var vv: VehicleView = vehicle_views.get(vehicle_id, null)
@@ -1427,6 +1447,48 @@ func _on_level_completed() -> void:
 	result_title_label.add_theme_color_override("font_color", Color("facc15"))
 	result_title_label.scale = Vector2.ONE
 	result_title_label.rotation = 0.0
+
+	# Star row (1..3 earned based on move_count vs ideal_moves).
+	_render_star_row()
+
+## Draws 3 fixed star slots under the title, coloring earned stars gold and the rest
+## grey. Uses unicode star characters (★ filled, ☆ empty) for portability.
+func _render_star_row() -> void:
+	var label: Label = _star_row_label
+	if label == null:
+		label = Label.new()
+		label.name = "StarRow"
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		label.add_theme_font_size_override("font_size", 56)
+		label.add_theme_color_override("font_color", Color("facc15"))
+		label.add_theme_color_override("font_outline_color", Color("0f172a"))
+		label.add_theme_constant_override("outline_size", 4)
+		result_overlay.add_child(label)
+		_star_row_label = label
+	var st: int = maxi(0, mini(3, _last_level_stars))
+	var row_str: String = ""
+	for i in 3:
+		row_str += "★" if i < st else "☆"
+		row_str += "  " if i < 2 else ""
+	label.text = row_str
+	# Center under the title (position relative to result_overlay)
+	var tl_size: Vector2 = result_title_label.size if result_title_label != null else Vector2(0, 0)
+	label.position = Vector2((result_overlay.size.x - label.size.x) * 0.5, tl_size.y + 80.0)
+	# Subtitle showing moves vs ideal
+	var sub_label: Label = _star_subtitle_label
+	if sub_label == null:
+		sub_label = Label.new()
+		sub_label.name = "StarSubtitle"
+		sub_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		sub_label.add_theme_font_size_override("font_size", 22)
+		sub_label.add_theme_color_override("font_color", Color("fef3c7"))
+		result_overlay.add_child(sub_label)
+		_star_subtitle_label = sub_label
+	if _last_level_ideal_moves > 0:
+		sub_label.text = "Moves: %d  /  Ideal: %d" % [_last_level_moves, _last_level_ideal_moves]
+	else:
+		sub_label.text = "Moves: %d" % _last_level_moves
+	sub_label.position = Vector2((result_overlay.size.x - sub_label.size.x) * 0.5, label.position.y + label.size.y + 12.0)
 
 	# Show reward badge
 	if reward_badge != null:

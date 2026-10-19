@@ -10,6 +10,9 @@ class_name CarJamLevelData
 @export var board_size: Vector2i = Vector2i(7, 7)
 @export var parking_slots_count: int = 4
 @export var unlocked_slot_ids: Array[int] = []
+## Authoring target for the perfect-solve move count. Used by the 3-star rating:
+## 3 stars when move_count <= ideal_moves, 2 stars when <= 1.5x, 1 star otherwise.
+@export var ideal_moves: int = 0
 ## Slot IDs that should be configured as Plus bays (start locked, unlockable in-level).
 ## Plus bays show a green "+" affordance and visually stand apart from regular bays.
 @export var plus_slot_ids: Array[int] = []
@@ -24,6 +27,7 @@ func clone() -> CarJamLevelData:
 	copy.parking_slots_count = parking_slots_count
 	copy.unlocked_slot_ids = unlocked_slot_ids.duplicate()
 	copy.plus_slot_ids = plus_slot_ids.duplicate()
+	copy.ideal_moves = ideal_moves
 	for v in vehicles:
 		copy.vehicles.append(v.clone())
 	for g in passenger_groups:

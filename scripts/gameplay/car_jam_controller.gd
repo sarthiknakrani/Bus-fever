@@ -27,6 +27,9 @@ signal mystery_revealed(vehicle_id: int)
 ## vip_extracted fires when the player activates it on a stuck bus.
 signal vip_available_changed(available: bool)
 signal vip_extracted(vehicle_id: int, slot_id: int)
+## Emitted when the level is completed successfully. Args: stars (1..3), move_count, ideal_moves.
+## Stars are computed from move_count vs ideal_moves authored on the level resource.
+signal level_scored(stars: int, move_count: int, ideal_moves: int)
 
 enum GameState {
 	PLAYING,
@@ -53,6 +56,10 @@ class BoardingReservation extends RefCounted:
 var state: int = GameState.PLAYING
 var session_token: int = 0
 
+# Successful-tap counter for the per-level scoring (3/2/1 stars). Mystery reveals,
+# blocked taps, and parking-full toasts do NOT increment.
+var move_count: int = 0
+
 var authoritative_passengers: Dictionary = {} # pid (int) -> Dictionary
 var boarding_reservations: Dictionary = {} # pid (int) -> BoardingReservation
 var pending_boarders: Dictionary = {} # vehicle_id -> int
@@ -73,6 +80,7 @@ func load_level(lvl: CarJamLevelData) -> void:
 	# early listeners see the right state when board/parking signals emit.
 	_vip_used_this_level = false
 	vip_available_changed.emit(true)
+	move_count = 0
 
 	session_token += 1
 	level_data = lvl
@@ -290,6 +298,7 @@ func tap_vehicle(vehicle_id: int) -> bool:
 
 	var corridor: Array[Vector2i] = escape_res["swept_corridor"]
 	vehicle_dispatch_started.emit(vehicle_id, slot_id, corridor)
+	move_count += 1
 	return true
 
 func _check_level1_bus_escape(vehicle_id: int) -> Dictionary:
@@ -728,6 +737,15 @@ func _check_terminal_states() -> void:
 	if all_v_done and zero_passengers_remain and queue.is_empty():
 		state = GameState.WIN
 		level_completed.emit()
+		# Compute 3-tier stars from move_count vs the level's authored ideal_moves.
+		var ideal: int = level_data.ideal_moves if level_data != null else 0
+		var _stars: int = 1
+		if ideal > 0:
+			if move_count <= ideal:
+				_stars = 3
+			elif move_count <= int(ceil(float(ideal) * 1.5)):
+				_stars = 2
+		level_scored.emit(_stars, move_count, ideal)
 		return
 
 	# 2. Accurate Lose/Jam Check: Trigger level_failed (puzzle_failed) ONLY when:
