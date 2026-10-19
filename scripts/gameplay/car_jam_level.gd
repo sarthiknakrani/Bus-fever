@@ -1451,45 +1451,6 @@ func _on_level_completed() -> void:
 	# Star row (1..3 earned based on move_count vs ideal_moves).
 	_render_star_row()
 
-## Draws 3 fixed star slots under the title, coloring earned stars gold and the rest
-## grey. Uses unicode star characters (★ filled, ☆ empty) for portability.
-func _render_star_row() -> void:
-	var label: Label = _star_row_label
-	if label == null:
-		label = Label.new()
-		label.name = "StarRow"
-		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		label.add_theme_font_size_override("font_size", 56)
-		label.add_theme_color_override("font_color", Color("facc15"))
-		label.add_theme_color_override("font_outline_color", Color("0f172a"))
-		label.add_theme_constant_override("outline_size", 4)
-		result_overlay.add_child(label)
-		_star_row_label = label
-	var st: int = maxi(0, mini(3, _last_level_stars))
-	var row_str: String = ""
-	for i in 3:
-		row_str += "★" if i < st else "☆"
-		row_str += "  " if i < 2 else ""
-	label.text = row_str
-	# Center under the title (position relative to result_overlay)
-	var tl_size: Vector2 = result_title_label.size if result_title_label != null else Vector2(0, 0)
-	label.position = Vector2((result_overlay.size.x - label.size.x) * 0.5, tl_size.y + 80.0)
-	# Subtitle showing moves vs ideal
-	var sub_label: Label = _star_subtitle_label
-	if sub_label == null:
-		sub_label = Label.new()
-		sub_label.name = "StarSubtitle"
-		sub_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		sub_label.add_theme_font_size_override("font_size", 22)
-		sub_label.add_theme_color_override("font_color", Color("fef3c7"))
-		result_overlay.add_child(sub_label)
-		_star_subtitle_label = sub_label
-	if _last_level_ideal_moves > 0:
-		sub_label.text = "Moves: %d  /  Ideal: %d" % [_last_level_moves, _last_level_ideal_moves]
-	else:
-		sub_label.text = "Moves: %d" % _last_level_moves
-	sub_label.position = Vector2((result_overlay.size.x - sub_label.size.x) * 0.5, label.position.y + label.size.y + 12.0)
-
 	# Show reward badge
 	if reward_badge != null:
 		reward_badge.visible = true
@@ -1528,6 +1489,45 @@ func _render_star_row() -> void:
 			_on_result_next_pressed()
 	)
 	_celebration_tweens.append(auto_next_tw)
+
+## Draws 3 fixed star slots under the title, coloring earned stars gold and the rest
+## grey. Uses unicode star characters (★ filled, ☆ empty) for portability.
+func _render_star_row() -> void:
+	var label: Label = _star_row_label
+	if label == null:
+		label = Label.new()
+		label.name = "StarRow"
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		label.add_theme_font_size_override("font_size", 56)
+		label.add_theme_color_override("font_color", Color("facc15"))
+		label.add_theme_color_override("font_outline_color", Color("0f172a"))
+		label.add_theme_constant_override("outline_size", 4)
+		result_overlay.add_child(label)
+		_star_row_label = label
+	var st: int = maxi(0, mini(3, _last_level_stars))
+	var row_str: String = ""
+	for i in 3:
+		row_str += "★" if i < st else "☆"
+		row_str += "  " if i < 2 else ""
+	label.text = row_str
+	# Center under the title (position relative to result_overlay)
+	var tl_size: Vector2 = result_title_label.size if result_title_label != null else Vector2(0, 0)
+	label.position = Vector2((result_overlay.size.x - label.size.x) * 0.5, tl_size.y + 80.0)
+	# Subtitle showing moves vs ideal
+	var sub_label: Label = _star_subtitle_label
+	if sub_label == null:
+		sub_label = Label.new()
+		sub_label.name = "StarSubtitle"
+		sub_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		sub_label.add_theme_font_size_override("font_size", 22)
+		sub_label.add_theme_color_override("font_color", Color("fef3c7"))
+		result_overlay.add_child(sub_label)
+		_star_subtitle_label = sub_label
+	if _last_level_ideal_moves > 0:
+		sub_label.text = "Moves: %d  /  Ideal: %d" % [_last_level_moves, _last_level_ideal_moves]
+	else:
+		sub_label.text = "Moves: %d" % _last_level_moves
+	sub_label.position = Vector2((result_overlay.size.x - sub_label.size.x) * 0.5, label.position.y + label.size.y + 12.0)
 
 func _on_puzzle_failed() -> void:
 	# Guard: failure flow runs once per session.
