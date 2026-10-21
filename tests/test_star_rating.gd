@@ -80,6 +80,36 @@ func _run_test() -> void:
 	assert(ev["moves"] == expected_moves, "moves in signal must equal dispatched.size")
 	assert(ev["stars"] == expected_stars, "3-star rating for perfect-play 6 moves on ideal=6 must yield 3 stars")
 
+	# 4) Verify Level 2 authored ideal_moves = 12 and scoring thresholds.
+	print("[Test] Level 2 star scoring thresholds...")
+	var lvl2: CarJamLevelData = ResourceLoader.load("res://levels/level_002.tres") as CarJamLevelData
+	assert(lvl2 != null, "level_002.tres must load")
+	assert(lvl2.ideal_moves == 12, "Level 2 ideal_moves must be 12 (one tap per bus for 12 buses), got: %d" % lvl2.ideal_moves)
+	print("  [PASS] Level 2 authored with ideal_moves=12")
+
+	var ctrl2 := CarJamController.new()
+	root.add_child(ctrl2)
+	ctrl2.load_level(lvl2)
+	var star_events_2: Array = []
+	ctrl2.level_scored.connect(
+		func(s: int, m: int, ideal: int) -> void: star_events_2.append({"stars": s, "moves": m, "ideal": ideal})
+	)
+	ctrl2.move_count = 12
+	for vid in ctrl2.vehicles:
+		var v: VehicleModel = ctrl2.vehicles[vid]
+		v.state = VehicleModel.VehicleState.COMPLETED
+		v.passenger_occupancy = v.capacity
+	for g in ctrl2.queue.get_all_groups():
+		g.remaining_count = 0
+	for pid in ctrl2.authoritative_passengers:
+		ctrl2.authoritative_passengers[pid]["state"] = "BOARDED"
+	ctrl2._check_terminal_states()
+	assert(not star_events_2.is_empty(), "level_scored must fire for Level 2")
+	var ev2: Dictionary = star_events_2[0]
+	print("  Level 2 12-move clear → stars=%d moves=%d ideal=%d" % [ev2["stars"], ev2["moves"], ev2["ideal"]])
+	assert(ev2["stars"] == 3, "12 moves on Level 2 (ideal 12) must award 3 stars")
+	assert(ev2["ideal"] == 12, "ideal_moves must be 12")
+
 	print("\n=======================================================")
 	print("=== ALL STAR RATING TESTS PASSED ===")
 	print("=======================================================\n")

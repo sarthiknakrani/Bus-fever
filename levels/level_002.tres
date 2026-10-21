@@ -179,5 +179,6 @@ title = "Level 2"
 board_size = Vector2i(6, 6)
 parking_slots_count = 7
 unlocked_slot_ids = Array[int]([1, 2, 3, 4])
+ideal_moves = 12
 vehicles = Array[ExtResource("3_ssqa0")]([SubResource("Resource_r46n8"), SubResource("Resource_qr7mg"), SubResource("Resource_er5fi"), SubResource("Resource_dh8uc"), SubResource("Resource_tpsu1"), SubResource("Resource_7oh1j"), SubResource("Resource_xov1q"), SubResource("Resource_eldw1"), SubResource("Resource_opaqo"), SubResource("Resource_io41y"), SubResource("Resource_y67xn"), SubResource("Resource_bretr")])
 passenger_groups = Array[ExtResource("1_ajesq")]([SubResource("Resource_gsivs"), SubResource("Resource_uw0fl"), SubResource("Resource_cto8n"), SubResource("Resource_4ftab"), SubResource("Resource_ujhyu"), SubResource("Resource_sckbn"), SubResource("Resource_y081a"), SubResource("Resource_ws7cc"), SubResource("Resource_r065b"), SubResource("Resource_mmxpe"), SubResource("Resource_m50rt"), SubResource("Resource_fdx02")])
