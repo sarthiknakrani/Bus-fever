@@ -151,6 +151,7 @@ const MIN_ROW_GAP := 28.5
 const NUM_LANES := 4
 const PASSENGER_SPACING := 17.5
 const MAX_INITIAL_LOOP_PASSENGERS := 144
+const MAX_LOOP_ROWS: int = int(MAX_INITIAL_LOOP_PASSENGERS / NUM_LANES) # 36 rows
 const SLOT_SPACING := 72.0
 
 var passenger_track: Path2D
@@ -364,9 +365,10 @@ func _process(delta: float) -> void:
 			var lead_row = _feeder_rows.front()
 			var needed_cap: int = lead_row.passengers.size()
 			var can_merge: bool = (_oval_freed_capacity >= needed_cap) or _entrance_active
+
 			if can_merge and lead_row.progress >= f_len - 2.0:
 				var merge_clear := true
-				var clearance_buffer: float = ROW_SPACING * 0.88
+				var clearance_buffer: float = (track_len / float(MAX_LOOP_ROWS) * 0.96) if _entrance_active else (ROW_SPACING * 0.88)
 				for cr in _circulating_rows:
 					var d = absf(cr.progress - _merge_prog)
 					if d > track_len * 0.5:
@@ -1196,11 +1198,13 @@ func _init_passenger_track() -> void:
 
 	if not use_entrance:
 		# Immediate population for headless test suite
+		# Equal uniform spacing for all rows on loop so no uneven gap exists anywhere
+		var loop_spacing: float = track_len / float(initial_rows_count)
 		for r in range(initial_rows_count):
 			var row = all_rows[r]
 			row.is_feeder = false
 			# Row 0 starts at gate (0, 115), Row 1 behind Row 0, etc.
-			row.progress = fposmod(gate_prog - float(r) * ROW_SPACING, track_len)
+			row.progress = fposmod(gate_prog - float(r) * loop_spacing, track_len)
 			
 			var pt_info = _get_curve_point_and_normal(passenger_track.curve, row.progress, true)
 			for p in row.passengers:

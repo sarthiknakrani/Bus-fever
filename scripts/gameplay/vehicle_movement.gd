@@ -60,10 +60,20 @@ static func animate_dispatch(
 	var exit_dist: float = start_pos.distance_to(_legacy_exit_pos)
 	var exit_point: Vector2 = _legacy_exit_pos if exit_dist >= 40.0 else start_pos + forward_world * 140.0
 
-	var BYPASS_LEFT_X := -240.0
-	var BYPASS_RIGHT_X := 240.0
-	var BYPASS_BOTTOM_Y := 940.0
-	var CORRIDOR_TOP_Y := corridor_pos.y
+	# Keep strictly inside screen frame (zero out-of-bounds driving):
+	# Board buses occupy X in [-100, 100], Y in [560, 810].
+	# Bypass at X = -165.0 / +165.0 clears all board buses while staying 100% inside frame.
+	var half_frame_w: float = 175.0
+	var vp = vehicle_node.get_viewport()
+	if vp != null:
+		var v_size = vp.get_visible_rect().size
+		if v_size.x > 100.0:
+			half_frame_w = maxf(160.0, v_size.x * 0.5 - 32.0)
+
+	var BYPASS_LEFT_X: float = -half_frame_w
+	var BYPASS_RIGHT_X: float = half_frame_w
+	var BYPASS_BOTTOM_Y: float = 855.0
+	var CORRIDOR_TOP_Y: float = corridor_pos.y
 
 	var pts: Array[Vector2] = []
 	pts.append(start_pos)
