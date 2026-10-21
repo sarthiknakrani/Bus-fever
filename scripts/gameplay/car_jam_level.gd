@@ -382,11 +382,9 @@ func _process(delta: float) -> void:
 
 					if _entrance_active:
 						# During entrance parade, merge behind the preceding row.
-						# For the final 1-2 closing rows, require clearance both ahead and behind.
-						var req_ahead: float = 26.0
-						if _entrance_spawn_quota <= 2:
-							req_ahead = 14.0
-						if min_ahead < req_ahead or min_behind < 14.0:
+						# Clearance is guaranteed by gated lead row spacing.
+						var req_clear: float = 24.0
+						if min_ahead < req_clear or min_behind < req_clear:
 							merge_clear = false
 					else:
 						# In normal circulation mode, only merge into genuine vacated gaps (>= 48px)
@@ -443,6 +441,8 @@ func _process(delta: float) -> void:
 	_circulating_rows.sort_custom(func(a, b): return a.progress > b.progress)
 	var empty_rows: Array[PassengerRow] = []
 
+	var loop_sp: float = track_len / float(MAX_INITIAL_LOOP_PASSENGERS / NUM_LANES)
+
 	for i in range(_circulating_rows.size()):
 		var row = _circulating_rows[i]
 		if row.passengers.is_empty():
@@ -452,7 +452,19 @@ func _process(delta: float) -> void:
 		var base_circ_spd: float = passenger_entrance_speed if _entrance_active else passenger_normal_speed
 		var speed = base_circ_spd
 		var dist_ahead = track_len
-		if _circulating_rows.size() > 1:
+
+		if _entrance_active and i == 0:
+			# Gated Entrance Parade: Lead row (i=0) advances strictly in sync with incoming rows
+			# to reserve exact uniform spacing for all 36 parade rows and prevent junction collision.
+			var max_lead_prog: float = track_len - float(_entrance_spawn_quota) * loop_sp
+			if _entrance_spawn_quota > 0:
+				max_lead_prog = minf(max_lead_prog, 1060.0)
+			dist_ahead = maxf(0.0, max_lead_prog - row.progress)
+			if dist_ahead > ROW_SPACING * 1.25:
+				speed = passenger_entrance_speed
+			elif dist_ahead < ROW_SPACING * 0.90:
+				speed = base_circ_spd * 0.85
+		elif _circulating_rows.size() > 1:
 			var ahead_row: PassengerRow
 			if i == 0:
 				ahead_row = _circulating_rows.back()
@@ -488,7 +500,9 @@ func _process(delta: float) -> void:
 		var old_prog = row.progress
 		var dist_moved = speed * delta
 		var min_gap: float = MIN_ROW_GAP
-		if _circulating_rows.size() > 1:
+		if _entrance_active and i == 0:
+			dist_moved = minf(dist_moved, dist_ahead)
+		elif _circulating_rows.size() > 1:
 			if dist_ahead <= min_gap:
 				dist_moved = 0.0
 			else:

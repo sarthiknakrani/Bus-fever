@@ -20,7 +20,7 @@ var _last_pos: Vector2 = Vector2.ZERO
 var _facing_right: bool = true
 var _smoothed_speed: float = 0.0
 
-const BASE_SCALE := 0.24
+const BASE_SCALE := 0.21
 const IDLE_FRAME := 6
 const RUN_FRAMES := 6
 const TOTAL_FRAMES := 8
@@ -53,7 +53,7 @@ func setup(p_col_id: String, p_id: int = 0, p_lane: int = 0) -> void:
 		_shadow.texture = t_shadow
 	_shadow.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	_shadow.position = Vector2(0, 0)
-	_shadow.scale = Vector2(0.24, 0.12)
+	_shadow.scale = Vector2(BASE_SCALE, BASE_SCALE * 0.5)
 	_shadow.modulate = Color(0, 0, 0, 0.45)
 	_shadow.z_index = -1
 	add_child(_shadow)
@@ -130,7 +130,7 @@ func _process(delta: float) -> void:
 				_char_sprite.rotation = 0.0
 				_char_sprite.scale = Vector2(facing_sign, 1.0)
 			if _shadow != null:
-				_shadow.scale = Vector2(0.24, 0.12)
+				_shadow.scale = Vector2(BASE_SCALE, BASE_SCALE * 0.5)
 				_shadow.modulate.a = 0.45
 		else:
 			# Real Running Cycle synchronized directly with movement distance
@@ -148,7 +148,7 @@ func _process(delta: float) -> void:
 				_char_sprite.scale = Vector2(facing_sign, 1.0)
 			
 			if _shadow != null:
-				_shadow.scale = Vector2(0.24, 0.12)
+				_shadow.scale = Vector2(BASE_SCALE, BASE_SCALE * 0.5)
 				_shadow.modulate.a = 0.45
 
 func animate_jump(delay: float) -> void:

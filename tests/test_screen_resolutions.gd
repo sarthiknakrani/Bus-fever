@@ -7,6 +7,8 @@ func _init() -> void:
 	var failures: Array[String] = []
 
 	var test_resolutions: Array[Dictionary] = [
+		{"name": "iPhone Standard (390x844)", "size": Vector2(390, 844)},
+		{"name": "iPhone Pro Max (810x1746)", "size": Vector2(810, 1746)},
 		{"name": "Ultra Tall Phone (720x1880)", "size": Vector2(720, 1880)},
 		{"name": "Tall Flagship Phone (1080x2400)", "size": Vector2(1080, 2400)},
 		{"name": "Standard 16:9 Phone (720x1280)", "size": Vector2(720, 1280)},
