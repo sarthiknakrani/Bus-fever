@@ -291,7 +291,7 @@ func _process(delta: float) -> void:
 		var running_cap: int = _oval_freed_capacity
 		var authorized_count: int = 0
 		if _entrance_active:
-			authorized_count = _feeder_rows.size()
+			authorized_count = mini(_feeder_rows.size(), _entrance_spawn_quota)
 		else:
 			for r in _feeder_rows:
 				var req: int = r.passengers.size()
@@ -312,7 +312,7 @@ func _process(delta: float) -> void:
 				if j == 0:
 					target_prog = f_len
 					# Signal intent to oncoming traffic when within merge approach zone (45px)
-					_lead_feeder_committed = (f_row.progress >= f_len - 45.0)
+					_lead_feeder_committed = (f_row.progress >= f_len - 45.0) and ((_oval_freed_capacity >= f_row.passengers.size()) or _entrance_active)
 				else:
 					target_prog = _feeder_rows[j - 1].progress - ROW_SPACING
 			else:
@@ -364,7 +364,7 @@ func _process(delta: float) -> void:
 		if not _feeder_rows.is_empty():
 			var lead_row = _feeder_rows.front()
 			var needed_cap: int = lead_row.passengers.size()
-			var can_merge: bool = (_oval_freed_capacity >= needed_cap) or _entrance_active
+			var can_merge: bool = (_oval_freed_capacity >= needed_cap) or (_entrance_active and _entrance_spawn_quota > 0)
 
 			if can_merge and lead_row.progress >= f_len - 2.0:
 				var merge_clear := true
