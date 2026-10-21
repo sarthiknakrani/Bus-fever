@@ -16,9 +16,9 @@ var outer_meet_pt := Vector2.ZERO
 var inner_meet_ang: float = -0.65
 var outer_meet_ang: float = 0.09
 
-# Snug geometry constants: tight fit to larger 4-across passengers (100px total passenger span)
-const ROAD_HALF_WIDTH: float = 53.0
-const GATEWAY_HALF_WIDTH: float = 55.0
+# Snug geometry constants: tight fit to 4-across passengers (76.5px total passenger span)
+const ROAD_HALF_WIDTH: float = 43.0
+const GATEWAY_HALF_WIDTH: float = 45.0
 
 const COLOR_ROAD := Color("767786") # Authoritative road grey matching PlatformView
 const COLOR_ROAD_SHADOW := Color("5d5e6c") # Ambient occlusion inner shadow
@@ -336,8 +336,8 @@ func _draw() -> void:
 	_draw_gateway_bollard(Vector2(x_gate, plat_y))
 
 func _draw_lane_guidelines(straight_x: float, r_center: float, c_l: Vector2, c_r: Vector2) -> void:
-	# Offsets for 3 lane divider boundaries between the 4 lanes (-26, 0, +26)
-	var lane_divs = [-26.0, 0.0, 26.0]
+	# Offsets for 3 lane divider boundaries between the 4 lanes (-17.5, 0, +17.5)
+	var lane_divs = [-17.5, 0.0, 17.5]
 	for l_off in lane_divs:
 		var r_div: float = r_center + l_off
 		var pts = PackedVector2Array()
