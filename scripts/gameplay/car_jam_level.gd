@@ -1648,15 +1648,6 @@ func _on_level_completed() -> void:
 	# Start celebratory fireworks, flying coins and balance roll
 	_start_victory_celebration(old_coins, new_coins)
 
-	# Auto-advance to next level after celebration completes if player does not tap NEXT manually
-	var auto_next_tw = create_tween()
-	auto_next_tw.tween_interval(3.5)
-	auto_next_tw.tween_callback(func():
-		if _result_outcome == "victory" and not _next_pressed:
-			_on_result_next_pressed()
-	)
-	_celebration_tweens.append(auto_next_tw)
-
 ## Draws 3 fixed star slots under the title, coloring earned stars gold and the rest
 ## grey. Uses unicode star characters (★ filled, ☆ empty) for portability.
 func _render_star_row() -> void:
@@ -1910,8 +1901,8 @@ func _on_result_next_pressed() -> void:
 		if gc.has_level(next_num):
 			gc.start_level(next_num)
 		else:
-			# Belt-and-braces: if no next level exists, send home instead of looping.
-			gc.goto_scene("res://scenes/main.tscn")
+			# Final authored level: replay level when player taps REPLAY
+			gc.start_level(gc.current_level_number)
 
 func _on_result_retry_pressed() -> void:
 	if _result_outcome != "failure":
