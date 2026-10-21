@@ -43,11 +43,10 @@ func _run_test() -> void:
 	print("  [PASS] Mystery reveal does not count\n")
 
 	# 2) Each successful dispatch increments move_count by 1.
-	# Tap buses in a valid level-1 dispatch order. Bus 2 is already revealed but still on
-	# the board, so we dispatch it FIRST to clear its blocker on bus 4.
+	# Tap buses in a valid level-1 dispatch order: 3 -> 4 -> 1 -> 2 -> 5 -> 6
 	print("[Test] Successful dispatches should yield move_count=N where N=successful taps...")
 	var dispatched: Array = []
-	for vid in [2, 4, 5, 1, 3, 6]:
+	for vid in [3, 4, 1, 2, 5, 6]:
 		if ctrl.tap_vehicle(vid):
 			dispatched.append(vid)
 		await create_timer(0.05).timeout

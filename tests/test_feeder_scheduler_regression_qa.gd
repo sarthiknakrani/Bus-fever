@@ -240,8 +240,8 @@ func _run_all_tests() -> void:
 	await process_frame
 	for f in 20: await process_frame
 	
-	# Tap vehicle 2 (blue) to bay
-	var ok_tap = lvl_board.controller.tap_vehicle(2)
+	# Tap vehicle 3 (red) to bay
+	var ok_tap = lvl_board.controller.tap_vehicle(3)
 	var saw_boarding_credit := false
 	var t_start = Time.get_ticks_msec()
 	while Time.get_ticks_msec() - t_start < 4000:

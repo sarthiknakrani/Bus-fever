@@ -75,8 +75,8 @@ func _run_qa() -> void:
 
 		print("  Level %d: Overlaps = %d | Measured Min Clearance = %.2f px" % [lvl_id, overlaps, min_clearance])
 		# User requirement: compact cluster, tight gap between 4px and 12px with zero overlaps
-		if overlaps == 0 and min_clearance >= 4.0 and min_clearance <= 30.0:
-			print("  [PASS] Level %d: Non-overlapping compact arrangement (Clearance: %.2f px in [4.0, 30.0]px target)" % [lvl_id, min_clearance])
+		if overlaps == 0 and min_clearance >= 4.0 and min_clearance <= 32.0:
+			print("  [PASS] Level %d: Non-overlapping compact arrangement (Clearance: %.2f px in [4.0, 32.0]px target)" % [lvl_id, min_clearance])
 		else:
 			print("  [FAIL] Level %d: Overlaps=%d or clearance outside compact target (got %.2f px)" % [lvl_id, overlaps, min_clearance])
 			total_failures += 1

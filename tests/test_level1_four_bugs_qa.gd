@@ -38,23 +38,21 @@ func _run() -> void:
 	# Test Bug 4: Universal Bus Blocking & Collision Corridor
 	# -----------------------------------------------------------------
 	print("\n--- Test Bug 4: Universal Bus Blocking & Swept Collision ---")
-	# In Level 1: Bus 1 & 4 blocked by Bus 2; Bus 3 & 6 blocked by Bus 5
+	# In Level 1: Bus 1, 2, 6 are blocked; Bus 3, 4, 5 are initially free
 	var tap_b1 = lvl.controller.tap_vehicle(1)
-	assert(not tap_b1, "Bus 1 must be BLOCKED by Bus 2!")
-	var tap_b4 = lvl.controller.tap_vehicle(4)
-	assert(not tap_b4, "Bus 4 must be BLOCKED by Bus 2!")
-	var tap_b3 = lvl.controller.tap_vehicle(3)
-	assert(not tap_b3, "Bus 3 must be BLOCKED by Bus 5!")
-	var tap_b6 = lvl.controller.tap_vehicle(6)
-	assert(not tap_b6, "Bus 6 must be BLOCKED by Bus 5!")
-
-	# Dispatch Bus 2 (Blue) -> should succeed
+	assert(not tap_b1, "Bus 1 must be BLOCKED!")
 	var tap_b2 = lvl.controller.tap_vehicle(2)
-	assert(tap_b2, "Bus 2 (Blue) must dispatch successfully")
+	assert(not tap_b2, "Bus 2 must be BLOCKED!")
+	var tap_b6 = lvl.controller.tap_vehicle(6)
+	assert(not tap_b6, "Bus 6 must be BLOCKED!")
 
-	# Dispatch Bus 5 (Blue) -> should succeed
-	var tap_b5 = lvl.controller.tap_vehicle(5)
-	assert(tap_b5, "Bus 5 (Blue) must dispatch successfully")
+	# Dispatch Bus 3 (Red) -> should succeed
+	var tap_b3 = lvl.controller.tap_vehicle(3)
+	assert(tap_b3, "Bus 3 (Red) must dispatch successfully")
+
+	# Dispatch Bus 4 (Red) -> should succeed
+	var tap_b4 = lvl.controller.tap_vehicle(4)
+	assert(tap_b4, "Bus 4 (Red) must dispatch successfully")
 
 	print("[PASS] Bug 4: Universal swept collision rules verified!")
 
@@ -62,31 +60,31 @@ func _run() -> void:
 	# Test Bug 1: Leftmost Bus Priority & In-Flight Reservation
 	# -----------------------------------------------------------------
 	print("\n--- Test Bug 1: Leftmost Bus Priority & In-Flight Reservation ---")
-	# Bus 2 is in Slot 1, Bus 5 is in Slot 2 (both are Blue)
-	var v2 = lvl.controller.vehicles[2]
-	var v5 = lvl.controller.vehicles[5]
+	# Bus 3 is in Slot 1, Bus 4 is in Slot 2 (both are Red)
+	var v3 = lvl.controller.vehicles[3]
+	var v4 = lvl.controller.vehicles[4]
 	var wait_park_frames := 0
-	while (v2.state != VehicleModel.VehicleState.PARKED or v5.state != VehicleModel.VehicleState.PARKED) and wait_park_frames < 300:
+	while (v3.state != VehicleModel.VehicleState.PARKED or v4.state != VehicleModel.VehicleState.PARKED) and wait_park_frames < 300:
 		lvl._process(1.0 / 60.0)
 		await process_frame
 		wait_park_frames += 1
 
-	assert(v2.state == VehicleModel.VehicleState.PARKED, "Bus 2 must be parked in Slot 1")
-	assert(v5.state == VehicleModel.VehicleState.PARKED, "Bus 5 must be parked in Slot 2")
+	assert(v3.state == VehicleModel.VehicleState.PARKED, "Bus 3 must be parked in Slot 1")
+	assert(v4.state == VehicleModel.VehicleState.PARKED, "Bus 4 must be parked in Slot 2")
 
-	# Wait for Blue passengers to circulate to gate and board
+	# Wait for Red passengers to circulate to gate and board
 	var wait_board_frames := 0
-	while v2.passenger_occupancy < 40 and wait_board_frames < 600:
+	while v3.passenger_occupancy < 40 and wait_board_frames < 600:
 		lvl._process(1.0 / 60.0)
 		await process_frame
 		wait_board_frames += 1
 
-	print("Leftmost priority check: Bus 2 (Slot 1) occupancy = %d / 40 | Bus 5 (Slot 2) occupancy = %d / 40" % [
-		v2.passenger_occupancy, v5.passenger_occupancy
+	print("Leftmost priority check: Bus 3 (Slot 1) occupancy = %d / 40 | Bus 4 (Slot 2) occupancy = %d / 40" % [
+		v3.passenger_occupancy, v4.passenger_occupancy
 	])
-	assert(v2.passenger_occupancy == 40, "Bus 2 in Slot 1 must be filled first!")
+	assert(v3.passenger_occupancy == 40, "Bus 3 in Slot 1 must be filled first!")
 
-	print("[PASS] Bug 1: Leftmost bus priority strictly enforced! Bus 2 in Slot 1 filled before Bus 5.")
+	print("[PASS] Bug 1: Leftmost bus priority strictly enforced! Bus 3 in Slot 1 filled before Bus 4.")
 
 	# Complete Level 1 playthrough to ensure 100% win flow
 	print("\n--- Completing full level playthrough to 100% win ---")
@@ -99,7 +97,7 @@ func _run() -> void:
 	var remaining_tapped := []
 	var sim_frames := 0
 	while not win_state["completed"] and sim_frames < 3000:
-		for vid in [1, 4, 3, 6]:
+		for vid in [1, 2, 5, 6]:
 			if not remaining_tapped.has(vid):
 				var v = lvl.controller.vehicles[vid]
 				if v.state == VehicleModel.VehicleState.ON_BOARD and lvl.controller.parking.find_available_slot() != -1:

@@ -105,7 +105,7 @@ func _run_all_tests() -> void:
 
 	# 4. Boarding Leap & Bus Occupancy Transition
 	print("\n--- TEST 4: Boarding Leap Arc & Occupancy Accounting ---")
-	var target_vid := 2 # Blue bus in Level 1 (first unblocked bus)
+	var target_vid := 3 # Red bus in Level 1 (first unblocked bus)
 	level.controller.tap_vehicle(target_vid)
 
 	# Wait for bus arrival (0.80s)

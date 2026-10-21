@@ -373,31 +373,31 @@ func _run_all_timing_tests() -> void:
 
 	# Test 9: Event-Driven Immediate Boarding Recovery (No Stalls)
 	print("\n--- TEST 9: Event-Driven Boarding Recovery ---")
-	# Tap free vehicle in Level 1 (Vehicle 2)
+	# Tap free vehicle in Level 1 (Vehicle 3)
 	var ctrl_l1: CarJamController = live_l1.controller
 
-	var ok_tap = ctrl_l1.tap_vehicle(2)
+	var ok_tap = ctrl_l1.tap_vehicle(3)
 	if not ok_tap:
-		print("  [FAIL] Failed to tap vehicle 2 in Level 1")
+		print("  [FAIL] Failed to tap vehicle 3 in Level 1")
 		failures += 1
 	else:
-		print("  [PASS] Vehicle 2 dispatched. Waiting for arrival (0.80s)...")
+		print("  [PASS] Vehicle 3 dispatched. Waiting for arrival (0.80s)...")
 		await create_timer(0.95).timeout
-		var v2 = ctrl_l1.vehicles[2]
-		if v2.state == VehicleModel.VehicleState.PARKED:
-			print("  [PASS] Vehicle 2 is PARKED at slot %d" % v2.reserved_slot)
+		var v3 = ctrl_l1.vehicles[3]
+		if v3.state == VehicleModel.VehicleState.PARKED:
+			print("  [PASS] Vehicle 3 is PARKED at slot %d" % v3.reserved_slot)
 			# Allow time for progressive feeder passengers travelling at 240 px/s to reach platform boarding zone
 			await create_timer(2.6).timeout
-			var occupancy = v2.passenger_occupancy
-			var pending = ctrl_l1.pending_boarders.get(2, 0)
-			print("  [MEASURED] Vehicle 2 occupancy + pending: %d" % (occupancy + pending))
+			var occupancy = v3.passenger_occupancy
+			var pending = ctrl_l1.pending_boarders.get(3, 0)
+			print("  [MEASURED] Vehicle 3 occupancy + pending: %d" % (occupancy + pending))
 			if occupancy + pending > 0:
 				print("  [PASS] Event-driven boarding immediately initiated as feeder passengers reach slot!")
 			else:
 				print("  [FAIL] Passengers stalled: no boarding initiated for parked bus")
 				failures += 1
 		else:
-			print("  [FAIL] Vehicle 2 failed to arrive at parking slot")
+			print("  [FAIL] Vehicle 3 failed to arrive at parking slot")
 			failures += 1
 
 	live_l1.queue_free()

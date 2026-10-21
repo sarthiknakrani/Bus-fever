@@ -71,19 +71,19 @@ func _run_queue_flow_tests() -> void:
 	# TEST 3: Boarding-Driven Capacity Release
 	# ----------------------------------------------------
 	print("\n--- TEST 3: Boarding-Driven Feeder Merge Release ---")
-	# Tap vehicle 2 (Blue bus, capacity 40)
-	var tapped := l1.controller.tap_vehicle(2)
+	# Tap vehicle 3 (Red bus, capacity 40)
+	var tapped := l1.controller.tap_vehicle(3)
 	if not tapped:
-		print("  [FAIL] Could not tap vehicle 2")
+		print("  [FAIL] Could not tap vehicle 3")
 		failures += 1
 	else:
-		print("  [PASS] Bus 2 tapped. Waiting for arrival, full boarding, and feeder merge...")
+		print("  [PASS] Bus 3 tapped. Waiting for arrival, full boarding, and feeder merge...")
 		# Wait for bus arrival (0.8s) + full boarding (3.5s) + train tail to pass entrance and feeder merge (5.0s)
 		await create_timer(9.5).timeout
 
-		var v3 = l1.controller.vehicles[2]
+		var v3 = l1.controller.vehicles[3]
 		var boarded = v3.passenger_occupancy
-		var in_flight = l1.controller.pending_boarders.get(2, 0)
+		var in_flight = l1.controller.pending_boarders.get(3, 0)
 		var total_boarded_or_boarding = boarded + in_flight
 
 		var current_oval = l1.circulating_ids.size()
@@ -97,7 +97,7 @@ func _run_queue_flow_tests() -> void:
 		if total_boarded_or_boarding > 0:
 			print("  [PASS] Boarding active: %d passengers departed oval into bus" % total_boarded_or_boarding)
 		else:
-			print("  [FAIL] No passengers boarded bus 2")
+			print("  [FAIL] No passengers boarded bus 3")
 			failures += 1
 
 		# Invariant: total sum must equal 240

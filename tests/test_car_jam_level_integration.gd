@@ -52,7 +52,7 @@ func _init() -> void:
 		print("  [PASS] %d passengers initialized in queue" % ctrl.queue.get_initial_total())
 
 		# 3. Blocked vehicle tap test
-		# Vehicle 1 (yellow) is initially blocked by Vehicle 2 (blue)
+		# Vehicle 1 (yellow) is initially blocked by Vehicle 3 and 4 (red)
 		var tapped_blocked := ctrl.tap_vehicle(1)
 		if tapped_blocked:
 			failures.append("Blocked vehicle 1 should NOT be dispatched")
@@ -60,43 +60,49 @@ func _init() -> void:
 			print("  [PASS] Blocked tap rejected: Vehicle 1 remained ON_BOARD")
 
 		# 4. Legal dispatch and boarding test
-		# Vehicle 2 (blue) is initially free and matches queue head (blue)
-		var free_id := 2
+		# Vehicle 3 (red) is initially free and matches queue head (red)
+		var free_id := 3
 		var target_slot := ctrl.parking.find_available_slot()
 		var tapped_a := ctrl.tap_vehicle(free_id)
 		if not tapped_a:
-			failures.append("Vehicle 2 should be a legal dispatch")
+			failures.append("Vehicle 3 should be a legal dispatch")
 		else:
-			print("  [PASS] Vehicle 2 dispatched successfully to slot %d" % target_slot)
+			print("  [PASS] Vehicle 3 dispatched successfully to slot %d" % target_slot)
 
 		# Simulate arrival at slot
 		ctrl.on_vehicle_arrived_at_slot(free_id, target_slot, ctrl.session_token)
 		var v_a: VehicleModel = ctrl.vehicles[free_id]
 		for pid in ctrl.authoritative_passengers:
 			var p = ctrl.authoritative_passengers[pid]
-			if p["color_id"] == "blue" and p["state"] == "CIRCULATING":
-				if ctrl.try_reserve_boarding(pid, free_id, "blue", p["group_id"]):
-					ctrl.commit_boarding(pid, free_id, "blue", ctrl.session_token)
+			if p["color_id"] == "red" and p["state"] == "CIRCULATING":
+				if ctrl.try_reserve_boarding(pid, free_id, "red", p["group_id"]):
+					ctrl.commit_boarding(pid, free_id, "red", ctrl.session_token)
 			if v_a.is_full():
 				break
 		if not v_a.is_full() or v_a.state != VehicleModel.VehicleState.FULL:
-			failures.append("Vehicle 2 should have boarded matching passengers and become FULL")
+			failures.append("Vehicle 3 should have boarded matching passengers and become FULL")
 		else:
-			print("  [PASS] Vehicle 2 boarded matching passengers and filled")
+			print("  [PASS] Vehicle 3 boarded matching passengers and filled")
 
-		# Simulate departure of vehicle 2
+		# Simulate departure of vehicle 3
 		ctrl.on_vehicle_departed_from_slot(free_id, target_slot, ctrl.session_token)
 		if v_a.state != VehicleModel.VehicleState.COMPLETED:
-			failures.append("Vehicle 2 should be COMPLETED after departure")
+			failures.append("Vehicle 3 should be COMPLETED after departure")
 		else:
-			print("  [PASS] Vehicle 2 departed, marked COMPLETED, and slot freed")
+			print("  [PASS] Vehicle 3 departed, marked COMPLETED, and slot freed")
 
-		# 5. Fast unblocking: Now Vehicle 1 should be FREE to escape UP!
+		# 5. Fast unblocking: Vehicle 1 (yellow) is blocked by Vehicle 3 and 4 (red).
+		# Dispatch and clear blocker 4 so Vehicle 1 becomes free to escape DOWN!
+		var s4 := ctrl.parking.find_available_slot()
+		ctrl.tap_vehicle(4)
+		ctrl.on_vehicle_arrived_at_slot(4, s4, ctrl.session_token)
+		ctrl.on_vehicle_departed_from_slot(4, s4, ctrl.session_token)
+
 		var tapped_b := ctrl.tap_vehicle(1)
 		if not tapped_b:
 			failures.append("Vehicle 1 should now be unblocked and legal to dispatch")
 		else:
-			print("  [PASS] Dynamic unblocking: Vehicle 1 successfully dispatched after 2 cleared")
+			print("  [PASS] Dynamic unblocking: Vehicle 1 successfully dispatched after blockers cleared")
 	else:
 		if ctrl.vehicles.size() != 12:
 			failures.append("Expected 12 vehicles, got %d" % ctrl.vehicles.size())
