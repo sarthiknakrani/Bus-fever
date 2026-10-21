@@ -1051,19 +1051,16 @@ func _init_passenger_track() -> void:
 	feeder_track = Path2D.new()
 	feeder_track.name = "FeederTrack"
 	var f_curve := Curve2D.new()
-	f_curve.add_point(Vector2(360, -950), Vector2.ZERO, Vector2(-10, 80))
-	f_curve.add_point(Vector2(335, -520), Vector2(15, -120), Vector2(-15, 120))
-	f_curve.add_point(Vector2(290, -280), Vector2(15, -65), Vector2(-18, 65))
-	f_curve.add_point(Vector2(265, -110), Vector2(15, -65), Vector2(-18, 65))
-	f_curve.add_point(Vector2(235, 20), Vector2(18, -45), Vector2(-22, 35))
 
 	passenger_track.curve = oval_curve
 
 	_platform_start_prog = oval_curve.get_closest_offset(Vector2(105, 115))
 	_platform_end_prog = oval_curve.get_closest_offset(Vector2(-105, 115))
-	_merge_prog = oval_curve.get_closest_offset(Vector2(180, 82))
+	_merge_prog = oval_curve.get_closest_offset(Vector2(220, 0))
 	var merge_pt: Vector2 = oval_curve.sample_baked(_merge_prog)
-	f_curve.add_point(merge_pt, Vector2(25, -26), Vector2.ZERO)
+	var feeder_top_x: float = maxf(360.0, merge_pt.x + 140.0)
+	f_curve.add_point(Vector2(feeder_top_x, -950.0), Vector2.ZERO, Vector2.ZERO)
+	f_curve.add_point(merge_pt, Vector2.ZERO, Vector2.ZERO)
 	feeder_track.curve = f_curve
 
 	# PREMIUM PLAZA INTEGRATION
@@ -3179,7 +3176,8 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 	# Calculate the top-right offscreen coordinate in passenger_track_root's local space
 	var top_local_y: float = -half_h - track_y
 	var feeder_top_y: float = minf(top_local_y - 120.0, -950.0)
-	var feeder_top_x: float = maxf(360.0, 245.0 + (-110.0 - feeder_top_y) * 0.30)
+	var merge_pt: Vector2 = passenger_track.curve.sample_baked(_merge_prog)
+	var feeder_top_x: float = maxf(360.0, merge_pt.x + (-feeder_top_y) * (140.0 / 950.0))
 	_update_feeder_curve(Vector2(feeder_top_x, feeder_top_y))
 
 	if passenger_track_bg != null:
@@ -3207,15 +3205,9 @@ func _update_feeder_curve(p0: Vector2) -> void:
 		return
 	var old_len: float = feeder_track.curve.get_baked_length() if feeder_track.curve != null else 0.0
 	var f_curve := Curve2D.new()
-	var out_handle_len := (Vector2(335, -520) - p0).length() * 0.35
-	var out_dir := (Vector2(335, -520) - p0).normalized()
-	f_curve.add_point(p0, Vector2.ZERO, out_dir * out_handle_len)
-	f_curve.add_point(Vector2(335, -520), Vector2(15, -120), Vector2(-15, 120))
-	f_curve.add_point(Vector2(290, -280), Vector2(15, -65), Vector2(-18, 65))
-	f_curve.add_point(Vector2(265, -110), Vector2(15, -65), Vector2(-18, 65))
-	f_curve.add_point(Vector2(235, 20), Vector2(18, -45), Vector2(-22, 35))
+	f_curve.add_point(p0, Vector2.ZERO, Vector2.ZERO)
 	var merge_pt: Vector2 = passenger_track.curve.sample_baked(_merge_prog)
-	f_curve.add_point(merge_pt, Vector2(25, -26), Vector2.ZERO)
+	f_curve.add_point(merge_pt, Vector2.ZERO, Vector2.ZERO)
 	feeder_track.curve = f_curve
 	var new_len: float = f_curve.get_baked_length()
 
