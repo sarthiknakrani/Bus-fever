@@ -576,8 +576,3 @@ func _start_logo_shine_animation() -> void:
 	sm.set_shader_parameter("secondary_width", 0.012)
 	sm.set_shader_parameter("secondary_offset", 0.045)
 	sm.set_shader_parameter("secondary_alpha", 0.35)
-
-
-
-
-

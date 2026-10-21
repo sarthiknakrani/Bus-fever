@@ -187,6 +187,7 @@ const RUNNER_SPAWN_INTERVAL: float = 0.035
 
 @export var passenger_normal_speed: float = 335.0
 @export var passenger_sprint_speed: float = 380.0
+@export var passenger_entrance_speed: float = 670.0
 @export var bus_movement_duration_multiplier: float = 1.0
 const TRACK_SPEED := 40.0
 
@@ -321,13 +322,14 @@ func _process(delta: float) -> void:
 					target_prog = minf(_feeder_rows[j - 1].progress - ROW_SPACING, queue_slot)
 			
 			var dist_ahead: float = maxf(0.0, target_prog - f_row.progress)
-			var speed: float = passenger_sprint_speed if _entrance_active else passenger_normal_speed
+			var base_spd: float = passenger_entrance_speed if _entrance_active else passenger_normal_speed
+			var speed: float = base_spd
 			if j > 0:
 				var gap_to_prev: float = _feeder_rows[j - 1].progress - f_row.progress
 				if gap_to_prev > ROW_SPACING * 1.25:
-					speed = passenger_sprint_speed
+					speed = passenger_entrance_speed if _entrance_active else passenger_sprint_speed
 				elif gap_to_prev < ROW_SPACING * 0.90:
-					speed = passenger_normal_speed * 0.85
+					speed = base_spd * 0.85
 					
 			var dist_moved: float = speed * delta
 			dist_moved = minf(dist_moved, dist_ahead)
@@ -427,7 +429,8 @@ func _process(delta: float) -> void:
 			empty_rows.append(row)
 			continue
 
-		var speed = passenger_normal_speed
+		var base_circ_spd: float = passenger_entrance_speed if _entrance_active else passenger_normal_speed
+		var speed = base_circ_spd
 		var dist_ahead = track_len
 		if _circulating_rows.size() > 1:
 			var ahead_row: PassengerRow
@@ -442,9 +445,9 @@ func _process(delta: float) -> void:
 				dist_ahead += track_len
 
 			if dist_ahead > ROW_SPACING * 1.25:
-				speed = passenger_sprint_speed
+				speed = passenger_entrance_speed if _entrance_active else passenger_sprint_speed
 			elif dist_ahead < ROW_SPACING * 0.90:
-				speed = passenger_normal_speed * 0.85
+				speed = base_circ_spd * 0.85
 
 		if _lead_feeder_committed:
 			var d_merge = row.progress - _merge_prog
@@ -1650,8 +1653,13 @@ func _on_level_completed() -> void:
 				_st = 2
 		_last_level_stars = _st
 
-	# Star row (1..3 earned based on move_count vs ideal_moves).
-	_render_star_row()
+	# Star row removed per user request ("remove star features from this game")
+	if _star_row_label != null and is_instance_valid(_star_row_label):
+		_star_row_label.queue_free()
+		_star_row_label = null
+	if _star_subtitle_label != null and is_instance_valid(_star_subtitle_label):
+		_star_subtitle_label.queue_free()
+		_star_subtitle_label = null
 
 	# Show reward badge
 	if reward_badge != null:
@@ -1683,46 +1691,14 @@ func _on_level_completed() -> void:
 	# Start celebratory fireworks, flying coins and balance roll
 	_start_victory_celebration(old_coins, new_coins)
 
-## Draws 3 fixed star slots under the title, coloring earned stars gold and the rest
-## grey. Uses unicode star characters (★ filled, ☆ empty) for portability.
+## Star features removed per user request ("remove star features from this game")
 func _render_star_row() -> void:
-	var label: Label = _star_row_label
-	if label == null:
-		label = Label.new()
-		label.name = "StarRow"
-		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		label.add_theme_font_size_override("font_size", 56)
-		label.add_theme_color_override("font_color", Color("facc15"))
-		label.add_theme_color_override("font_outline_color", Color("0f172a"))
-		label.add_theme_constant_override("outline_size", 4)
-		result_overlay.add_child(label)
-		_star_row_label = label
-	var st: int = maxi(0, mini(3, _last_level_stars))
-	var row_str: String = ""
-	for i in 3:
-		row_str += "★" if i < st else "☆"
-		row_str += "  " if i < 2 else ""
-	label.text = row_str
-	var tl_size: Vector2 = result_title_label.size if result_title_label != null else Vector2(0, 0)
-	var tl_y: float = result_title_label.position.y if result_title_label != null else 100.0
-	label.custom_minimum_size = Vector2(result_overlay.size.x, 60.0)
-	label.position = Vector2(0.0, tl_y + tl_size.y + 20.0)
-	# Subtitle showing moves vs ideal
-	var sub_label: Label = _star_subtitle_label
-	if sub_label == null:
-		sub_label = Label.new()
-		sub_label.name = "StarSubtitle"
-		sub_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		sub_label.add_theme_font_size_override("font_size", 22)
-		sub_label.add_theme_color_override("font_color", Color("fef3c7"))
-		result_overlay.add_child(sub_label)
-		_star_subtitle_label = sub_label
-	if _last_level_ideal_moves > 0:
-		sub_label.text = "Moves: %d  /  Ideal: %d" % [_last_level_moves, _last_level_ideal_moves]
-	else:
-		sub_label.text = "Moves: %d" % _last_level_moves
-	sub_label.custom_minimum_size = Vector2(result_overlay.size.x, 30.0)
-	sub_label.position = Vector2(0.0, label.position.y + 65.0)
+	if _star_row_label != null and is_instance_valid(_star_row_label):
+		_star_row_label.queue_free()
+		_star_row_label = null
+	if _star_subtitle_label != null and is_instance_valid(_star_subtitle_label):
+		_star_subtitle_label.queue_free()
+		_star_subtitle_label = null
 
 func _on_puzzle_failed() -> void:
 	# Guard: failure flow runs once per session.

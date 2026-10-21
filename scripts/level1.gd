@@ -1212,12 +1212,6 @@ func _show_win_overlay() -> void:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(title)
 
-	var stars := Label.new()
-	stars.text = "⭐ ⭐ ⭐"
-	stars.add_theme_font_size_override("font_size", 44)
-	stars.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(stars)
-
 	var reward := Label.new()
 	reward.text = "+50 COINS EARNED!"
 	reward.add_theme_font_size_override("font_size", 24)

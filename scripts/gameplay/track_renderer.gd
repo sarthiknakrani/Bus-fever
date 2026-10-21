@@ -202,134 +202,123 @@ func _draw() -> void:
 	curb_right.append(Vector2(x_gate, plat_y + 1.0))
 
 	# -----------------------------------------------------------------
-	# 4. ROAD SURFACE POLYGONS
+	# 4. ROAD SURFACE POLYGONS (100% UNIFIED, SEAMLESS, ZERO GAPS)
 	# -----------------------------------------------------------------
-	var top_poly = PackedVector2Array()
-	top_poly.append(Vector2(-straight_x - r_outer, 0.0))
-	for i in range(1, n_arc / 2):
-		var ang = PI + (float(i) / float(n_arc / 2)) * (PI / 2.0)
-		top_poly.append(c_left + Vector2(cos(ang), sin(ang)) * r_outer)
-	top_poly.append(Vector2(-straight_x, -r_outer))
-	top_poly.append(Vector2(straight_x, -r_outer))
+	# Build complete seamless outer boundary tracing both oval and feeder
+	var outer_road := PackedVector2Array()
+	# Start at gateway left
+	outer_road.append(Vector2(-x_gate, plat_y + 1.0))
+	outer_road.append(Vector2(-x_gate, r_outer))
+	outer_road.append(Vector2(-straight_x, r_outer))
+	# Left arc
+	for i in range(1, n_arc):
+		var ang = PI / 2.0 + (float(i) / float(n_arc)) * PI
+		outer_road.append(c_left + Vector2(cos(ang), sin(ang)) * r_outer)
+	# Top straight
+	outer_road.append(Vector2(-straight_x, -r_outer))
+	outer_road.append(Vector2(straight_x, -r_outer))
+	# Top right arc to inner meet
 	for i in range(1, steps_to_inner):
 		var ang = -PI / 2.0 + (float(i) / float(steps_to_inner)) * (inner_meet_ang - (-PI / 2.0))
-		top_poly.append(c_right + Vector2(cos(ang), sin(ang)) * r_outer)
-
-	if inner_meet_idx >= 0 and outer_meet_idx >= 0:
-		top_poly.append(inner_meet_pt)
+		outer_road.append(c_right + Vector2(cos(ang), sin(ang)) * r_outer)
+	if inner_meet_idx >= 0:
+		outer_road.append(inner_meet_pt)
 		for i in range(inner_meet_idx - 1, -1, -1):
-			top_poly.append(f_inner[i])
-		top_poly.append(f_outer[0])
+			outer_road.append(f_inner[i])
+	if not f_outer.is_empty():
+		outer_road.append(f_outer[0])
+	if outer_meet_idx >= 0:
 		for i in range(1, outer_meet_idx):
-			top_poly.append(f_outer[i])
-		top_poly.append(outer_meet_pt)
-		if outer_meet_ang < 0.0:
-			var steps_to_zero = max(1, int(abs(outer_meet_ang) / (PI / float(n_arc))))
-			for i in range(1, steps_to_zero):
-				var ang = outer_meet_ang + (float(i) / float(steps_to_zero)) * (0.0 - outer_meet_ang)
-				top_poly.append(c_right + Vector2(cos(ang), sin(ang)) * r_outer)
-		top_poly.append(Vector2(straight_x + r_outer, 0.0))
-	else:
-		top_poly.append(Vector2(straight_x + r_outer, 0.0))
-
-	top_poly.append(Vector2(straight_x_inner + r_inner_scaled, 0.0))
-	for i in range(1, n_arc / 2):
-		var ang = 0.0 - (float(i) / float(n_arc / 2)) * (PI / 2.0)
-		top_poly.append(c_right_inner + Vector2(cos(ang), sin(ang)) * r_inner_scaled)
-	top_poly.append(Vector2(straight_x_inner, -r_inner_scaled))
-	top_poly.append(Vector2(-straight_x_inner, -r_inner_scaled))
-	for i in range(1, n_arc / 2):
-		var ang = -PI / 2.0 - (float(i) / float(n_arc / 2)) * (PI / 2.0)
-		top_poly.append(c_left_inner + Vector2(cos(ang), sin(ang)) * r_inner_scaled)
-	top_poly.append(Vector2(-straight_x_inner - r_inner_scaled, 0.0))
-
-	# Bottom half polygon
-	var btm_poly = PackedVector2Array()
-	var start_btm_ang: float = maxf(0.0, outer_meet_ang if outer_meet_idx >= 0 else 0.0)
-	steps_from_outer = max(1, int(abs(PI / 2.0 - start_btm_ang) / (PI / float(n_arc))))
-	btm_poly.append(c_right + Vector2(cos(start_btm_ang), sin(start_btm_ang)) * r_outer)
-
+			outer_road.append(f_outer[i])
+		outer_road.append(outer_meet_pt)
 	for i in range(1, steps_from_outer):
-		var ang = start_btm_ang + (float(i) / float(steps_from_outer)) * (PI / 2.0 - start_btm_ang)
-		btm_poly.append(c_right + Vector2(cos(ang), sin(ang)) * r_outer)
-	btm_poly.append(Vector2(straight_x, r_outer))
-	btm_poly.append(Vector2(x_gate, r_outer))
-	btm_poly.append(Vector2(x_gate, plat_y + 25.0))
-	btm_poly.append(Vector2(-x_gate, plat_y + 25.0))
-	btm_poly.append(Vector2(-x_gate, r_outer))
-	btm_poly.append(Vector2(-straight_x, r_outer))
-	for i in range(1, n_arc / 2):
-		var ang = PI / 2.0 + (float(i) / float(n_arc / 2)) * (PI / 2.0)
-		btm_poly.append(c_left + Vector2(cos(ang), sin(ang)) * r_outer)
-	btm_poly.append(Vector2(-straight_x - r_outer, 0.0))
-	btm_poly.append(Vector2(-straight_x_inner - r_inner_scaled, 0.0))
-	for i in range(1, n_arc / 2):
-		var ang = PI - (float(i) / float(n_arc / 2)) * (PI / 2.0)
-		btm_poly.append(c_left_inner + Vector2(cos(ang), sin(ang)) * r_inner_scaled)
-	btm_poly.append(Vector2(-straight_x_inner, r_inner_scaled))
-	btm_poly.append(Vector2(straight_x_inner, r_inner_scaled))
-	for i in range(1, n_arc / 2):
-		var ang = PI / 2.0 - (float(i) / float(n_arc / 2)) * (PI / 2.0)
-		btm_poly.append(c_right_inner + Vector2(cos(ang), sin(ang)) * r_inner_scaled)
-	btm_poly.append(Vector2(straight_x_inner + r_inner_scaled, 0.0))
+		var ang = outer_meet_ang + (float(i) / float(steps_from_outer)) * (PI / 2.0 - outer_meet_ang)
+		outer_road.append(c_right + Vector2(cos(ang), sin(ang)) * r_outer)
+	outer_road.append(Vector2(straight_x, r_outer))
+	outer_road.append(Vector2(x_gate, r_outer))
+	outer_road.append(Vector2(x_gate, plat_y + 1.0))
 
 	# -----------------------------------------------------------------
-	# 5. DRAWING PIPELINE (2.5D SHADOWS, ROAD, PROMINENT THICK 3D CURB WALLS)
+	# 5. DRAWING PIPELINE (RICH 3D DEPTH, DUAL-LAYER DROP SHADOWS, BEVELED CURBS)
 	# -----------------------------------------------------------------
-	# Step A: 2.5D Drop shadows onto surrounding garden lawn
-	var shadow_offset := Vector2(0, 5.0)
-	var s_left = PackedVector2Array()
-	for pt in curb_left: s_left.append(pt + shadow_offset)
-	var s_right = PackedVector2Array()
-	for pt in curb_right: s_right.append(pt + shadow_offset)
+	# Step A: Dual-layer 2.5D Drop shadows onto surrounding garden lawn
+	var shadow_offset_deep := Vector2(0, 8.0)
+	var shadow_offset_near := Vector2(0, 4.0)
+	var s_left_deep = PackedVector2Array()
+	var s_left_near = PackedVector2Array()
+	for pt in curb_left:
+		s_left_deep.append(pt + shadow_offset_deep)
+		s_left_near.append(pt + shadow_offset_near)
+	var s_right_deep = PackedVector2Array()
+	var s_right_near = PackedVector2Array()
+	for pt in curb_right:
+		s_right_deep.append(pt + shadow_offset_deep)
+		s_right_near.append(pt + shadow_offset_near)
 
-	draw_polyline(s_left, COLOR_SHADOW, 9.0, true)
-	draw_polyline(s_right, COLOR_SHADOW, 9.0, true)
+	# Deep volumetric ambient shadow + crisp contact shadow
+	draw_polyline(s_left_deep, Color(0.01, 0.04, 0.01, 0.28), 16.0, true)
+	draw_polyline(s_right_deep, Color(0.01, 0.04, 0.01, 0.28), 16.0, true)
+	draw_polyline(s_left_near, Color(0.01, 0.04, 0.01, 0.45), 8.5, true)
+	draw_polyline(s_right_near, Color(0.01, 0.04, 0.01, 0.45), 8.5, true)
 
-	# Step B: Grey road surface
-	var clean_top = Geometry2D.merge_polygons(top_poly, PackedVector2Array())
-	for p in clean_top:
-		draw_colored_polygon(p, COLOR_ROAD)
+	# Inner retaining shadow onto recessed garden island
+	var s_inner = PackedVector2Array()
+	for pt in curb_inner:
+		s_inner.append(pt + Vector2(0, 3.5))
+	draw_polyline(s_inner, Color(0.01, 0.04, 0.01, 0.35), 7.5, true)
 
-	var clean_btm = Geometry2D.merge_polygons(btm_poly, PackedVector2Array())
-	for p in clean_btm:
-		draw_colored_polygon(p, COLOR_ROAD)
+	# Step B: 100% Solid, seamless grey road surface (zero gaps / zero green seams)
+	# Draw solid underlay patch across feeder-oval merge zone so green lawn can never peek through
+	var merge_patch := PackedVector2Array([
+		Vector2(straight_x_inner + r_inner_scaled - 10.0, -15.0),
+		Vector2(straight_x + r_outer + 15.0, -15.0),
+		Vector2(straight_x + r_outer + 15.0, 15.0),
+		Vector2(straight_x_inner + r_inner_scaled - 10.0, 15.0)
+	])
+	draw_colored_polygon(merge_patch, COLOR_ROAD)
 
-	# Step C: Ambient occlusion shadow along inner & outer road edges
-	draw_polyline(curb_left, COLOR_ROAD_SHADOW, 4.0, true)
-	draw_polyline(curb_right, COLOR_ROAD_SHADOW, 4.0, true)
-	draw_polyline(curb_inner, COLOR_ROAD_SHADOW, 3.5, true)
+	var road_polys = Geometry2D.clip_polygons(outer_road, curb_inner)
+	if not road_polys.is_empty():
+		for p in road_polys:
+			draw_colored_polygon(p, COLOR_ROAD)
+	else:
+		draw_colored_polygon(outer_road, COLOR_ROAD)
+
+	# Step C: Ambient occlusion shadow along inner & outer road edges (curved 3D banking)
+	draw_polyline(curb_left, COLOR_ROAD_SHADOW, 4.5, true)
+	draw_polyline(curb_right, COLOR_ROAD_SHADOW, 4.5, true)
+	draw_polyline(curb_inner, COLOR_ROAD_SHADOW, 4.0, true)
 
 	# Step D: Faint 4-lane guide markings (subtle dashed guidelines)
 	_draw_lane_guidelines(straight_x, r_center, c_left, c_right)
 
-	# Step E: Raised 3D Curb Walls (Vertical Extrusion dy = 3.5px)
-	var wall_dy := Vector2(0, 3.5)
+	# Step E: Raised 3D Curb Walls (Vertical Extrusion dy = 4.5px)
+	var wall_dy := Vector2(0, 4.5)
 	var w_left = PackedVector2Array()
 	for pt in curb_left: w_left.append(pt + wall_dy)
 	var w_right = PackedVector2Array()
 	for pt in curb_right: w_right.append(pt + wall_dy)
 
-	draw_polyline(w_left, COLOR_CURB_FACE, 7.5, true)
-	draw_polyline(w_right, COLOR_CURB_FACE, 7.5, true)
+	draw_polyline(w_left, COLOR_CURB_FACE, 8.5, true)
+	draw_polyline(w_right, COLOR_CURB_FACE, 8.5, true)
 
-	# Inner retaining curb wall (bottom half visible to 2.5D camera)
+	# Inner retaining curb wall (visible to 2.5D camera)
 	var w_inner = PackedVector2Array()
 	for pt in curb_inner:
-		if pt.y >= -10.0:
+		if pt.y >= -15.0:
 			w_inner.append(pt + wall_dy)
 	if w_inner.size() >= 2:
-		draw_polyline(w_inner, COLOR_CURB_FACE, 7.5, true)
+		draw_polyline(w_inner, COLOR_CURB_FACE, 8.5, true)
 
-	# Step F: PROMINENT THICK 3D WHITE & BEVEL CURBS (4.2px white rim, 6.5px bevel)
+	# Step F: PROMINENT THICK 3D WHITE & BEVEL CURBS (4.5px white rim, 6.5px bevel)
 	draw_polyline(curb_left, COLOR_CURB_BEVEL, 6.5, true)
-	draw_polyline(curb_left, COLOR_CURB_HIGHLIGHT, 4.2, true)
+	draw_polyline(curb_left, COLOR_CURB_HIGHLIGHT, 4.5, true)
 
 	draw_polyline(curb_right, COLOR_CURB_BEVEL, 6.5, true)
-	draw_polyline(curb_right, COLOR_CURB_HIGHLIGHT, 4.2, true)
+	draw_polyline(curb_right, COLOR_CURB_HIGHLIGHT, 4.5, true)
 
 	draw_polyline(curb_inner, COLOR_CURB_BEVEL, 6.5, true)
-	draw_polyline(curb_inner, COLOR_CURB_HIGHLIGHT, 4.2, true)
+	draw_polyline(curb_inner, COLOR_CURB_HIGHLIGHT, 4.5, true)
 
 	# Step G: 3D Gateway Endcap Bollards at (-x_gate, plat_y) and (x_gate, plat_y)
 	_draw_gateway_bollard(Vector2(-x_gate, plat_y))
