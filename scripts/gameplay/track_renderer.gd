@@ -261,28 +261,19 @@ func _draw() -> void:
 	draw_polyline(s_left_near, Color(0.01, 0.04, 0.01, 0.45), 8.5, true)
 	draw_polyline(s_right_near, Color(0.01, 0.04, 0.01, 0.45), 8.5, true)
 
+	# Step B: 100% Solid, seamless grey road surface (zero gaps / zero green seams)
+	# Draw solid outer road surface covering track & feeder seamlessly
+	draw_colored_polygon(outer_road, COLOR_ROAD)
+
+	# Central sunken garden island inside curb_inner
+	const COLOR_CENTRAL_GARDEN := Color("66b946")
+	draw_colored_polygon(curb_inner, COLOR_CENTRAL_GARDEN)
+
 	# Inner retaining shadow onto recessed garden island
 	var s_inner = PackedVector2Array()
 	for pt in curb_inner:
 		s_inner.append(pt + Vector2(0, 3.5))
 	draw_polyline(s_inner, Color(0.01, 0.04, 0.01, 0.35), 7.5, true)
-
-	# Step B: 100% Solid, seamless grey road surface (zero gaps / zero green seams)
-	# Draw solid underlay patch across feeder-oval merge zone so green lawn can never peek through
-	var merge_patch := PackedVector2Array([
-		Vector2(straight_x_inner + r_inner_scaled - 10.0, -15.0),
-		Vector2(straight_x + r_outer + 15.0, -15.0),
-		Vector2(straight_x + r_outer + 15.0, 15.0),
-		Vector2(straight_x_inner + r_inner_scaled - 10.0, 15.0)
-	])
-	draw_colored_polygon(merge_patch, COLOR_ROAD)
-
-	var road_polys = Geometry2D.clip_polygons(outer_road, curb_inner)
-	if not road_polys.is_empty():
-		for p in road_polys:
-			draw_colored_polygon(p, COLOR_ROAD)
-	else:
-		draw_colored_polygon(outer_road, COLOR_ROAD)
 
 	# Step C: Ambient occlusion shadow along inner & outer road edges (curved 3D banking)
 	draw_polyline(curb_left, COLOR_ROAD_SHADOW, 4.5, true)

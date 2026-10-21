@@ -43,42 +43,69 @@ static func animate_dispatch(
 	# -----------------------------------------------------------------
 	var tw := vehicle_node.create_tween()
 
-	# Puzzle-arrow direction expressed in world space (after the
-	# 45-degree board rotation + 0.6 Y-scale). This is the direction
-	# the bus drives along in Stage A. Passed in by the caller as
-	# _legacy_exit_pos so this static function never depends on
-	# board_root transform.
+	# -------------------------------------------------------------------------
+	# BOARD-TO-PARKING ROUTING (Zero-Overlap Perimeter Clearance)
+	#
+	# Stage A: Drive along puzzle arrow to clear the board footprint.
+	# Stage B: If exiting to the side or down, follow outer perimeter corridor
+	#          around the board so the bus NEVER cuts across other buses.
+	# Stage C: Enter top approach corridor below the assigned parking bay.
+	# Stage D: Settle exactly on slot_pos with final rotation matching slot.
+	# -------------------------------------------------------------------------
 	var forward_world: Vector2 = (_legacy_exit_pos - start_pos)
 	if forward_world.length_squared() < 0.0001:
 		forward_world = Vector2(0, -1)
 	forward_world = forward_world.normalized()
 
-	# -------------------------------------------------------------------------
-	# 4-point cubic Bézier chain:
-	#
-	#   P0 = bus on the board (start)
-	#   P1 = 130 px ALONG the puzzle arrow past P0 (Stage A exit)
-	#   P2 = corridor waypoint, BELOW the parking strip and under slot
-	#   P3 = slot center (final destination, tangent aligned with slot_rotation)
-	# -------------------------------------------------------------------------
-	var P1: Vector2 = start_pos + forward_world * 130.0
-	var P2: Vector2 = corridor_pos
-	if P2.distance_to(start_pos) < 80.0:
-		P2 = slot_pos + Vector2(0.0, 85.0).rotated(slot_rotation)
+	var exit_dist: float = start_pos.distance_to(_legacy_exit_pos)
+	var exit_point: Vector2 = _legacy_exit_pos if exit_dist >= 40.0 else start_pos + forward_world * 140.0
 
-	if forward_world.y < -0.5:
-		P1.y = maxf(P1.y, P2.y + 10.0)
+	var BYPASS_LEFT_X := -240.0
+	var BYPASS_RIGHT_X := 240.0
+	var BYPASS_BOTTOM_Y := 940.0
+	var CORRIDOR_TOP_Y := corridor_pos.y
+
+	var pts: Array[Vector2] = []
+	pts.append(start_pos)
+	pts.append(exit_point)
+
+	if exit_point.y > 540.0:
+		# Exited to side or bottom; navigate around board perimeter
+		if forward_world.y > 0.4 or exit_point.y >= 880.0:
+			# Exited DOWN: turn around bottom corner towards target slot side
+			var side_x = BYPASS_LEFT_X if slot_pos.x <= 0.0 else BYPASS_RIGHT_X
+			pts.append(Vector2(exit_point.x, maxf(exit_point.y, BYPASS_BOTTOM_Y)))
+			pts.append(Vector2(side_x, maxf(exit_point.y, BYPASS_BOTTOM_Y)))
+			pts.append(Vector2(side_x, CORRIDOR_TOP_Y))
+		elif forward_world.x < -0.1 or exit_point.x <= 0.0:
+			# Exited LEFT: follow left highway up to top corridor
+			pts.append(Vector2(minf(exit_point.x, BYPASS_LEFT_X), exit_point.y))
+			pts.append(Vector2(minf(exit_point.x, BYPASS_LEFT_X), CORRIDOR_TOP_Y))
+		else:
+			# Exited RIGHT: follow right highway up to top corridor
+			pts.append(Vector2(maxf(exit_point.x, BYPASS_RIGHT_X), exit_point.y))
+			pts.append(Vector2(maxf(exit_point.x, BYPASS_RIGHT_X), CORRIDOR_TOP_Y))
+
+	pts.append(corridor_pos)
+	pts.append(slot_pos)
 
 	var in_tangent := Vector2(0.0, 32.0).rotated(slot_rotation)
 	var curve := Curve2D.new()
-	# P0 - bus on the board; out tangent = puzzle direction.
-	curve.add_point(start_pos, Vector2.ZERO, forward_world * 120.0)
-	# P1 - driven-out waypoint; smooth continuation of puzzle direction.
-	curve.add_point(P1, -forward_world * 100.0, forward_world * 100.0)
-	# P2 - corridor below parking strip; tangent towards slot entry
-	curve.add_point(P2, Vector2(0.0, 50.0).rotated(slot_rotation), -in_tangent)
-	# P3 - slot center; in tangent aligned with slot angle
-	curve.add_point(slot_pos, in_tangent, Vector2.ZERO)
+	for i in range(pts.size()):
+		var p = pts[i]
+		var in_tan = Vector2.ZERO
+		var out_tan = Vector2.ZERO
+		if i == 0:
+			out_tan = forward_world * 80.0
+		elif i == pts.size() - 1:
+			in_tan = in_tangent
+		else:
+			var prev_p = pts[i - 1]
+			var next_p = pts[i + 1]
+			var seg_d = (next_p - prev_p).normalized() * minf(50.0, prev_p.distance_to(p) * 0.35)
+			in_tan = -seg_d
+			out_tan = seg_d
+		curve.add_point(p, in_tan, out_tan)
 
 	# Derive front vector (the bus sprite's "front" in its NATIVE puzzle orientation).
 	var v_dir: int = vehicle_node.get("vehicle_dir") if vehicle_node.get("vehicle_dir") != null else CarJamVehicleData.Direction.UP

@@ -366,7 +366,7 @@ func _process(delta: float) -> void:
 			var can_merge: bool = (_oval_freed_capacity >= needed_cap) or _entrance_active
 			if can_merge and lead_row.progress >= f_len - 2.0:
 				var merge_clear := true
-				var clearance_buffer: float = ROW_SPACING * 0.85
+				var clearance_buffer: float = ROW_SPACING * 0.88
 				for cr in _circulating_rows:
 					var d = absf(cr.progress - _merge_prog)
 					if d > track_len * 0.5:
@@ -374,6 +374,24 @@ func _process(delta: float) -> void:
 					if d < clearance_buffer:
 						merge_clear = false
 						break
+
+				# In normal circulation mode, only merge into genuine vacated gaps
+				# left by boarded passengers (where passengers khali hue ho)
+				if merge_clear and not _entrance_active and _circulating_rows.size() > 1:
+					var min_dist_ahead: float = track_len
+					var min_dist_behind: float = track_len
+					for cr in _circulating_rows:
+						var d_ahead = cr.progress - _merge_prog
+						if d_ahead < 0.0: d_ahead += track_len
+						if d_ahead < min_dist_ahead: min_dist_ahead = d_ahead
+
+						var d_behind = _merge_prog - cr.progress
+						if d_behind < 0.0: d_behind += track_len
+						if d_behind < min_dist_behind: min_dist_behind = d_behind
+
+					if min_dist_ahead < ROW_SPACING * 0.85 or min_dist_behind < ROW_SPACING * 0.85:
+						merge_clear = false
+
 				if merge_clear:
 					_feeder_rows.pop_front()
 					_lead_feeder_committed = false
@@ -444,10 +462,18 @@ func _process(delta: float) -> void:
 			if dist_ahead < 0.0:
 				dist_ahead += track_len
 
-			if dist_ahead > ROW_SPACING * 1.25:
-				speed = passenger_entrance_speed if _entrance_active else passenger_sprint_speed
-			elif dist_ahead < ROW_SPACING * 0.90:
-				speed = base_circ_spd * 0.85
+			if _entrance_active:
+				if dist_ahead > ROW_SPACING * 1.25:
+					speed = passenger_entrance_speed
+				elif dist_ahead < ROW_SPACING * 0.90:
+					speed = base_circ_spd * 0.85
+			else:
+				# Normal circulating mode: do NOT sprint to close vacated gaps.
+				# Vacated gaps travel to the feeder merge point where queue passengers enter.
+				if dist_ahead < ROW_SPACING * 0.88:
+					speed = base_circ_spd * 0.82
+				else:
+					speed = base_circ_spd
 
 		if _lead_feeder_committed:
 			var d_merge = row.progress - _merge_prog
