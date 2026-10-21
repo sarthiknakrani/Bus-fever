@@ -52,32 +52,38 @@ func _run() -> void:
 		for f in dir.get_files():
 			dir.remove(f)
 
-	# Phase 1: Start with empty track (15 frames)
-	for i in range(15):
+	# Phase 1: Start with empty track (30 frames)
+	for i in range(30):
 		await process_frame
 		_save_frame()
 
-	# Phase 2: Passengers stream in from feeder (60 frames)
+	# Phase 2: Passengers stream in from feeder and wrap around full oval (360 frames = 6 seconds)
+	for i in range(360):
+		await process_frame
+		if i % 2 == 0:
+			_save_frame()
+
+	# Phase 3: Oval circulating smoothly (60 frames)
 	for i in range(60):
 		await process_frame
-		_save_frame()
+		if i % 2 == 0:
+			_save_frame()
 
-	# Phase 3: Queue stops at gate (40 frames)
-	for i in range(40):
-		await process_frame
-		_save_frame()
-
-	# Phase 4: Dispatch Blue Bus 2 (unblocked at start)
+	# Phase 4: Dispatch Blue Bus 2
+	print("  Dispatching Blue Bus 2...")
 	lvl.controller.tap_vehicle(2)
-	for i in range(35):
-		await process_frame
-		_save_frame()
-
-	# Phase 5: Dispatch Yellow Bus 1 (freed after Bus 2)
-	lvl.controller.tap_vehicle(1)
 	for i in range(120):
 		await process_frame
-		_save_frame()
+		if i % 2 == 0:
+			_save_frame()
+
+	# Phase 5: Dispatch Yellow Bus 1
+	print("  Dispatching Yellow Bus 1...")
+	lvl.controller.tap_vehicle(1)
+	for i in range(180):
+		await process_frame
+		if i % 2 == 0:
+			_save_frame()
 
 	print("=== RECORDING FINISHED: %d frames captured ===" % frame_idx)
 	quit(0)
