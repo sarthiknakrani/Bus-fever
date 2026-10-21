@@ -336,11 +336,7 @@ func tap_vehicle(vehicle_id: int) -> bool:
 			return false
 
 	# 1. Swept corridor collision check
-	var escape_res: Dictionary
-	if level_data != null and level_data.level_id == 1:
-		escape_res = _check_level1_bus_escape(vehicle_id)
-	else:
-		escape_res = board.check_swept_escape(v)
+	var escape_res: Dictionary = board.check_swept_escape(v)
 
 	if not escape_res["can_escape"]:
 		print("[QA %d] Tap Bus %d | State: %s | Legal: %s | Slots: %s | REJECTED: Physically Blocked by %d" % [Time.get_ticks_msec(), vehicle_id, state_str, str(can_disp), slots_str, escape_res["blocker_id"]])
@@ -380,22 +376,6 @@ func tap_vehicle(vehicle_id: int) -> bool:
 	vehicle_dispatch_started.emit(vehicle_id, slot_id, corridor)
 	move_count += 1
 	return true
-
-func _check_level1_bus_escape(vehicle_id: int) -> Dictionary:
-	var blocker_id := -1
-	if vehicle_id == 1 or vehicle_id == 4:
-		var b2: VehicleModel = vehicles.get(2, null)
-		if b2 != null and b2.state == VehicleModel.VehicleState.ON_BOARD:
-			blocker_id = 2
-	elif vehicle_id == 3 or vehicle_id == 6:
-		var b5: VehicleModel = vehicles.get(5, null)
-		if b5 != null and b5.state == VehicleModel.VehicleState.ON_BOARD:
-			blocker_id = 5
-	var empty_corr: Array[Vector2i] = []
-	if blocker_id != -1:
-		return {"can_escape": false, "blocker_id": blocker_id, "swept_corridor": empty_corr}
-	var ok_corr: Array[Vector2i] = [Vector2i.ZERO]
-	return {"can_escape": true, "blocker_id": -1, "swept_corridor": ok_corr}
 
 ## Called by vehicle movement view when arrival at parking slot completes.
 func on_vehicle_arrived_at_slot(vehicle_id: int, slot_id: int, token: int) -> void:
@@ -816,7 +796,6 @@ func _check_terminal_states() -> void:
 
 	if all_v_done and zero_passengers_remain and queue.is_empty():
 		state = GameState.WIN
-		level_completed.emit()
 		# Compute 3-tier stars from move_count vs the level's authored ideal_moves.
 		var ideal: int = level_data.ideal_moves if level_data != null else 0
 		var _stars: int = 1
@@ -826,6 +805,7 @@ func _check_terminal_states() -> void:
 			elif move_count <= int(ceil(float(ideal) * 1.5)):
 				_stars = 2
 		level_scored.emit(_stars, move_count, ideal)
+		level_completed.emit()
 		return
 
 	# 2. Accurate Lose/Jam Check: Trigger level_failed (puzzle_failed) ONLY when:

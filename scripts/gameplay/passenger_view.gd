@@ -137,7 +137,8 @@ func _process(delta: float) -> void:
 			# Frame changes smoothly across all 8 running frames with actual travel speed (stride ~ 36px)
 			_anim_time += moved_dist / 36.0
 			if _is_animated and _char_sprite != null:
-				var run_frame: int = int(floor(fmod(_anim_time + _phase_offset, 1.0) * float(RUN_FRAMES))) % RUN_FRAMES
+				var norm_t: float = wrapf(_anim_time + _phase_offset, 0.0, 1.0)
+				var run_frame: int = clampi(int(floor(norm_t * float(RUN_FRAMES))), 0, RUN_FRAMES - 1)
 				_char_sprite.frame = run_frame
 			
 			if _char_sprite != null:

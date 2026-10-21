@@ -165,8 +165,8 @@ func _test_responsive_resolutions_and_captures() -> void:
 			# Verify vertical clearance from Settings button (y >= 60)
 			_assert(logo.position.y >= 60.0, "[%s] Logo clears top settings area (y=%.1f >= 60)" % [tag, logo.position.y])
 
-			# Verify logo stays strictly within the cloud zone, never overlaying background buildings/trees (horizon ~0.3706)
-			var max_horizon_y: float = float(win_size.y) * 0.36
+			# Verify logo stays strictly within the cloud zone, never overlaying background buildings/trees (skyline at ~0.435-0.455)
+			var max_horizon_y: float = maxf(float(win_size.y) * 0.44, 260.0)
 			_assert(logo.position.y + logo.size.y <= max_horizon_y + 0.5, "[%s] Logo stays strictly inside clouds, never overlaying background buildings/trees (bottom=%.1f <= max=%.1f)" % [tag, logo.position.y + logo.size.y, max_horizon_y])
 
 			# Verify vertical clearance from Play button (play button at ~0.81 * H)

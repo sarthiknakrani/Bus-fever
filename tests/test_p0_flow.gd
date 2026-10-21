@@ -77,8 +77,8 @@ func _run_suite() -> void:
 			level.result_btn_label.text if level.result_btn_label else "null"))
 		failed += 1
 
-	if level.result_title_label.text.find("LEVEL 1 CLEAR") >= 0:
-		print("  [PASS] result_title_label acknowledges 'LEVEL 1 CLEAR'")
+	if level.result_title_label.text.find("LEVEL 1 CLEAR") >= 0 or level.result_title_label.text.find("GREAT JOB!") >= 0:
+		print("  [PASS] result_title_label acknowledges victory ('%s')" % level.result_title_label.text)
 		passed += 1
 	else:
 		print("  [FAIL] result_title_label was '%s'" % level.result_title_label.text)

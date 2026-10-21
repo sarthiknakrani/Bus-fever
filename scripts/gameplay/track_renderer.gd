@@ -20,8 +20,7 @@ var outer_meet_ang: float = 0.09
 const ROAD_HALF_WIDTH: float = 53.0
 const GATEWAY_HALF_WIDTH: float = 55.0
 
-# Authoritative 3D reference colors
-const COLOR_ROAD := Color("727382") # Refined slate grey
+const COLOR_ROAD := Color("767786") # Authoritative road grey matching PlatformView
 const COLOR_ROAD_SHADOW := Color("5d5e6c") # Ambient occlusion inner shadow
 const COLOR_CURB_FACE := Color("4b4d5a") # Vertical 3D curb wall face
 const COLOR_CURB_BEVEL := Color("a5abc2") # Curb bevel transition
