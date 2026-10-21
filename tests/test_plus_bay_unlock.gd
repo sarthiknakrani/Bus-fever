@@ -13,11 +13,13 @@ func _run_test() -> void:
 	print("=== PLUS BAY UNLOCK PROGRESSION TEST ===")
 	print("=======================================================\n")
 
-	# Load level 1 data directly from the .tres.
-	var lvl: CarJamLevelData = ResourceLoader.load("res://levels/level_001.tres") as CarJamLevelData
-	assert(lvl != null, "level_001.tres must load")
+	# Load level 1 data directly from the .tres and configure plus bays for progression test.
+	var base_lvl: CarJamLevelData = ResourceLoader.load("res://levels/level_001.tres") as CarJamLevelData
+	assert(base_lvl != null, "level_001.tres must load")
+	var lvl: CarJamLevelData = base_lvl.duplicate(true) as CarJamLevelData
+	lvl.plus_slot_ids = [4, 5]
 	print("[Test] Loaded level %d (%d slots, plus=%s)" % [lvl.level_id, lvl.parking_slots_count, str(lvl.plus_slot_ids)])
-	assert(lvl.plus_slot_ids == [4, 5], "Level 1 should declare plus_slot_ids = [4, 5]")
+	assert(lvl.plus_slot_ids == [4, 5], "Level data configured with plus_slot_ids = [4, 5]")
 
 	# Spin up controller and load level directly.
 	var ctrl := CarJamController.new()

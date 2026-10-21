@@ -24,8 +24,8 @@ static func _build_level_1(mystery_ids: Array[int]) -> CarJamLevelData:
 	lvl.board_size = Vector2i(5, 5)
 	lvl.parking_slots_count = 7
 	lvl.unlocked_slot_ids = [1, 2, 3, 4, 5, 6]
-	# Slot 4 and 5 are configured as PLUS bays (start locked, unlock mid-level via dispatch threshold).
-	lvl.plus_slot_ids = [4, 5]
+	# Level 1 has standard unlocked bays (no green plus bays, matching original reference).
+	lvl.plus_slot_ids = []
 	# Ideal taps to clear level 1: one tap per bus, in dispatch order (bus 1, 4, 2, 5, 3, 6 — see the
 	# rule order in tap_vehicle). 6 dispatches = perfect 3-star rating.
 	lvl.ideal_moves = 6

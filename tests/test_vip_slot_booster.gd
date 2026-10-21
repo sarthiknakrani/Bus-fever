@@ -16,6 +16,8 @@ func _run_test() -> void:
 
 	var lvl: CarJamLevelData = ResourceLoader.load("res://levels/level_001.tres") as CarJamLevelData
 	assert(lvl != null, "level_001.tres must load")
+	lvl = lvl.duplicate(true)
+	lvl.plus_slot_ids = [4, 5]
 
 	var ctrl := CarJamController.new()
 	root.add_child(ctrl)

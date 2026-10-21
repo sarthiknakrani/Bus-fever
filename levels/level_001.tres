@@ -92,6 +92,6 @@ board_size = Vector2i(5, 5)
 parking_slots_count = 7
 unlocked_slot_ids = Array[int]([1, 2, 3, 4, 5, 6])
 ideal_moves = 6
-plus_slot_ids = Array[int]([4, 5])
+plus_slot_ids = Array[int]([])
 vehicles = Array[ExtResource("3_2rj5p")]([SubResource("Resource_j16qs"), SubResource("Resource_ve5tp"), SubResource("Resource_8pr85"), SubResource("Resource_7spjs"), SubResource("Resource_5vwlj"), SubResource("Resource_pnxit")])
 passenger_groups = Array[ExtResource("1_wi1xg")]([SubResource("Resource_4o2j7"), SubResource("Resource_jy0cp"), SubResource("Resource_miac7"), SubResource("Resource_y2kor"), SubResource("Resource_hlj77"), SubResource("Resource_by0b7")])
