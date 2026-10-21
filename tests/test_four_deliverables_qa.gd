@@ -146,7 +146,7 @@ func _run_qa() -> void:
 	# ----------------------------------------------------
 	print("\n--- TEST 4: Feeder Track Geometry & Stop Line Separation ---")
 	var f_len := level.feeder_track.curve.get_baked_length()
-	var stop_pos := f_len - 240.0
+	var stop_pos := f_len - 120.0
 	var f_stop_pt := level.feeder_track.curve.sample_baked(stop_pos)
 	var closest_oval_prog := level.passenger_track.curve.get_closest_offset(f_stop_pt)
 	var closest_oval_pt := level.passenger_track.curve.sample_baked(closest_oval_prog)
@@ -166,7 +166,7 @@ func _run_qa() -> void:
 	if not level._feeder_rows.is_empty():
 		var lead_prog = level._feeder_rows.front().progress
 		print("  [MEASURED] Lead feeder row progress: %.1f (Stop pos: %.1f)" % [lead_prog, stop_pos])
-		if lead_prog <= f_len - 150.0:
+		if lead_prog <= f_len - 110.0:
 			print("  [PASS] Lead feeder row held strictly at stop line before junction")
 		else:
 			print("  [FAIL] Lead feeder row entered junction prematurely: %.1f" % lead_prog)

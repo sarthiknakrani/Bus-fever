@@ -285,7 +285,7 @@ func _process(delta: float) -> void:
 				_feeder_rows.append(next_row)
 				
 		# B. Dynamic Continuous Feeder Admission Scheduler
-		var feeder_stop_pos: float = f_len - 240.0
+		var feeder_stop_pos: float = f_len - 120.0
 		
 		# 1. Determine how many feeder rows are authorized by freed loop capacity
 		var running_cap: int = _oval_freed_capacity
@@ -1223,7 +1223,7 @@ func _init_passenger_track() -> void:
 
 		# Remaining rows form a separate dense waiting queue on feeder ramp
 		var f_len = feeder_track.curve.get_baked_length()
-		var feeder_stop_pos: float = f_len - 240.0 # Queue stop line rests 240px before junction
+		var feeder_stop_pos: float = f_len - 120.0 # Queue stop line rests 120px before junction (snug fit right at junction entrance with zero overlap)
 		for r in range(initial_rows_count, all_rows.size()):
 			var row = all_rows[r]
 			var feeder_idx = r - initial_rows_count
