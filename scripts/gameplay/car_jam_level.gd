@@ -368,31 +368,31 @@ func _process(delta: float) -> void:
 
 			if can_merge and lead_row.progress >= f_len - 2.0:
 				var merge_clear := true
-				var clearance_buffer: float = (track_len / float(MAX_LOOP_ROWS) * 0.96) if _entrance_active else (ROW_SPACING * 0.88)
-				for cr in _circulating_rows:
-					var d = absf(cr.progress - _merge_prog)
-					if d > track_len * 0.5:
-						d = track_len - d
-					if d < clearance_buffer:
-						merge_clear = false
-						break
-
-				# In normal circulation mode, only merge into genuine vacated gaps
-				# left by boarded passengers (where passengers khali hue ho)
-				if merge_clear and not _entrance_active and _circulating_rows.size() > 1:
-					var min_dist_ahead: float = track_len
-					var min_dist_behind: float = track_len
+				if not _circulating_rows.is_empty():
+					var min_ahead: float = track_len
+					var min_behind: float = track_len
 					for cr in _circulating_rows:
 						var d_ahead = cr.progress - _merge_prog
 						if d_ahead < 0.0: d_ahead += track_len
-						if d_ahead < min_dist_ahead: min_dist_ahead = d_ahead
+						if d_ahead < min_ahead: min_ahead = d_ahead
 
 						var d_behind = _merge_prog - cr.progress
 						if d_behind < 0.0: d_behind += track_len
-						if d_behind < min_dist_behind: min_dist_behind = d_behind
+						if d_behind < min_behind: min_behind = d_behind
 
-					if min_dist_ahead < ROW_SPACING * 0.85 or min_dist_behind < ROW_SPACING * 0.85:
-						merge_clear = false
+					if _entrance_active:
+						# During entrance parade, merge behind the preceding row.
+						# For the final 1-2 closing rows, require clearance both ahead and behind.
+						var req_ahead: float = 26.0
+						if _entrance_spawn_quota <= 2:
+							req_ahead = 14.0
+						if min_ahead < req_ahead or min_behind < 14.0:
+							merge_clear = false
+					else:
+						# In normal circulation mode, only merge into genuine vacated gaps (>= 48px)
+						# left by boarded passengers (where passengers khali hue ho)
+						if min_ahead < 20.0 or min_behind < 20.0 or (min_ahead + min_behind) < 48.0:
+							merge_clear = false
 
 				if merge_clear:
 					_feeder_rows.pop_front()
@@ -477,7 +477,7 @@ func _process(delta: float) -> void:
 				else:
 					speed = base_circ_spd
 
-		if _lead_feeder_committed:
+		if _lead_feeder_committed and not _entrance_active:
 			var d_merge = row.progress - _merge_prog
 			if d_merge < 0.0: d_merge += track_len
 			var dist_to_merge = track_len - d_merge
