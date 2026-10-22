@@ -17,7 +17,11 @@ func _run() -> void:
 
 	var gc = root.get_node_or_null("GameController")
 	if gc == null:
-		gc = load("res://scripts/autoload/game_controller.gd").new()
+		var gc_script = GDScript.new()
+		gc_script.source_code = "extends Node\nvar current_level_number: int = 1\nfunc has_level(n: int) -> bool: return n <= 2\n"
+		gc_script.reload()
+		gc = Node.new()
+		gc.set_script(gc_script)
 		gc.name = "GameController"
 		root.add_child(gc)
 	gc.current_level_number = 1

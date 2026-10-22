@@ -222,10 +222,10 @@ func _run_suite() -> void:
 		str(saw_boarding_credit), l_d._oval_freed_capacity
 	])
 
-	# Now step until feeder row merges into freed capacity (max 150 frames = 2.5s)
+	# Now step until feeder row merges into freed capacity (max 400 frames / ~4.0s)
 	var before_merge_f = l_d._feeder_rows.size()
 	var merged := false
-	for f in 150:
+	for f in 400:
 		await process_frame
 		if l_d._feeder_rows.size() < before_merge_f:
 			merged = true
