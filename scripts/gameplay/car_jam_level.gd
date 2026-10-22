@@ -1582,16 +1582,15 @@ func _on_vehicle_tapped(vehicle_id: int) -> void:
 		return
 	if controller != null and controller._arrange_animating:
 		return
+	var v_model: VehicleModel = controller.vehicles.get(vehicle_id, null) if controller != null else null
+	if v_model == null or v_model.state != VehicleModel.VehicleState.ON_BOARD:
+		return
 	_play_sfx("select")
 	# VIP booster intercept: when VIP selection is pending, tapping any bus flies it into VIP Slot 0!
 	if _vip_pending:
 		_handle_vip_bus_pick(vehicle_id)
 		return
-	var accepted_ctrl: bool = controller.tap_vehicle(vehicle_id)
-	if not accepted_ctrl:
-		var vv: VehicleView = vehicle_views.get(vehicle_id, null)
-		if vv != null and not vv._is_shaking:
-			vv.play_blocked_shake()
+	controller.tap_vehicle(vehicle_id)
 
 
 func _on_vehicle_dispatch_started(vehicle_id: int, slot_id: int, corridor: Array[Vector2i]) -> void:
@@ -1690,7 +1689,7 @@ func _on_vehicle_blocked(vehicle_id: int, blocker_id: int) -> void:
 	if blocker_id != -1:
 		var blocker_vv: VehicleView = vehicle_views.get(blocker_id, null)
 		if blocker_vv != null:
-			blocker_vv.play_blocked_shake()
+			blocker_vv.play_blocker_highlight()
 
 # Feature B handler: mystery reveal animation. The controller has already flipped
 # is_mystery=false on the model; we drive the visual "?" fade-out on the matching view.

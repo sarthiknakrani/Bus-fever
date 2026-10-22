@@ -6,12 +6,12 @@ class_name CarJamPuzzleSolver
 ## Accurately models real gameplay rules:
 ##  1. Board swept-escape collision corridors.
 ##  2. Authoritative unlocked parking slots (defaulting to slots 1, 2, 3 via CarJamParkingManager).
-##  3. Active circular oval passenger capacity (152) and separate waiting feeder queue.
+##  3. Active circular oval passenger capacity (144 = 36 slots * 4 lanes) and separate waiting feeder queue.
 ##  4. Continuous oval circulation boarding with capacity-driven feeder admission.
 ##  5. Atomic slot transitions (FREE -> RESERVED -> OCCUPIED -> DEPARTING -> FREE).
 ##  6. Win & deadlock terminal states without false failures.
 
-const OVAL_CAPACITY: int = 152
+const OVAL_CAPACITY: int = 144
 
 class SimVehicle:
 	var id: int
@@ -224,7 +224,7 @@ static func solve(lvl: CarJamLevelData, max_iterations: int = 50000, override_un
 			init_state.passenger_seq.append(String(g.color_id))
 
 	# Initial oval population
-	init_state.oval_capacity = OVAL_CAPACITY
+	init_state.oval_capacity = lvl.oval_capacity if ("oval_capacity" in lvl and lvl.oval_capacity > 0) else OVAL_CAPACITY
 	var init_oval_count = mini(init_state.passenger_seq.size(), init_state.oval_capacity)
 	init_state.feeder_index = init_oval_count
 	init_state.oval_counts = {}

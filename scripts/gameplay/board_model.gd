@@ -8,9 +8,12 @@ class_name CarJamBoardModel
 var _size: Vector2i = Vector2i(7, 7)
 ## _grid[y][x] = vehicle_id (int) or -1 if empty
 var _grid: Array = []
+## In-flight physical corridor reservations: vehicle_id (int) -> Array[Vector2i]
+var _in_flight_corridors: Dictionary = {}
 
 func setup(size: Vector2i) -> void:
 	_size = size
+	_in_flight_corridors.clear()
 	_grid.clear()
 	_grid.resize(_size.y)
 	for y in _size.y:
@@ -57,9 +60,33 @@ func clear_cell(p: Vector2i) -> void:
 	if in_bounds(p):
 		_grid[p.y][p.x] = -1
 
+## Register an in-flight physical corridor reservation while a dispatched bus
+## is traversing the board. Prevents a trailing or intersecting bus from escaping
+## through cells that the in-flight bus has not yet physically cleared.
+func reserve_in_flight(vehicle_id: int, initial_cells: Array[Vector2i], swept_corridor: Array[Vector2i]) -> void:
+	var cells: Array[Vector2i] = []
+	for c in initial_cells:
+		if not cells.has(c):
+			cells.append(c)
+	for c in swept_corridor:
+		if not cells.has(c):
+			cells.append(c)
+	_in_flight_corridors[vehicle_id] = cells
+
+## Release an in-flight corridor reservation once the bus has fully cleared the board.
+func clear_in_flight(vehicle_id: int) -> void:
+	_in_flight_corridors.erase(vehicle_id)
+
+func is_in_flight(vehicle_id: int) -> bool:
+	return _in_flight_corridors.has(vehicle_id)
+
+func get_in_flight_corridors() -> Dictionary:
+	return _in_flight_corridors
+
 ## Authoritative Swept-Footprint Escape Corridor Validation.
 ## Slides the full vehicle footprint step-by-step along its escape vector.
-## If any swept cell hits another vehicle, returns { "can_escape": false, "blocker_id": id }.
+## If any swept cell hits another vehicle or an active in-flight corridor,
+## returns { "can_escape": false, "blocker_id": id }.
 ## If all footprint cells clear the board boundaries unobstructed, returns { "can_escape": true }.
 func check_swept_escape(v: VehicleModel) -> Dictionary:
 	if v == null or not v.can_dispatch():
@@ -71,6 +98,20 @@ func check_swept_escape(v: VehicleModel) -> Dictionary:
 
 	var initial_cells := v.get_occupied_cells()
 	var swept_corridor: Array[Vector2i] = []
+
+	# Check if any in-flight vehicle is currently traversing v's starting footprint
+	for if_id in _in_flight_corridors:
+		if if_id != v.id:
+			var if_cells: Array = _in_flight_corridors[if_id]
+			for base_cell in initial_cells:
+				if if_cells.has(base_cell):
+					return {
+						"can_escape": false,
+						"blocker_id": if_id,
+						"collision_cell": base_cell,
+						"swept_corridor": swept_corridor
+					}
+
 	var step := 1
 	var max_steps: int = maxi(_size.x, _size.y) + 4
 
@@ -82,14 +123,25 @@ func check_swept_escape(v: VehicleModel) -> Dictionary:
 				any_in_bounds = true
 				var occupant: int = _grid[swept_cell.y][swept_cell.x]
 				if occupant != -1 and occupant != v.id:
-					# Real collision! Swept footprint blocked by another vehicle
+					# Real collision! Swept footprint blocked by another stationary vehicle
 					return {
 						"can_escape": false,
 						"blocker_id": occupant,
 						"collision_cell": swept_cell,
 						"swept_corridor": swept_corridor
 					}
-				if not swept_cell in swept_corridor and not swept_cell in initial_cells:
+				# Check in-flight corridor collision
+				for if_id in _in_flight_corridors:
+					if if_id != v.id:
+						var if_cells: Array = _in_flight_corridors[if_id]
+						if if_cells.has(swept_cell):
+							return {
+								"can_escape": false,
+								"blocker_id": if_id,
+								"collision_cell": swept_cell,
+								"swept_corridor": swept_corridor
+							}
+				if not swept_corridor.has(swept_cell) and not initial_cells.has(swept_cell):
 					swept_corridor.append(swept_cell)
 
 		if not any_in_bounds:

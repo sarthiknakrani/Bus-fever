@@ -111,12 +111,20 @@ static func animate_dispatch(
 
 	var in_tangent := Vector2(0.0, 32.0).rotated(slot_rotation)
 	var curve := Curve2D.new()
+	var exit_seg_len: float = start_pos.distance_to(clamped_exit)
 	for i in range(pts.size()):
 		var p = pts[i]
 		var in_tan = Vector2.ZERO
 		var out_tan = Vector2.ZERO
 		if i == 0:
-			out_tan = forward_world * 80.0
+			# Stage A: Strictly straight initial escape along arrow direction
+			out_tan = forward_world * (exit_seg_len * 0.4)
+		elif i == 1:
+			# Stage A completion: In-tangent ensures segment 0->1 is 100% straight
+			in_tan = -forward_world * (exit_seg_len * 0.4)
+			if pts.size() > 2:
+				var next_d = (pts[2] - pts[1]).normalized()
+				out_tan = next_d * minf(50.0, pts[1].distance_to(pts[2]) * 0.35)
 		elif i == pts.size() - 1:
 			in_tan = in_tangent
 		else:
@@ -126,6 +134,12 @@ static func animate_dispatch(
 			in_tan = -seg_d
 			out_tan = seg_d
 		curve.add_point(p, in_tan, out_tan)
+
+	# Calculate normalized progress t when the bus reaches clamped_exit (clears board)
+	var total_curve_len: float = curve.get_baked_length()
+	var stage_a_offset: float = curve.get_closest_offset(clamped_exit)
+	var clear_t: float = clampf(stage_a_offset / total_curve_len, 0.1, 0.7) if total_curve_len > 0.0 else 0.3
+	var board_cleared_ref: Array[bool] = [false]
 
 	# Derive front vector (the bus sprite's "front" in its NATIVE puzzle orientation).
 	var v_dir: int = vehicle_node.get("vehicle_dir") if vehicle_node.get("vehicle_dir") != null else CarJamVehicleData.Direction.UP
@@ -159,7 +173,12 @@ static func animate_dispatch(
 		true,            # drive_forward
 		front_native,
 		true,            # force_final_rot
-		final_rot_target
+		final_rot_target,
+		clear_t,
+		controller,
+		vehicle_id,
+		token,
+		board_cleared_ref
 	)
 	tw.tween_method(curve_callable, 0.0, 1.0, duration) \
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
@@ -173,7 +192,12 @@ static func animate_dispatch(
 		tw_spr.tween_property(spr, "scale", Vector2.ONE, duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 
-	var lambda_func := func(v_node, t_scale, ctrl, v_id, s_id, tok, t_start_sec):
+	var lambda_func := func(v_node, t_scale, ctrl, v_id, s_id, tok, t_start_sec, b_cleared_ref):
+		if not b_cleared_ref.is_empty() and not b_cleared_ref[0]:
+			b_cleared_ref[0] = true
+			if is_instance_valid(ctrl) and ctrl.has_method("on_vehicle_cleared_board"):
+				ctrl.on_vehicle_cleared_board(v_id, tok)
+
 		var t_arrival_end: float = Time.get_ticks_msec() / 1000.0
 		print("[QA] Bus %d ARRIVAL COMPLETE at %.3f (Actual: %.3fs | Target: %.2fs)" % [
 			v_id, t_arrival_end, t_arrival_end - t_start_sec, BUS_ARRIVAL_DURATION * duration_mult
@@ -206,7 +230,7 @@ static func animate_dispatch(
 		ctrl.on_vehicle_arrived_at_slot(v_id, s_id, tok)
 
 	tw.tween_callback(lambda_func.bind(
-		vehicle_node, target_scale, controller, vehicle_id, slot_id, token, t_dispatch_start
+		vehicle_node, target_scale, controller, vehicle_id, slot_id, token, t_dispatch_start, board_cleared_ref
 	))
 
 
@@ -343,8 +367,30 @@ static func animate_departure(
 			controller.on_vehicle_departed_from_slot(vehicle_id, slot_id, token)
 	)
 
-static func _update_curve(t: float, curve: Curve2D, v_node: Node2D, target_scale: Vector2, start_scale: Vector2, drive_forward: bool, front_native: Vector2, force_final_rot: bool = false, final_rot_target: float = 0.0) -> void:
+static func _update_curve(
+	t: float,
+	curve: Curve2D,
+	v_node: Node2D,
+	target_scale: Vector2,
+	start_scale: Vector2,
+	drive_forward: bool,
+	front_native: Vector2,
+	force_final_rot: bool = false,
+	final_rot_target: float = 0.0,
+	clear_t: float = 1.0,
+	controller: Node = null,
+	vehicle_id: int = -1,
+	token: int = 0,
+	board_cleared_ref: Array[bool] = []
+) -> void:
 	if not is_instance_valid(v_node): return
+
+	# When bus passes the board exit threshold, release its in-flight corridor reservation
+	if not board_cleared_ref.is_empty() and not board_cleared_ref[0] and t >= clear_t:
+		board_cleared_ref[0] = true
+		if is_instance_valid(controller) and controller.has_method("on_vehicle_cleared_board"):
+			controller.on_vehicle_cleared_board(vehicle_id, token)
+
 	var total_len: float = curve.get_baked_length()
 	var offset: float = t * total_len
 	var pos: Vector2 = curve.sample_baked(offset)

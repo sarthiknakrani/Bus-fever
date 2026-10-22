@@ -325,7 +325,18 @@ func play_arrange_move(new_pos: Vector2, on_complete: Callable) -> void:
 	tw.tween_property(self, "scale", orig_scale, 0.1).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
 	tw.tween_callback(on_complete)
 
+var _highlight_tween: Tween = null
+
+func play_blocker_highlight() -> void:
+	if _highlight_tween != null and _highlight_tween.is_valid():
+		_highlight_tween.kill()
+	modulate = Color(1.35, 1.35, 1.35, 1.0)
+	_highlight_tween = create_tween()
+	_highlight_tween.tween_property(self, "modulate", Color.WHITE, 0.25).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
 func play_blocked_shake() -> void:
+	if is_in_parking or is_dispatched:
+		return
 	if not _is_shaking:
 		_orig_board_pos = position
 		_is_shaking = true

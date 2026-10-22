@@ -16,6 +16,8 @@ class_name CarJamLevelData
 ## Slot IDs that should be configured as Plus bays (start locked, unlockable in-level).
 ## Plus bays show a green "+" affordance and visually stand apart from regular bays.
 @export var plus_slot_ids: Array[int] = []
+## Authoritative active circular oval passenger capacity (default 144 = 36 slots * 4 lanes).
+@export var oval_capacity: int = 144
 @export var vehicles: Array[CarJamVehicleData] = []
 @export var passenger_groups: Array[PassengerGroupData] = []
 
@@ -28,6 +30,7 @@ func clone() -> CarJamLevelData:
 	copy.unlocked_slot_ids = unlocked_slot_ids.duplicate()
 	copy.plus_slot_ids = plus_slot_ids.duplicate()
 	copy.ideal_moves = ideal_moves
+	copy.oval_capacity = oval_capacity
 	for v in vehicles:
 		copy.vehicles.append(v.clone())
 	for g in passenger_groups:

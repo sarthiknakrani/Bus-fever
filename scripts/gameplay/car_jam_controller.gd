@@ -88,6 +88,9 @@ var _arrange_used_this_level: bool = false
 var _jumble_used_this_level: bool = false
 # Set to true while the arrange animation is playing to block double-activation.
 var _arrange_animating: bool = false
+## When enabled (or automatically during live visual gameplay via track_snapshot_provider),
+## reserves the moving bus's physical board corridor until Stage A exit clears the board.
+var in_flight_corridor_reservation_enabled: bool = false
 
 func load_level(lvl: CarJamLevelData) -> void:
 	# Feature C: reset VIP booster availability BEFORE the rest of load_level runs so any
@@ -675,16 +678,28 @@ func tap_vehicle(vehicle_id: int) -> bool:
 	v.state = VehicleModel.VehicleState.EXITING
 	v.reserved_slot = slot_id
 
+	var corridor: Array[Vector2i] = escape_res["swept_corridor"]
+	# Register in-flight corridor reservation during visual gameplay or when explicitly enabled
+	if track_snapshot_provider.is_valid() or in_flight_corridor_reservation_enabled:
+		board.reserve_in_flight(vehicle_id, v.get_occupied_cells(), corridor)
+
 	# Clear from authoritative board grid
 	board.remove_vehicle(vehicle_id)
 
 	board_updated.emit()
 	parking_updated.emit()
 
-	var corridor: Array[Vector2i] = escape_res["swept_corridor"]
 	vehicle_dispatch_started.emit(vehicle_id, slot_id, corridor)
 	move_count += 1
 	return true
+
+## Called when vehicle completes Stage A exit and fully clears the board area.
+func on_vehicle_cleared_board(vehicle_id: int, token: int) -> void:
+	if token != session_token:
+		return
+	if board != null:
+		board.clear_in_flight(vehicle_id)
+	board_updated.emit()
 
 ## Called by vehicle movement view when arrival at parking slot completes.
 func on_vehicle_arrived_at_slot(vehicle_id: int, slot_id: int, token: int) -> void:
@@ -699,6 +714,9 @@ func on_vehicle_arrived_at_slot(vehicle_id: int, slot_id: int, token: int) -> vo
 	if not parking.confirm_arrival(slot_id, vehicle_id):
 		push_error("Parking arrival confirmation failed for Bus %d at Slot %d" % [vehicle_id, slot_id])
 		return
+
+	if board != null:
+		board.clear_in_flight(vehicle_id)
 
 	v.state = VehicleModel.VehicleState.PARKED
 	v.reserved_slot = slot_id
@@ -1221,7 +1239,8 @@ func _check_terminal_states() -> void:
 			if p.get("state", "") == "CIRCULATING":
 				circulating_count += 1
 
-		var credits: int = maxi(152 - circulating_count, 0)
+		var max_cap: int = level_data.oval_capacity if (level_data != null and "oval_capacity" in level_data and level_data.oval_capacity > 0) else 144
+		var credits: int = maxi(max_cap - circulating_count, 0)
 		var has_feeder_match := false
 		var p_keys: Array = authoritative_passengers.keys()
 		p_keys.sort()
