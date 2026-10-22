@@ -221,14 +221,14 @@ func test_gameplay_vs_victory_single_counter(gc: Node) -> void:
 	if not lvl.is_node_ready():
 		lvl._ready()
 
-	_assert(lvl.gameplay_coin_counter != null, "gameplay_coin_counter initialized in level HUD")
+	# Assert that NO coin counter exists in the active gameplay HUD / SafeAreaRoot
+	var hud_coin_counter = lvl.get_node_or_null("HUD/SafeAreaRoot/GameplayCoinCounter")
+	_assert(hud_coin_counter == null, "Gameplay HUD has no coin counter (never occludes puzzle board or oval track)")
 	_assert(lvl.victory_coin_counter != null, "victory_coin_counter initialized in result overlay")
-	_assert(lvl.gameplay_coin_counter.visible == false, "gameplay_coin_counter is hidden during active puzzle play to prevent track occlusion")
-	_assert(lvl.victory_coin_counter.visible == false, "victory_coin_counter is hidden during gameplay")
+	_assert(lvl.victory_coin_counter.visible == false, "victory_coin_counter is hidden during active gameplay")
 
 	# Trigger victory celebration
 	lvl._start_victory_celebration(0, 50)
-	_assert(lvl.gameplay_coin_counter.visible == false, "gameplay_coin_counter remains hidden when victory celebration begins")
-	_assert(lvl.victory_coin_counter.visible == true, "victory_coin_counter becomes visible for victory celebration")
+	_assert(lvl.victory_coin_counter.visible == true, "victory_coin_counter becomes visible when level is completed")
 
 	lvl.queue_free()

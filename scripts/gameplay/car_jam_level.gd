@@ -95,7 +95,6 @@ var coin_counter_wrapper: Control
 var coin_counter_icon: Control
 var coin_balance_label: Label
 var victory_coin_counter: Control
-var gameplay_coin_counter: Control
 var reward_badge: PanelContainer
 var reward_badge_label: Label
 var _session_run_id: String = ""
@@ -1051,8 +1050,6 @@ func _load_current_level() -> void:
 		reward_badge.visible = false
 	if coin_counter_wrapper != null:
 		coin_counter_wrapper.visible = false
-	if gameplay_coin_counter != null:
-		gameplay_coin_counter.visible = false
 	if result_subtitle_label != null:
 		result_subtitle_label.visible = false
 		result_subtitle_label.text = ""
@@ -1943,8 +1940,6 @@ func _on_puzzle_failed() -> void:
 		reward_badge.visible = false
 	if coin_counter_wrapper != null:
 		coin_counter_wrapper.visible = false
-	if gameplay_coin_counter != null:
-		gameplay_coin_counter.visible = false
 	result_subtitle_label.text = "No parking spaces left!"
 	result_subtitle_label.visible = true
 	result_retry_btn.visible = true
@@ -2181,9 +2176,6 @@ func _format_number(n: int) -> String:
 func _start_victory_celebration(old_coins: int, new_coins: int) -> void:
 	_stop_celebration_effects()
 
-	if gameplay_coin_counter != null:
-		gameplay_coin_counter.visible = false
-
 	if victory_coin_counter != null:
 		victory_coin_counter.visible = true
 		victory_coin_counter.set_displayed_balance(old_coins)
@@ -2397,12 +2389,6 @@ func _build_hud() -> void:
 	safe_area_root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	safe_area_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud.add_child(safe_area_root)
-
-	# Gameplay Coin Counter HUD (kept hidden during active puzzle play to prevent track occlusion)
-	gameplay_coin_counter = CoinCounterHUDClass.new()
-	gameplay_coin_counter.name = "GameplayCoinCounter"
-	gameplay_coin_counter.visible = false
-	safe_area_root.add_child(gameplay_coin_counter)
 
 	# TopBar: Level 1, Restart, Pause
 	top_bar = Control.new()
@@ -3365,9 +3351,6 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 		if safe_rect.position.y > 0:
 			safe_top = maxf(28.0, safe_rect.position.y + 6.0)
 
-	var c_h: float = clampf(vp_size.x * 0.082, 28.0, 36.0)
-	var c_w: float = c_h * 4.0
-
 	if victory_coin_counter != null and is_instance_valid(victory_coin_counter):
 		var v_h: float = clampf(vp_size.x * 0.088, 30.0, 38.0)
 		var v_w: float = v_h * 4.0
@@ -3377,11 +3360,6 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 	elif coin_counter_wrapper != null:
 		coin_counter_wrapper.offset_top = safe_top
 		coin_counter_wrapper.offset_left = 20.0
-
-	if gameplay_coin_counter != null and is_instance_valid(gameplay_coin_counter):
-		gameplay_coin_counter.custom_minimum_size = Vector2(c_w, c_h)
-		gameplay_coin_counter.size = Vector2(c_w, c_h)
-		gameplay_coin_counter.position = Vector2(20.0, safe_top + 52.0)
 
 func _update_feeder_curve(p0: Vector2) -> void:
 	if feeder_track == null or passenger_track == null or passenger_track.curve == null:
