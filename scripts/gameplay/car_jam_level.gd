@@ -2598,9 +2598,20 @@ func _build_hud() -> void:
 	pause_overlay.add_child(p_center)
 
 	var p_wrapper := Control.new()
-	p_wrapper.custom_minimum_size = Vector2(280, 315)
+	p_wrapper.name = "ModalWrapper"
+	p_wrapper.custom_minimum_size = Vector2(300, 320)
+	p_wrapper.size = Vector2(300, 320)
+	p_wrapper.pivot_offset = Vector2(150, 160)
 	p_wrapper.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	p_center.add_child(p_wrapper)
+
+	# Smooth entrance pop-in
+	p_wrapper.scale = Vector2(0.85, 0.85)
+	p_wrapper.modulate.a = 0.0
+	var tw := p_wrapper.create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(p_wrapper, "scale", Vector2.ONE, 0.20).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(p_wrapper, "modulate:a", 1.0, 0.15)
 
 	var p_panel := PanelContainer.new()
 	p_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -2644,6 +2655,7 @@ func _build_hud() -> void:
 
 	# C. Separate inner container (Toggles)
 	var toggles := VBoxContainer.new()
+	toggles.name = "TogglesVBox"
 	toggles.add_theme_constant_override("separation", 10)
 	pb_vbox.add_child(toggles)
 	
@@ -3502,7 +3514,19 @@ func _on_pause_pressed() -> void:
 func _on_resume_pressed() -> void:
 	_play_sfx("ui")
 	get_tree().paused = false
-	pause_overlay.visible = false
+	if pause_overlay != null and is_instance_valid(pause_overlay):
+		var p_wrap = pause_overlay.find_child("ModalWrapper", true, false)
+		if p_wrap != null:
+			var tw := p_wrap.create_tween()
+			tw.set_parallel(true)
+			tw.tween_property(p_wrap, "scale", Vector2(0.85, 0.85), 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+			tw.tween_property(p_wrap, "modulate:a", 0.0, 0.12)
+			tw.chain().tween_callback(func():
+				if is_instance_valid(pause_overlay):
+					pause_overlay.visible = false
+			)
+		else:
+			pause_overlay.visible = false
 
 func _play_sfx(sfx_name: String) -> void:
 	if not is_inside_tree():
@@ -3747,9 +3771,15 @@ func _rollback_uncommitted_passenger(p: Dictionary, pid: int) -> void:
 	controller.check_terminal_states()
 
 func _create_custom_toggle(text: String, icon_path: String, is_on: bool, on_toggle: Callable) -> Control:
+	var row_wrapper := Control.new()
+	row_wrapper.custom_minimum_size = Vector2(240, 44)
+	row_wrapper.size = Vector2(240, 44)
+
 	var row := HBoxContainer.new()
-	row.custom_minimum_size = Vector2(230, 38)
+	row.set_anchors_preset(Control.PRESET_FULL_RECT)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row_wrapper.add_child(row)
 
 	var icon := TextureRect.new()
 	icon.texture = load(icon_path)
@@ -3768,7 +3798,7 @@ func _create_custom_toggle(text: String, icon_path: String, is_on: bool, on_togg
 	var lbl := Label.new()
 	lbl.text = text
 	lbl.add_theme_font_size_override("font_size", 16)
-	lbl.add_theme_color_override("font_color", Color("5c3d2e")) # High contrast chocolate brown (WCAG AAA)
+	lbl.add_theme_color_override("font_color", Color("4a2810")) # High contrast warm brown
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -3782,7 +3812,8 @@ func _create_custom_toggle(text: String, icon_path: String, is_on: bool, on_togg
 
 	var pill := Panel.new()
 	pill.custom_minimum_size = Vector2(PILL_W, PILL_H)
-	pill.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
+	pill.size = Vector2(PILL_W, PILL_H)
+	pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var pill_style := ClayStyle.create_clay_pill(
 		Color("22c55e") if is_on else Color("cbd5e1"),
 		Color("15803d") if is_on else Color("94a3b8"),
@@ -3797,18 +3828,6 @@ func _create_custom_toggle(text: String, icon_path: String, is_on: bool, on_togg
 	var tg_style := ClayStyle.create_clay_highlight_style(int(PILL_H / 2), 0.32)
 	t_gloss.add_theme_stylebox_override("panel", tg_style)
 	pill.add_child(t_gloss)
-	
-	if is_on:
-		var shine = ColorRect.new()
-		shine.color = Color(1, 1, 1, 0.4)
-		shine.rotation_degrees = 25
-		shine.size = Vector2(10, 100)
-		shine.position = Vector2(-50, -20)
-		shine.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		pill.add_child(shine)
-		var tw = pill.create_tween().set_loops()
-		tw.tween_property(shine, "position:x", 100.0, 1.2).from(-50.0).set_trans(Tween.TRANS_SINE)
-		tw.tween_interval(1.0)
 
 	var inside := Control.new()
 	inside.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -3817,41 +3836,67 @@ func _create_custom_toggle(text: String, icon_path: String, is_on: bool, on_togg
 
 	var knob := Panel.new()
 	knob.custom_minimum_size = Vector2(KNOB, KNOB)
+	knob.size = Vector2(KNOB, KNOB)
+	knob.pivot_offset = Vector2(KNOB * 0.5, KNOB * 0.5)
 	knob.position = Vector2(
 		(PILL_W - KNOB - PAD) if is_on else PAD,
 		(PILL_H - KNOB) / 2.0
 	)
 	var knob_style := ClayStyle.create_clay_button_style(Color("ffffff"), Color("cbd5e1"), int(KNOB / 2), 3, 5, 2, 0.22)
 	knob.add_theme_stylebox_override("panel", knob_style)
+	knob.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	inside.add_child(knob)
 
+	var knob_gloss := Panel.new()
+	knob_gloss.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	knob_gloss.anchor_bottom = 0.48
+	knob_gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	knob_gloss.add_theme_stylebox_override("panel", ClayStyle.create_clay_highlight_style(int(KNOB / 2), 0.35))
+	knob.add_child(knob_gloss)
+
+	var pill_center := CenterContainer.new()
+	pill_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pill_center.add_child(pill)
+	row.add_child(pill_center)
+
+	# Full-row interactive hit button for reliable, effortless mobile touch
 	var hit := Button.new()
+	hit.name = "HitButton"
 	hit.set_anchors_preset(Control.PRESET_FULL_RECT)
-	hit.offset_left = -10
-	hit.offset_top = -10
-	hit.offset_right = 10
-	hit.offset_bottom = 10
 	hit.flat = true
-	hit.modulate = Color(1, 1, 1, 0.01)
-	pill.add_child(hit)
+	hit.focus_mode = Control.FOCUS_NONE
+	hit.modulate = Color(1, 1, 1, 0.0)
+	hit.mouse_filter = Control.MOUSE_FILTER_STOP
+	row_wrapper.add_child(hit)
 
 	var state := {"on": is_on}
 	hit.pressed.connect(func():
 		_play_sfx("ui")
 		state["on"] = not state["on"]
 		var on: bool = state["on"]
-		pill_style.bg_color = Color("22c55e") if on else Color("cbd5e1")
-		pill_style.border_color = Color("15803d") if on else Color("94a3b8")
+
+		var target_bg := Color("22c55e") if on else Color("cbd5e1")
+		var target_lip := Color("15803d") if on else Color("94a3b8")
 		var target_x: float = (PILL_W - KNOB - PAD) if on else PAD
-		var ktw := knob.create_tween()
-		ktw.tween_property(knob, "position:x", target_x, 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+		var tw := pill.create_tween()
+		tw.set_parallel(true)
+		tw.tween_method(func(c: Color):
+			pill_style.bg_color = c
+			pill.queue_redraw()
+		, pill_style.bg_color, target_bg, 0.16)
+		tw.tween_method(func(c: Color):
+			pill_style.border_color = c
+			pill.queue_redraw()
+		, pill_style.border_color, target_lip, 0.16)
+		tw.tween_property(knob, "position:x", target_x, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tw.tween_property(knob, "scale", Vector2(1.15, 0.90), 0.08).set_trans(Tween.TRANS_QUAD)
+		tw.chain().tween_property(knob, "scale", Vector2.ONE, 0.10).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
 		on_toggle.call(on)
 	)
 
-	var pill_center := CenterContainer.new()
-	pill_center.add_child(pill)
-	row.add_child(pill_center)
-	return row
+	return row_wrapper
 
 
 func _create_close_button(on_close: Callable) -> Button:
