@@ -53,27 +53,36 @@ func _run_test() -> void:
 	assert(not ctrl.is_arrange_available(), "is_arrange_available must now be false")
 	print("  [PASS] Arrange is single-use per level\n")
 
-	# 4) Jumble: pick 3+ on-board buses, snapshot anchors, run jumble, ensure
-	#    post-anchors are a permutation (same set, different order).
+	# 4) Jumble: pick on-board buses, snapshot colors, run jumble, ensure
+	#    every bus changes to an alternative color, multiset of colors is conserved,
+	#    and NO new colors are added.
 	var on_board_ids: Array = []
-	var pre_jumble_anchors: Dictionary = {}
+	var pre_jumble_colors: Dictionary = {}
+	var pre_color_counts: Dictionary = {}
 	for vid in ctrl.vehicles:
 		var v = ctrl.vehicles[vid]
 		if v != null and v.state == VehicleModel.VehicleState.ON_BOARD:
 			on_board_ids.append(vid)
-			pre_jumble_anchors[vid] = v.anchor
+			pre_jumble_colors[vid] = v.color_id
+			pre_color_counts[v.color_id] = pre_color_counts.get(v.color_id, 0) + 1
 	assert(on_board_ids.size() >= 3, "Need >= 3 ON_BOARD vehicles for jumble test")
 	assert(ctrl.try_jumble_buses(), "Jumble must succeed with >= 3 ON_BOARD vehicles")
 	await create_timer(0.05).timeout
 
-	var pre_set: Dictionary = {}
-	var post_set: Dictionary = {}
+	var post_color_counts: Dictionary = {}
+	var changed_count: int = 0
 	for vid in on_board_ids:
-		pre_set[pre_jumble_anchors[vid]] = true
-		post_set[ctrl.vehicles[vid].anchor] = true
-	assert(pre_set.size() == post_set.size(), "Jumbled positions must keep the same multiset of anchors")
-	assert(pre_set.size() == on_board_ids.size(), "Each ON_BOARD vehicle must still have a valid anchor after jumble")
-	print("  [PASS] Jumble preserves the anchor multiset\n")
+		var pre_col: String = pre_jumble_colors[vid]
+		var post_col: String = ctrl.vehicles[vid].color_id
+		assert(pre_color_counts.has(post_col), "Jumbled color '%s' must be an existing level color (no new color added)" % post_col)
+		post_color_counts[post_col] = post_color_counts.get(post_col, 0) + 1
+		if post_col != pre_col:
+			changed_count += 1
+		assert(post_col != pre_col, "Bus %d must change to an alternative color (was %s, got %s)" % [vid, pre_col, post_col])
+
+	assert(changed_count == on_board_ids.size(), "ALL buses must change to an alternative color")
+	assert(pre_color_counts == post_color_counts, "Color multiset must be strictly conserved (no orphan passenger demand)")
+	print("  [PASS] Jumble changed ALL bus colors to alternatives with zero new colors added\n")
 
 	# 5) Jumble is single-use.
 	assert(not ctrl.try_jumble_buses(), "Second Jumble attempt must fail (single-use)")

@@ -359,3 +359,116 @@ static func _update_curve(t: float, curve: Curve2D, v_node: Node2D, target_scale
 			v_node.rotation = tangent_rot
 
 	v_node.scale = start_scale.lerp(target_scale, t)
+
+## Feature C: VIP Flight Dispatch Animation.
+## Lifts any selected bus into the air from its board position, arcs over all board
+## obstacles with altitude scaling and dynamic banking, and touches down in VIP Slot 0.
+static func animate_vip_flight(
+	vehicle_node: Node2D,
+	start_pos: Vector2,
+	slot_pos: Vector2,
+	token: int,
+	controller: Node,
+	vehicle_id: int,
+	target_scale: Vector2,
+	duration_mult: float = 1.0,
+	slot_rotation: float = 0.0,
+	on_land_callback: Callable = Callable()
+) -> void:
+	if vehicle_node == null or not is_instance_valid(vehicle_node):
+		return
+
+	var start_rot: float = vehicle_node.rotation
+	var start_scale: Vector2 = vehicle_node.scale
+	var duration: float = 0.95 * duration_mult
+
+	# Quadratic Bezier apex: high in the air above start and slot
+	var mid_x: float = (start_pos.x + slot_pos.x) * 0.5
+	var apex_y: float = minf(start_pos.y, slot_pos.y) - 220.0
+	var p1 := Vector2(mid_x, apex_y)
+
+	# Dynamic lateral bank direction
+	var lateral_dx: float = slot_pos.x - start_pos.x
+	var bank_sign: float = signf(lateral_dx) if absf(lateral_dx) > 10.0 else 0.0
+	var max_bank_angle: float = deg_to_rad(14.0) * bank_sign
+
+	# Spawn ground shadow node under the bus in transit_layer
+	var parent_node = vehicle_node.get_parent()
+	var shadow_node: Node2D = null
+	if parent_node != null:
+		shadow_node = Node2D.new()
+		shadow_node.name = "VIPFlightShadow_%d" % vehicle_id
+		shadow_node.z_index = 50
+		parent_node.add_child(shadow_node)
+		var shadow_draw := func():
+			if not is_instance_valid(shadow_node): return
+			shadow_node.draw_colored_polygon(
+				PackedVector2Array([
+					Vector2(-26, -14), Vector2(0, -18), Vector2(26, -14),
+					Vector2(32, 0), Vector2(26, 14), Vector2(0, 18),
+					Vector2(-26, 14), Vector2(-32, 0)
+				]),
+				Color(0, 0, 0, 0.35)
+			)
+		shadow_node.draw.connect(shadow_draw)
+		shadow_node.queue_redraw()
+
+	var flight_method := func(p: float):
+		if not is_instance_valid(vehicle_node):
+			if shadow_node != null and is_instance_valid(shadow_node):
+				shadow_node.queue_free()
+			return
+
+		# Quadratic Bezier position: (1-p)^2 * P0 + 2(1-p)p * P1 + p^2 * P2
+		var u: float = 1.0 - p
+		var current_pos: Vector2 = u * u * start_pos + 2.0 * u * p * p1 + p * p * slot_pos
+		vehicle_node.position = current_pos
+
+		# 3D altitude curve: sin(p * PI) reaches 1.0 at peak
+		var alt: float = sin(p * PI)
+
+		# Scale swells up by +36% at peak altitude (feel of rising toward camera)
+		var base_scale: Vector2 = start_scale.lerp(target_scale, p)
+		vehicle_node.scale = base_scale * (1.0 + 0.36 * alt)
+
+		# Smooth rotation blend + dynamic banking tilt
+		var base_rot: float = lerp_angle(start_rot, slot_rotation, p)
+		var bank: float = max_bank_angle * sin(p * PI)
+		vehicle_node.rotation = base_rot + bank
+
+		# Update ground shadow (follows ground directly under bus)
+		if shadow_node != null and is_instance_valid(shadow_node):
+			shadow_node.position = start_pos.lerp(slot_pos, p)
+			var shadow_scale: float = (1.0 + 0.25 * alt)
+			shadow_node.scale = Vector2(shadow_scale, shadow_scale * 0.6)
+			shadow_node.modulate.a = clampf(0.35 - 0.15 * alt, 0.12, 0.35)
+
+	var tw := vehicle_node.create_tween()
+	tw.tween_method(flight_method, 0.0, 1.0, duration) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+
+	# Touchdown Impact Bounce & Finalization
+	tw.tween_callback(func():
+		if shadow_node != null and is_instance_valid(shadow_node):
+			shadow_node.queue_free()
+
+		if not is_instance_valid(vehicle_node):
+			return
+
+		vehicle_node.position = slot_pos
+		vehicle_node.rotation = slot_rotation
+
+		if on_land_callback.is_valid():
+			on_land_callback.call()
+
+		# Squash & stretch landing impact
+		var bounce_tw := vehicle_node.create_tween()
+		bounce_tw.tween_property(vehicle_node, "scale", target_scale * Vector2(1.14, 0.86), 0.07).set_trans(Tween.TRANS_QUAD)
+		bounce_tw.tween_property(vehicle_node, "scale", target_scale * Vector2(0.96, 1.04), 0.07).set_trans(Tween.TRANS_QUAD)
+		bounce_tw.tween_property(vehicle_node, "scale", target_scale, 0.06).set_trans(Tween.TRANS_QUAD)
+
+		bounce_tw.tween_callback(func():
+			if is_instance_valid(controller):
+				controller.on_vehicle_arrived_at_slot(vehicle_id, 0, token)
+		)
+	)

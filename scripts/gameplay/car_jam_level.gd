@@ -58,6 +58,8 @@ var result_overlay: Control
 # visible only when the controller's vip_available_changed(true) signal fires.
 var vip_overlay: Control
 var vip_button: TextureButton
+var _vip_pending: bool = false
+var _vip_button_tween: Tween
 
 # Bottom power-up bar: Arrange (bus-swap) + Jumble (random-permute) + VIP together.
 # Created as a separate canvas layer anchored to the bottom of the screen; matches the
@@ -109,6 +111,7 @@ var _failure_temp_nodes: Array[Node] = []
 
 var _toast_container: CenterContainer
 var _toast_panel: PanelContainer
+var _toast_label: Label
 var _toast_tween: Tween
 var _last_toast_time: float = -999.0
 
@@ -469,6 +472,9 @@ func _process(delta: float) -> void:
 			if i == 0:
 				ahead_row = _circulating_rows.back()
 				dist_ahead = (ahead_row.progress + track_len) - row.progress
+				if not _entrance_active:
+					# Closed-ring convoy: ahead_row is the tail row, which advances this frame in lockstep.
+					dist_ahead += speed * delta
 			else:
 				ahead_row = _circulating_rows[i - 1]
 				dist_ahead = ahead_row.progress - row.progress
@@ -500,6 +506,7 @@ func _process(delta: float) -> void:
 		var old_prog = row.progress
 		var dist_moved = speed * delta
 		var min_gap: float = MIN_ROW_GAP
+
 		if _entrance_active and i == 0:
 			dist_moved = minf(dist_moved, dist_ahead)
 		elif _circulating_rows.size() > 1:
@@ -691,6 +698,7 @@ func _setup_controller() -> void:
 	controller.puzzle_failed.connect(_on_puzzle_failed)
 	controller.mystery_revealed.connect(_on_mystery_revealed)
 	controller.vip_available_changed.connect(_on_vip_available_changed)
+	controller.vehicles_jumbled.connect(_on_vehicles_jumbled)
 	controller.level_scored.connect(_on_level_scored)
 
 # Feature C: build the VIP booster overlay (Button + Container) and parent it to a
@@ -748,26 +756,163 @@ func _setup_vip_overlay() -> void:
 
 ## Handler: controller tells us the VIP booster is available or used. Toggle the overlay.
 func _on_vip_available_changed(available: bool) -> void:
-	if vip_overlay == null or not is_instance_valid(vip_overlay):
-		return
-	vip_overlay.visible = available
+	if vip_overlay != null and is_instance_valid(vip_overlay):
+		vip_overlay.visible = available
+	if not available:
+		_vip_pending = false
+		_set_vip_button_active_visual(false)
+		if vip_button != null and is_instance_valid(vip_button):
+			vip_button.modulate = Color(0.55, 0.55, 0.55, 0.75)
+	else:
+		if vip_button != null and is_instance_valid(vip_button):
+			vip_button.modulate = Color.WHITE
 	if available:
 		_play_audio("ui")
 
-## Handler: player tapped the VIP button. Try to extract a stuck matching-color
-## parked bus via the controller. If nothing is parked, show a brief toast.
-func _on_vip_button_pressed() -> void:
-	if controller == null:
+## Set visual pulsing/glow state for the VIP button during bus selection mode.
+func _set_vip_button_active_visual(active: bool) -> void:
+	if vip_button == null or not is_instance_valid(vip_button):
 		return
-	var stuck_bus_id: int = _find_stuck_parked_bus()
-	if stuck_bus_id == -1:
-		_show_parking_full_toast()
-		return
-	var ok: bool = controller.try_extract_vip(stuck_bus_id)
-	if ok:
-		_play_audio("booster")
+	if _vip_button_tween != null and _vip_button_tween.is_valid():
+		_vip_button_tween.kill()
+		_vip_button_tween = null
+	if active:
+		vip_button.pivot_offset = vip_button.size / 2.0
+		_vip_button_tween = create_tween().set_loops()
+		_vip_button_tween.tween_property(vip_button, "scale", Vector2(1.14, 1.14), 0.35).set_trans(Tween.TRANS_SINE)
+		_vip_button_tween.tween_property(vip_button, "scale", Vector2(1.0, 1.0), 0.35).set_trans(Tween.TRANS_SINE)
+		vip_button.modulate = Color(1.3, 1.25, 0.6)
 	else:
-		_show_parking_full_toast()
+		vip_button.scale = Vector2.ONE
+		if controller != null and not controller.is_vip_available():
+			vip_button.modulate = Color(0.55, 0.55, 0.55, 0.75)
+		else:
+			vip_button.modulate = Color.WHITE
+
+## Handler: player tapped the VIP button.
+## Toggles VIP flight selection mode. Player can select ANY bus on the board
+## (even physically trapped ones) to fly and place directly in VIP Slot 0.
+func _on_vip_button_pressed() -> void:
+	if controller == null or controller.state != CarJamController.GameState.PLAYING:
+		return
+	if not controller.is_vip_available():
+		_play_audio("blocked")
+		_show_toast_message("VIP ALREADY USED!")
+		return
+	var vip_slot = controller.parking.get_slot(0)
+	if vip_slot != null and vip_slot.state != CarJamParkingManager.SlotState.FREE:
+		_play_audio("blocked")
+		_show_toast_message("VIP SLOT OCCUPIED!")
+		return
+
+	# Toggle VIP selection mode
+	_vip_pending = not _vip_pending
+	if _vip_pending:
+		if _arrange_pending:
+			_arrange_pending = false
+			_arrange_first_vehicle_id = -1
+		_play_audio("select")
+		_set_vip_button_active_visual(true)
+		_show_toast_message("TAP ANY BUS TO FLY TO VIP!")
+	else:
+		_set_vip_button_active_visual(false)
+
+func _handle_vip_bus_pick(vehicle_id: int) -> void:
+	var v: VehicleModel = controller.vehicles.get(vehicle_id, null)
+	if v == null or v.state != VehicleModel.VehicleState.ON_BOARD:
+		var vv: VehicleView = vehicle_views.get(vehicle_id, null)
+		if vv != null and not vv._is_shaking:
+			vv.play_blocked_shake()
+		_play_audio("blocked")
+		return
+
+	# Valid bus selected! Clear selection mode and launch flight!
+	_vip_pending = false
+	_set_vip_button_active_visual(false)
+	_fly_bus_to_vip_slot(vehicle_id)
+
+func _fly_bus_to_vip_slot(vehicle_id: int) -> void:
+	var vv: VehicleView = vehicle_views.get(vehicle_id, null)
+	if vv == null:
+		return
+
+	var ok: bool = controller.try_dispatch_vip(vehicle_id)
+	if not ok:
+		vv.play_blocked_shake()
+		_play_audio("blocked")
+		return
+
+	vv.is_dispatched = true
+	vv.set_arrow_visible(false)
+	if vv._touch_area != null:
+		vv._touch_area.input_pickable = false
+
+	_play_audio("booster")
+
+	# Reparent to TransitLayer preserving global position and rotation
+	var global_start := vv.global_position
+	var global_rot := vv.global_rotation
+	var orig_global_scale := vv.global_scale
+	if vv.get_parent() != null:
+		vv.get_parent().remove_child(vv)
+	transit_layer.add_child(vv)
+	vv.global_position = global_start
+	vv.global_rotation = global_rot
+	vv.global_scale = orig_global_scale
+	vv.z_index = 400
+
+	var target_slot_pos := _get_slot_world_pos(0)
+	var slot_rot: float = slot_views[0].rotation if slot_views.size() > 0 else deg_to_rad(-22.0)
+
+	var parked_size: Vector2 = vv.get_unscaled_parked_size()
+	var final_scale: float = VehicleView.BUS_VISUAL_SCALE
+	if parked_size.x > 0.0 and parked_size.y > 0.0 and (absf(parked_size.x - VehicleView.CANONICAL_CANVAS_WIDTH) > 1.0 or absf(parked_size.y - VehicleView.CANONICAL_CANVAS_HEIGHT) > 1.0):
+		var scale_w: float = ParkingSlotView.SLOT_WIDTH / parked_size.x
+		var scale_h: float = ParkingSlotView.SLOT_HEIGHT / parked_size.y
+		final_scale = minf(scale_w, scale_h)
+	var final_scale_vec := Vector2(final_scale, final_scale)
+
+	var on_land = func():
+		_play_sfx("parking")
+		_spawn_vip_landing_effects(target_slot_pos)
+
+	VehicleMovement.animate_vip_flight(
+		vv,
+		vv.position,
+		target_slot_pos,
+		controller.session_token,
+		controller,
+		vehicle_id,
+		final_scale_vec,
+		bus_movement_duration_multiplier,
+		slot_rot,
+		on_land
+	)
+
+func _spawn_vip_landing_effects(pos: Vector2) -> void:
+	if transit_layer == null:
+		return
+	var fx := Node2D.new()
+	fx.position = pos
+	fx.z_index = 380
+	transit_layer.add_child(fx)
+	var ring_r: float = 10.0
+	var ring_alpha: float = 1.0
+	var draw_call := func():
+		if not is_instance_valid(fx): return
+		fx.draw_arc(Vector2.ZERO, ring_r, 0.0, TAU, 32, Color(1.0, 0.84, 0.0, ring_alpha), 3.5, true)
+	fx.draw.connect(draw_call)
+	var tw := fx.create_tween()
+	tw.set_parallel(true)
+	tw.tween_method(func(r: float):
+		ring_r = r
+		if is_instance_valid(fx): fx.queue_redraw()
+	, 10.0, 52.0, 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_method(func(a: float):
+		ring_alpha = a
+		if is_instance_valid(fx): fx.queue_redraw()
+	, 1.0, 0.0, 0.35).set_trans(Tween.TRANS_SINE)
+	tw.chain().tween_callback(fx.queue_free)
 
 ## Resolve the AudioManager autoload and play a sound effect by name. No-op if the
 ## autoload isn't reachable (e.g., running outside the main scene tree).
@@ -789,15 +934,28 @@ func _on_arrange_button_pressed() -> void:
 	_arrange_first_vehicle_id = -1
 	_play_audio("ui")
 
-## Jumble button handler: triggers a random permutation of ON_BOARD buses.
+## Jumble button handler: changes all ON_BOARD bus colors to alternative colors without adding new colors.
 func _on_jumble_button_pressed() -> void:
 	if not controller.is_jumble_available():
+		_play_audio("blocked")
+		_show_toast_message("JUMBLE ALREADY USED!")
 		return
 	if controller.try_jumble_buses():
 		_play_audio("booster")
+		_show_toast_message("BUS COLORS JUMBLED!")
 	else:
 		# No ON_BOARD buses to permute (e.g. all parked already); surface a toast.
 		_show_parking_full_toast()
+
+## Handler: controller jumbled bus colors. Updates views and plays bounce pop animation.
+func _on_vehicles_jumbled() -> void:
+	for vid in controller.vehicles:
+		var v = controller.vehicles[vid]
+		if v != null and v.state == VehicleModel.VehicleState.ON_BOARD:
+			var vv: VehicleView = vehicle_views.get(vid, null)
+			if vv != null:
+				vv.set_color(v.color_id)
+				vv.play_jumble_pop()
 
 ## Pick any PARKED vehicle whose color matches the queue head color (the "stuck"
 ## bus the VIP booster is designed to free). Falls back to the first PARKED bus
@@ -1396,6 +1554,10 @@ func _on_vehicle_tapped(vehicle_id: int) -> void:
 	if _result_outcome != "" or _is_level_ending or controller.state != CarJamController.GameState.PLAYING:
 		return
 	_play_sfx("select")
+	# VIP booster intercept: when VIP selection is pending, tapping any bus flies it into VIP Slot 0!
+	if _vip_pending:
+		_handle_vip_bus_pick(vehicle_id)
+		return
 	# Arrange / Jumble intercept: when Arrange is pending, taps are interpreted as a
 	# 2-pick swap selection instead of normal dispatch.
 	if _arrange_pending:
@@ -3414,6 +3576,7 @@ func _setup_toast_ui() -> void:
 	lbl.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
 	lbl.add_theme_constant_override("outline_size", 2)
 	hb.add_child(lbl)
+	_toast_label = lbl
 	
 	_toast_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_toast_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -3429,7 +3592,40 @@ func _setup_toast_ui() -> void:
 	
 	_toast_container.add_child(_toast_panel)
 
+func _show_toast_message(msg: String) -> void:
+	var now := Time.get_ticks_msec() / 1000.0
+	if (_toast_panel != null and _toast_panel.visible) or (now - _last_toast_time < 0.6):
+		return
+	_last_toast_time = now
+
+	if _toast_container == null:
+		_setup_toast_ui()
+
+	if _toast_label != null:
+		_toast_label.text = msg
+
+	if _toast_tween:
+		_toast_tween.kill()
+
+	_toast_panel.visible = true
+	_toast_panel.modulate.a = 0.0
+	_toast_panel.reset_size()
+	_toast_panel.pivot_offset = _toast_panel.size / 2.0
+	_toast_panel.scale = Vector2(0.92, 0.92)
+
+	_toast_tween = create_tween()
+	_toast_tween.set_parallel(true)
+	_toast_tween.tween_property(_toast_panel, "modulate:a", 1.0, 0.10).set_trans(Tween.TRANS_SINE)
+	_toast_tween.tween_property(_toast_panel, "scale", Vector2.ONE, 0.10).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+	var tw_seq = create_tween()
+	tw_seq.tween_interval(1.10)
+	tw_seq.tween_property(_toast_panel, "modulate:a", 0.0, 0.20).set_trans(Tween.TRANS_SINE)
+	tw_seq.tween_callback(func(): _toast_panel.visible = false)
+
 func _show_parking_full_toast() -> void:
+	if _toast_label != null:
+		_toast_label.text = "PARKING FULL"
 	var now := Time.get_ticks_msec() / 1000.0
 	# Strict debounce: if toast is already active or triggered within 1.4s, don't re-trigger or spam
 	if (_toast_panel != null and _toast_panel.visible) or (now - _last_toast_time < 1.4):

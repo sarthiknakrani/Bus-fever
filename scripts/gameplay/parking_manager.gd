@@ -194,6 +194,23 @@ func reserve_slot(vehicle_id: int) -> int:
 	slot.vehicle_id = vehicle_id
 	return available_id
 
+## Atomically reserves the VIP slot (Slot 0) for vehicle_id.
+## Unlocks slot 0 specifically for this VIP flight dispatch.
+## Prevents double-reservation. Returns 0 on success, or -1 if unavailable.
+func reserve_vip_slot(vehicle_id: int) -> int:
+	for s in _slots:
+		if s.vehicle_id == vehicle_id:
+			return -1 # Already reserved!
+
+	var slot: ParkingSlot = get_slot(0)
+	if slot == null or slot.state != SlotState.FREE:
+		return -1
+
+	slot.is_unlocked = true
+	slot.state = SlotState.RESERVED
+	slot.vehicle_id = vehicle_id
+	return 0
+
 ## Called when vehicle movement reaches the parking slot.
 ## Strictly validates ownership.
 func confirm_arrival(slot_id: int, vehicle_id: int) -> bool:
@@ -224,6 +241,8 @@ func release_slot(slot_id: int, vehicle_id: int = -1) -> bool:
 			return false # Ownership mismatch, prevent stale release
 		slot.state = SlotState.FREE
 		slot.vehicle_id = -1
+		if slot.bay_kind == BayKind.VIP:
+			slot.is_unlocked = false
 		return true
 	return false
 

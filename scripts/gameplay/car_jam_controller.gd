@@ -27,6 +27,7 @@ signal mystery_revealed(vehicle_id: int)
 ## vip_extracted fires when the player activates it on a stuck bus.
 signal vip_available_changed(available: bool)
 signal vip_extracted(vehicle_id: int, slot_id: int)
+signal vip_flight_started(vehicle_id: int, slot_id: int)
 ## Emitted when the level is completed successfully. Args: stars (1..3), move_count, ideal_moves.
 ## Stars are computed from move_count vs ideal_moves authored on the level resource.
 signal level_scored(stars: int, move_count: int, ideal_moves: int)
@@ -35,6 +36,7 @@ signal level_scored(stars: int, move_count: int, ideal_moves: int)
 ## Jumble random-permutes all bus positions on the board.
 signal arrange_available_changed(available: bool)
 signal jumble_available_changed(available: bool)
+signal vehicles_jumbled()
 ## Fires when the player activates the Arrange or Jumble booster. Args: kind ("arrange"|"jumble")
 signal powerup_used(kind: String)
 
@@ -215,6 +217,46 @@ func try_extract_vip(vehicle_id: int) -> bool:
 	_check_terminal_states()
 	return true
 
+## Feature C: VIP flight dispatch.
+## Allows the player to select ANY bus on the board (even physically blocked ones)
+## and fly it directly into VIP parking Slot 0.
+## Frees the board grid cells immediately so surrounding vehicles are unblocked.
+func try_dispatch_vip(vehicle_id: int) -> bool:
+	if _vip_used_this_level or state != GameState.PLAYING:
+		return false
+	var v: VehicleModel = vehicles.get(vehicle_id, null)
+	if v == null or v.state != VehicleModel.VehicleState.ON_BOARD:
+		return false
+
+	var slot: CarJamParkingManager.ParkingSlot = parking.get_slot(0)
+	if slot == null or slot.state != CarJamParkingManager.SlotState.FREE:
+		return false
+
+	var slot_id: int = parking.reserve_vip_slot(vehicle_id)
+	if slot_id == -1:
+		return false
+
+	if v.is_mystery:
+		v.is_mystery = false
+		mystery_revealed.emit(vehicle_id)
+
+	# Remove from authoritative board grid immediately so grid cells are cleared
+	board.remove_vehicle(vehicle_id)
+
+	v.state = VehicleModel.VehicleState.EXITING
+	v.reserved_slot = 0
+	_vip_used_this_level = true
+	move_count += 1
+
+	board_updated.emit()
+	parking_updated.emit()
+	vip_available_changed.emit(false)
+	vip_extracted.emit(vehicle_id, 0)
+	vip_flight_started.emit(vehicle_id, 0)
+	powerup_used.emit("vip")
+	print("[CarJamController] VIP booster used: bus %d taking flight to VIP slot 0" % vehicle_id)
+	return true
+
 ## Arrange / Jumble booster API.
 func is_arrange_available() -> bool:
 	return not _arrange_used_this_level
@@ -252,9 +294,9 @@ func try_arrange_swap(vehicle_id_a: int, vehicle_id_b: int) -> bool:
 		[vehicle_id_a, str(va.anchor), vehicle_id_b, str(vb.anchor)])
 	return true
 
-## Random-permute the ON_BOARD vehicles' positions. Single-use per level (same as
-## Arrange / VIP). Useful when the only remaining dispatch is blocked and the
-## player wants to roll the dice on a fresh escape-route layout.
+## Jumble booster: Permutes all ON_BOARD bus colors so that each bus changes to an
+## alternative color (different from its current color), strictly preserving the multiset
+## of existing colors and adding NO new colors. Single-use per level.
 func try_jumble_buses() -> bool:
 	if _jumble_used_this_level:
 		return false
@@ -265,19 +307,52 @@ func try_jumble_buses() -> bool:
 			on_board_ids.append(vid)
 	if on_board_ids.size() < 2:
 		return false
-	# Snapshot original anchors and shuffle by swapping pairs.
-	var anchors_snapshot: Array[Vector2i] = []
+
+	var n: int = on_board_ids.size()
+	var original_colors: Array[String] = []
 	for vid in on_board_ids:
-		anchors_snapshot.append(vehicles[vid].anchor)
-	# Fisher-Yates-ish shuffle: pick pairs and swap.
-	anchors_snapshot.shuffle()
-	for i in on_board_ids.size():
-		vehicles[on_board_ids[i]].anchor = anchors_snapshot[i]
+		original_colors.append(vehicles[vid].color_id)
+
+	# Generate a derangement of original_colors so every bus changes to an alternative color
+	# without adding any new color (strict multiset conservation).
+	var best_colors: Array[String] = original_colors.duplicate()
+	var min_matches: int = n
+
+	# Randomized derangement search
+	for attempt in 100:
+		var candidate: Array[String] = original_colors.duplicate()
+		candidate.shuffle()
+		var matches: int = 0
+		for i in n:
+			if candidate[i] == original_colors[i]:
+				matches += 1
+		if matches < min_matches:
+			min_matches = matches
+			best_colors = candidate
+			if matches == 0:
+				break
+
+	# Greedy swap pass to resolve any remaining matches
+	for i in n:
+		if best_colors[i] == original_colors[i]:
+			for j in n:
+				if i != j and best_colors[j] != original_colors[i] and best_colors[i] != original_colors[j]:
+					var tmp: String = best_colors[i]
+					best_colors[i] = best_colors[j]
+					best_colors[j] = tmp
+					break
+
+	# Apply new alternative colors to vehicle models
+	for i in n:
+		var vid: int = on_board_ids[i]
+		vehicles[vid].color_id = best_colors[i]
+
 	_jumble_used_this_level = true
 	jumble_available_changed.emit(false)
 	powerup_used.emit("jumble")
+	vehicles_jumbled.emit()
 	board_updated.emit()
-	print("[CarJamController] Jumble used: random-permuted %d ON_BOARD vehicles" % on_board_ids.size())
+	print("[CarJamController] Jumble used: alternative colors assigned to %d ON_BOARD vehicles (no new colors added)" % n)
 	return true
 
 ## Unlock the next locked PLUS bay when the player has sustained enough dispatch progress.

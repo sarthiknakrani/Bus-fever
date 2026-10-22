@@ -164,6 +164,34 @@ func _build_visuals() -> void:
 	# Add base sprite and apply tightened board cell-fitting and leading-edge anchor shift
 	add_child(_base_sprite)
 	_apply_bus_cell_fit()
+
+func set_color(new_color_id: String) -> void:
+	vehicle_color_id = new_color_id.to_lower()
+	vehicle_color = CarJamVehicleData.color_to_rgb(new_color_id)
+	var dir_str := "down"
+	if vehicle_dir == CarJamVehicleData.Direction.UP: dir_str = "up"
+	elif vehicle_dir == CarJamVehicleData.Direction.LEFT: dir_str = "left"
+	elif vehicle_dir == CarJamVehicleData.Direction.RIGHT: dir_str = "right"
+	var col_str := vehicle_color_id
+	var tex_paths := [
+		"res://assets/sprites/premium_buses/bus_short_%s_%s.png" % [col_str, dir_str],
+		"res://assets/buses/short_%s_%s.png" % [col_str, dir_str],
+		"res://assets/buses/%s_%s.png" % [col_str, dir_str]
+	]
+	var tex_bus: Texture2D = null
+	for p in tex_paths:
+		tex_bus = _load_interim_sprite(p)
+		if tex_bus != null:
+			break
+	if _base_sprite != null and tex_bus != null:
+		_base_sprite.texture = tex_bus
+		_apply_bus_cell_fit()
+
+func play_jumble_pop() -> void:
+	var tw := create_tween()
+	var orig_scale: Vector2 = scale
+	tw.tween_property(self, "scale", orig_scale * Vector2(1.14, 1.14), 0.12).set_trans(Tween.TRANS_SINE)
+	tw.tween_property(self, "scale", orig_scale, 0.14).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
 	
 	# Boarding Layer and Anchor
 	if not boarding_layer:
