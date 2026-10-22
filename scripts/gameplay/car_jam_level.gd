@@ -244,6 +244,7 @@ func _process(delta: float) -> void:
 	if controller.state != CarJamController.GameState.PLAYING: return
 	
 	var track_len = passenger_track.curve.get_baked_length()
+	var loop_sp: float = track_len / float(MAX_INITIAL_LOOP_PASSENGERS / NUM_LANES)
 	track_time += delta
 	if not _speed_logged and circulating_ids.size() > 0:
 		_speed_logged = true
@@ -445,8 +446,6 @@ func _process(delta: float) -> void:
 	_circulating_rows.sort_custom(func(a, b): return a.progress > b.progress)
 	var empty_rows: Array[PassengerRow] = []
 
-	var loop_sp: float = track_len / float(MAX_INITIAL_LOOP_PASSENGERS / NUM_LANES)
-
 	for i in range(_circulating_rows.size()):
 		var row = _circulating_rows[i]
 		if row.passengers.is_empty():
@@ -457,10 +456,11 @@ func _process(delta: float) -> void:
 		var speed = base_circ_spd
 		var dist_ahead = track_len
 
+		var target_loop_sp: float = loop_sp
 		if _entrance_active and i == 0:
 			# Gated Entrance Parade: Lead row (i=0) advances strictly in sync with incoming rows
-			# to reserve exact uniform spacing for all 36 parade rows and prevent junction collision.
-			var max_lead_prog: float = track_len - float(_entrance_spawn_quota) * loop_sp
+			# to reserve exact uniform spacing for all 36 parade rows across the entire loop.
+			var max_lead_prog: float = track_len - float(_entrance_spawn_quota) * target_loop_sp
 			if _entrance_spawn_quota > 0:
 				max_lead_prog = minf(max_lead_prog, 1060.0)
 			dist_ahead = maxf(0.0, max_lead_prog - row.progress)
@@ -470,15 +470,20 @@ func _process(delta: float) -> void:
 				speed = base_circ_spd * 0.85
 		elif _circulating_rows.size() > 1:
 			var ahead_row: PassengerRow
+			var raw_dist_ahead: float = 0.0
 			if i == 0:
 				ahead_row = _circulating_rows.back()
-				dist_ahead = (ahead_row.progress + track_len) - row.progress
+				raw_dist_ahead = (ahead_row.progress + track_len) - row.progress
+				dist_ahead = raw_dist_ahead
 				if not _entrance_active:
 					# Closed-ring convoy: ahead_row is the tail row, which advances this frame in lockstep.
 					dist_ahead += speed * delta
 			else:
 				ahead_row = _circulating_rows[i - 1]
-				dist_ahead = ahead_row.progress - row.progress
+				raw_dist_ahead = ahead_row.progress - row.progress
+				if raw_dist_ahead < 0.0:
+					raw_dist_ahead += track_len
+				dist_ahead = raw_dist_ahead
 
 			if dist_ahead < 0.0:
 				dist_ahead += track_len
@@ -489,12 +494,22 @@ func _process(delta: float) -> void:
 				elif dist_ahead < ROW_SPACING * 0.90:
 					speed = base_circ_spd * 0.85
 			else:
-				# Normal circulating mode: do NOT sprint to close vacated gaps.
-				# Vacated gaps travel to the feeder merge point where queue passengers enter.
-				if dist_ahead < ROW_SPACING * 0.88:
-					speed = base_circ_spd * 0.82
+				# Full oval continuous circulation (before boarding): gently equalize spacing to loop_sp
+				# so no gap exists between any rows (e.g. between red and yellow).
+				# Once passengers board (oval_freed_capacity > 0), preserve vacated gaps (>= 48px) for feeder merging.
+				if _oval_freed_capacity == 0 and _circulating_rows.size() >= MAX_LOOP_ROWS:
+					var gap_err: float = raw_dist_ahead - target_loop_sp
+					if gap_err > 0.5:
+						speed = base_circ_spd * clampf(1.0 + (gap_err / target_loop_sp) * 1.2, 1.05, 1.45)
+					elif gap_err < -0.5:
+						speed = base_circ_spd * clampf(1.0 + (gap_err / target_loop_sp) * 1.2, 0.55, 0.95)
+					else:
+						speed = base_circ_spd
 				else:
-					speed = base_circ_spd
+					if dist_ahead < ROW_SPACING * 0.88:
+						speed = base_circ_spd * 0.82
+					else:
+						speed = base_circ_spd
 
 		if _lead_feeder_committed and not _entrance_active:
 			var d_merge = row.progress - _merge_prog
