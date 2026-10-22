@@ -44,17 +44,17 @@ static func create_clay_panel(
 		rim_color: Color = CLAY_CREAM_RIM,
 		radius: int = 28,
 		depth: int = 6,
-		shadow_size: int = 18,
+		shadow_size: int = 20,
 		shadow_y: int = 7,
 		shadow_color: Color = Color(0, 0, 0, 0.22)
 ) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = bg_color
 	sb.set_corner_radius_all(radius)
-	sb.corner_detail = 12
-	sb.border_width_top = 2
-	sb.border_width_left = 2
-	sb.border_width_right = 2
+	sb.corner_detail = 16
+	sb.border_width_top = 0
+	sb.border_width_left = 0
+	sb.border_width_right = 0
 	sb.border_width_bottom = depth
 	sb.border_color = rim_color
 	sb.border_blend = false
@@ -70,33 +70,38 @@ static func create_clay_button_style(
 		lip_color: Color,
 		radius: int = 22,
 		depth: int = 5,
-		shadow_size: int = 12,
+		shadow_size: int = 14,
 		shadow_y: int = 5,
 		shadow_alpha: float = 0.25
 ) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = face_color
 	sb.set_corner_radius_all(radius)
-	sb.corner_detail = 12
-	sb.border_width_top = 2
-	sb.border_width_left = 2
-	sb.border_width_right = 2
+	sb.corner_detail = 16
+	sb.border_width_top = 0
+	sb.border_width_left = 0
+	sb.border_width_right = 0
 	sb.border_width_bottom = depth
 	sb.border_color = lip_color
 	sb.border_blend = false
-	sb.shadow_color = Color(0, 0, 0, shadow_alpha)
+	# Tinted shadow matching bottom lip for realistic colored ambient bounce
+	var sh_col := lip_color
+	sh_col.a = shadow_alpha
+	sb.shadow_color = sh_col
 	sb.shadow_size = shadow_size
 	sb.shadow_offset = Vector2(0, shadow_y)
 	return sb
 
 
 ## Creates an inflated highlight overlay style (gives upper rounded specular reflection).
-static func create_clay_highlight_style(radius: int = 22, highlight_alpha: float = 0.22) -> StyleBoxFlat:
+static func create_clay_highlight_style(radius: int = 22, highlight_alpha: float = 0.25) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(1, 1, 1, highlight_alpha)
 	sb.corner_radius_top_left = radius
 	sb.corner_radius_top_right = radius
-	sb.corner_detail = 12
+	sb.corner_radius_bottom_left = 0
+	sb.corner_radius_bottom_right = 0
+	sb.corner_detail = 16
 	return sb
 
 
@@ -105,61 +110,71 @@ static func create_clay_pill(
 		face_color: Color,
 		lip_color: Color,
 		depth: int = 4,
-		shadow_size: int = 10,
+		shadow_size: int = 12,
 		shadow_y: int = 4,
 		shadow_alpha: float = 0.20
 ) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = face_color
 	sb.set_corner_radius_all(999)
-	sb.corner_detail = 14
-	sb.border_width_top = 2
-	sb.border_width_left = 2
-	sb.border_width_right = 2
+	sb.corner_detail = 16
+	sb.border_width_top = 0
+	sb.border_width_left = 0
+	sb.border_width_right = 0
 	sb.border_width_bottom = depth
 	sb.border_color = lip_color
-	sb.shadow_color = Color(0, 0, 0, shadow_alpha)
+	var sh_col := lip_color
+	sh_col.a = shadow_alpha
+	sb.shadow_color = sh_col
 	sb.shadow_size = shadow_size
 	sb.shadow_offset = Vector2(0, shadow_y)
 	return sb
 
 
 ## Attaches tactile clay squish animation to any Control button or node.
+## Animates purely via scale squash & stretch centered on pivot_offset.
+## Never alters position, preventing displacement bugs across viewports and containers.
 static func apply_clay_squish(
 		ctrl: Control,
-		press_offset_y: float = 3.0,
+		_unused_offset_y: float = 0.0,
 		scale_down: float = 0.93,
 		target_to_animate: Control = null
 ) -> void:
 	var anim_target: Control = target_to_animate if target_to_animate != null else ctrl
 	
-	# Helper to initialize center pivot
+	# Keep pivot centered dynamically whenever size changes
 	var update_pivot = func():
-		if is_instance_valid(anim_target) and anim_target.size.x > 0:
-			anim_target.pivot_offset = anim_target.size / 2.0
+		if is_instance_valid(anim_target) and anim_target.size.x > 0.0 and anim_target.size.y > 0.0:
+			anim_target.pivot_offset = anim_target.size * 0.5
 	
 	if not anim_target.resized.is_connected(update_pivot):
 		anim_target.resized.connect(update_pivot)
 	update_pivot.call()
 
-	var base_pos_y := anim_target.position.y
+	var active_tween: Array = [null]
 
 	var on_down = func():
 		if not is_instance_valid(anim_target):
 			return
 		update_pivot.call()
+		if active_tween[0] != null and is_instance_valid(active_tween[0]) and active_tween[0].is_valid():
+			active_tween[0].kill()
 		var tw := anim_target.create_tween()
-		tw.set_parallel(true)
-		tw.tween_property(anim_target, "scale", Vector2(scale_down, scale_down), 0.05).set_trans(Tween.TRANS_QUAD)
-		tw.tween_property(anim_target, "position:y", base_pos_y + press_offset_y, 0.05).set_trans(Tween.TRANS_QUAD)
+		active_tween[0] = tw
+		# Clay squash & stretch: compressed height with gentle horizontal bulge
+		var squash_scale := Vector2(scale_down * 1.02, scale_down * 0.94)
+		tw.tween_property(anim_target, "scale", squash_scale, 0.05).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 	var on_up = func():
 		if not is_instance_valid(anim_target):
 			return
+		update_pivot.call()
+		if active_tween[0] != null and is_instance_valid(active_tween[0]) and active_tween[0].is_valid():
+			active_tween[0].kill()
 		var tw := anim_target.create_tween()
-		tw.set_parallel(true)
-		tw.tween_property(anim_target, "scale", Vector2.ONE, 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-		tw.tween_property(anim_target, "position:y", base_pos_y, 0.10).set_trans(Tween.TRANS_QUAD)
+		active_tween[0] = tw
+		# Springy elastic bounce back to natural rest
+		tw.tween_property(anim_target, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 	if ctrl is BaseButton:
 		ctrl.button_down.connect(on_down)

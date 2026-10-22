@@ -296,8 +296,8 @@ func show_earn_coins_popup() -> void:
 	# 3. Modal Wrapper Card (Claymorphic)
 	var card := PanelContainer.new()
 	card.name = "Card"
-	card.custom_minimum_size = Vector2(320, 290)
-	card.pivot_offset = Vector2(160, 145)
+	card.custom_minimum_size = Vector2(320, 310)
+	card.pivot_offset = Vector2(160, 155)
 	card.modulate.a = 1.0
 
 	var card_style := ClayStyle.create_clay_panel(Color("fffdf7"), Color("f59e0b"), 28, 6, 22, 8, Color(0, 0, 0, 0.28))
@@ -346,28 +346,62 @@ func show_earn_coins_popup() -> void:
 	var close_btn := Button.new()
 	close_btn.text = "✕"
 	close_btn.custom_minimum_size = Vector2(34, 34)
+	close_btn.size = Vector2(34, 34)
+	close_btn.pivot_offset = Vector2(17, 17)
 	close_btn.focus_mode = Control.FOCUS_NONE
 	close_btn.add_theme_font_size_override("font_size", 16)
 	close_btn.add_theme_color_override("font_color", Color("475569"))
 	var close_style := ClayStyle.create_clay_button_style(Color("ffffff"), Color("cbd5e1"), 17, 3, 6, 2, 0.20)
 	close_btn.add_theme_stylebox_override("normal", close_style)
 	close_btn.add_theme_stylebox_override("pressed", close_style)
-	ClayStyle.apply_clay_squish(close_btn, 2.0, 0.90)
+	
+	var c_gloss := Panel.new()
+	c_gloss.set_anchors_preset(Control.PRESET_FULL_RECT)
+	c_gloss.anchor_bottom = 0.5
+	c_gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	c_gloss.add_theme_stylebox_override("panel", ClayStyle.create_clay_highlight_style(17, 0.35))
+	close_btn.add_child(c_gloss)
+
+	ClayStyle.apply_clay_squish(close_btn, 0.0, 0.90)
 	close_btn.pressed.connect(func():
 		_play_ui_sfx()
 		_close_popup(popup_root)
 	)
 	header_hbox.add_child(close_btn)
 
-	# Coin Graphic
+	# Coin Graphic inside a soft warm clay pedestal
+	var coin_center := CenterContainer.new()
+	coin_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var coin_pedestal := PanelContainer.new()
+	coin_pedestal.custom_minimum_size = Vector2(76, 76)
+	coin_pedestal.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var ped_style := ClayStyle.create_clay_panel(Color("fef3c7"), Color("f59e0b"), 38, 4, 12, 3, Color(0.96, 0.62, 0.11, 0.25))
+	coin_pedestal.add_theme_stylebox_override("panel", ped_style)
+	coin_center.add_child(coin_pedestal)
+
+	var coin_ped_gloss := Panel.new()
+	coin_ped_gloss.set_anchors_preset(Control.PRESET_FULL_RECT)
+	coin_ped_gloss.anchor_bottom = 0.5
+	coin_ped_gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	coin_ped_gloss.add_theme_stylebox_override("panel", ClayStyle.create_clay_highlight_style(38, 0.30))
+	coin_pedestal.add_child(coin_ped_gloss)
+
+	var coin_margin := CenterContainer.new()
+	coin_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	coin_pedestal.add_child(coin_margin)
+
 	var coin_icon := TextureRect.new()
-	coin_icon.custom_minimum_size = Vector2(64, 64)
+	coin_icon.custom_minimum_size = Vector2(52, 52)
+	coin_icon.size = Vector2(52, 52)
 	coin_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	coin_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	if ResourceLoader.exists("res://assets/ui/icons/coin.svg"):
 		coin_icon.texture = load("res://assets/ui/icons/coin.svg")
 	coin_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	vbox.add_child(coin_icon)
+	coin_margin.add_child(coin_icon)
+
+	vbox.add_child(coin_center)
 
 	# Explanation Text
 	var desc_lbl := Label.new()
@@ -381,13 +415,15 @@ func show_earn_coins_popup() -> void:
 	# Claymorphic Action Button
 	var act_btn := Button.new()
 	act_btn.text = _custom_action_title
-	act_btn.custom_minimum_size = Vector2(200, 48)
+	act_btn.custom_minimum_size = Vector2(210, 50)
+	act_btn.size = Vector2(210, 50)
+	act_btn.pivot_offset = Vector2(105, 25)
 	act_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	act_btn.focus_mode = Control.FOCUS_NONE
 	act_btn.add_theme_font_size_override("font_size", 18)
 	act_btn.add_theme_color_override("font_color", Color.WHITE)
 
-	var btn_style := ClayStyle.create_clay_button_style(Color("22c55e"), Color("15803d"), 20, 5, 12, 4, 0.25)
+	var btn_style := ClayStyle.create_clay_button_style(Color("22c55e"), Color("15803d"), 22, 5, 14, 4, 0.30)
 	act_btn.add_theme_stylebox_override("normal", btn_style)
 
 	var btn_pressed_style := btn_style.duplicate()
@@ -395,7 +431,14 @@ func show_earn_coins_popup() -> void:
 	btn_pressed_style.border_width_bottom = 2
 	act_btn.add_theme_stylebox_override("pressed", btn_pressed_style)
 
-	ClayStyle.apply_clay_squish(act_btn, 3.0, 0.94)
+	var act_gloss := Panel.new()
+	act_gloss.set_anchors_preset(Control.PRESET_FULL_RECT)
+	act_gloss.anchor_bottom = 0.5
+	act_gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	act_gloss.add_theme_stylebox_override("panel", ClayStyle.create_clay_highlight_style(22, 0.30))
+	act_btn.add_child(act_gloss)
+
+	ClayStyle.apply_clay_squish(act_btn, 0.0, 0.94)
 
 	act_btn.pressed.connect(func():
 		_play_ui_sfx()
