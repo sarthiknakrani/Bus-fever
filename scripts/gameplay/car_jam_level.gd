@@ -68,10 +68,8 @@ var powerup_overlay: Control
 var arrange_button: TextureButton
 var jumble_button: TextureButton
 
-# Arrange state: when the player has tapped Arrange, they're in "select pair" mode and
-# the next two bus taps swap them. We track _arrange_pending + the first picked vid.
-var _arrange_pending: bool = false
-var _arrange_first_vehicle_id: int = -1
+# Arrange state: guards against double-activation during animation.
+# The intelligent booster is one-tap; no pick-pair flow needed.
 
 # Per-level star rating row + moves/ideal subtitle on the victory result panel.
 # Created lazily by _render_star_row() so a level that fails before the stars signal
@@ -808,9 +806,6 @@ func _on_vip_button_pressed() -> void:
 	# Toggle VIP selection mode
 	_vip_pending = not _vip_pending
 	if _vip_pending:
-		if _arrange_pending:
-			_arrange_pending = false
-			_arrange_first_vehicle_id = -1
 		_play_audio("select")
 		_set_vip_button_active_visual(true)
 		_show_toast_message("TAP ANY BUS TO FLY TO VIP!")
@@ -924,15 +919,47 @@ func _play_audio(sfx_name: String) -> void:
 	if am != null and am.has_method("play"):
 		am.call("play", sfx_name)
 
-## Arrange button handler: sets the controller's arrange-pending state. The
-## _on_vehicle_tapped handler routes the next two bus taps through _handle_arrange_pick
-## to commit the swap. Cancelled by tapping the same bus twice.
+## Arrange button handler: one-tap intelligent booster. Automatically finds and
+## commits the best bus arrangement. Animates moved buses from old to new position.
 func _on_arrange_button_pressed() -> void:
 	if not controller.is_arrange_available():
+		_play_audio("blocked")
+		_show_toast_message("ARRANGE ALREADY USED!")
 		return
-	_arrange_pending = true
-	_arrange_first_vehicle_id = -1
-	_play_audio("ui")
+	if controller == null or controller.state != CarJamController.GameState.PLAYING:
+		return
+	if controller._arrange_animating:
+		return
+	var result: Dictionary = controller.try_arrange_intelligent()
+	if not result.get("ok", false):
+		_play_audio("blocked")
+		_show_toast_message("NO BETTER ARRANGEMENT FOUND")
+		return
+	_play_audio("booster")
+	_show_toast_message("BUSES REARRANGED!")
+	var moves: Array = result.get("moves", [])
+	var lvl: CarJamLevelData = controller.level_data
+	var b_size: Vector2i = lvl.board_size if lvl != null else Vector2i(7, 7)
+	var total_moves: int = moves.size()
+	var completed: int = 0
+	controller._arrange_animating = true
+	for m in moves:
+		var vid: int = m["vehicle_id"]
+		var new_anchor: Vector2i = m["new_anchor"]
+		var vm: VehicleModel = controller.vehicles.get(vid, null)
+		var vv: VehicleView = vehicle_views.get(vid, null)
+		if vv == null or vm == null:
+			total_moves -= 1
+			continue
+		var center_offset: Vector2 = _calc_footprint_center_offset(vm.footprint)
+		var new_pos: Vector2 = _cell_to_board_local(new_anchor, b_size) + center_offset
+		vv.play_arrange_move(new_pos, func():
+			completed += 1
+			if completed >= total_moves:
+				controller._arrange_animating = false
+		)
+	if total_moves <= 0:
+		controller._arrange_animating = false
 
 ## Jumble button handler: changes all ON_BOARD bus colors to alternative colors without adding new colors.
 func _on_jumble_button_pressed() -> void:
@@ -1553,15 +1580,12 @@ func _lock_gameplay_inputs() -> void:
 func _on_vehicle_tapped(vehicle_id: int) -> void:
 	if _result_outcome != "" or _is_level_ending or controller.state != CarJamController.GameState.PLAYING:
 		return
+	if controller != null and controller._arrange_animating:
+		return
 	_play_sfx("select")
 	# VIP booster intercept: when VIP selection is pending, tapping any bus flies it into VIP Slot 0!
 	if _vip_pending:
 		_handle_vip_bus_pick(vehicle_id)
-		return
-	# Arrange / Jumble intercept: when Arrange is pending, taps are interpreted as a
-	# 2-pick swap selection instead of normal dispatch.
-	if _arrange_pending:
-		_handle_arrange_pick(vehicle_id)
 		return
 	var accepted_ctrl: bool = controller.tap_vehicle(vehicle_id)
 	if not accepted_ctrl:
@@ -1569,36 +1593,6 @@ func _on_vehicle_tapped(vehicle_id: int) -> void:
 		if vv != null and not vv._is_shaking:
 			vv.play_blocked_shake()
 
-## Pick-pair flow for the Arrange booster. First valid pick stores vehicle_id;
-## second valid pick triggers try_arrange_swap with both ids and clears pending state.
-func _handle_arrange_pick(vehicle_id: int) -> void:
-	var v: VehicleModel = controller.vehicles.get(vehicle_id, null)
-	if v == null or v.state != VehicleModel.VehicleState.ON_BOARD:
-		# Only ON_BOARD vehicles can be rearranged; shake and stay pending.
-		var vv: VehicleView = vehicle_views.get(vehicle_id, null)
-		if vv != null:
-			vv.play_blocked_shake()
-		_play_audio("blocked")
-		return
-	if _arrange_first_vehicle_id == -1:
-		_arrange_first_vehicle_id = vehicle_id
-		_play_audio("select")
-		return
-	if _arrange_first_vehicle_id == vehicle_id:
-		# Same bus tapped twice — treat as cancel and reset.
-		_arrange_pending = false
-		_arrange_first_vehicle_id = -1
-		return
-	# Second pick — perform the swap and exit arrange mode.
-	var a: int = _arrange_first_vehicle_id
-	var b: int = vehicle_id
-	var ok: bool = controller.try_arrange_swap(a, b)
-	_arrange_pending = false
-	_arrange_first_vehicle_id = -1
-	if ok:
-		_play_audio("booster")
-	else:
-		_show_parking_full_toast()
 
 func _on_vehicle_dispatch_started(vehicle_id: int, slot_id: int, corridor: Array[Vector2i]) -> void:
 	_play_sfx("move")

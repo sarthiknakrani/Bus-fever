@@ -309,6 +309,22 @@ func _on_touch_input(_viewport: Node, event: InputEvent, _shape_idx: int) -> voi
 		if st.pressed and not st.double_tap:
 			tapped.emit(vehicle_id)
 
+## Smoothly lifts and lands the bus to its new board position during an Arrange move.
+## Calls on_complete when the animation finishes (model is already updated by then).
+func play_arrange_move(new_pos: Vector2, on_complete: Callable) -> void:
+	var tw := create_tween()
+	# Brief pause before lift
+	tw.tween_interval(0.05)
+	# Lift (scale up slightly) and move simultaneously
+	tw.set_parallel(true)
+	tw.tween_property(self, "scale", scale * Vector2(1.1, 1.1), 0.12)
+	tw.tween_property(self, "position", new_pos, 0.30).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	tw.set_parallel(false)
+	# Land (scale back to original)
+	var orig_scale := scale
+	tw.tween_property(self, "scale", orig_scale, 0.1).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+	tw.tween_callback(on_complete)
+
 func play_blocked_shake() -> void:
 	if not _is_shaking:
 		_orig_board_pos = position

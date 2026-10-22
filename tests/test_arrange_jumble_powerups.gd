@@ -2,7 +2,7 @@ extends SceneTree
 
 # Power-up Booster Test (Arrange + Jumble)
 # Verifies the two newer single-use power-ups:
-# - Arrange: swaps positions of two ON_BOARD buses; can't be used twice
+# - Arrange: intelligent one-tap auto-arrangement; can't be used twice
 # - Jumble: random-permutes all ON_BOARD positions; can't be used twice
 
 func _init() -> void:
@@ -25,37 +25,97 @@ func _run_test() -> void:
 	assert(ctrl.is_jumble_available(), "Jumble must be available at level start")
 	print("  [PASS] Both power-ups start available\n")
 
-	# Capture all vehicles' pre-swap anchors.
-	var pre_anchors: Dictionary = {}
-	for vid in ctrl.vehicles:
-		pre_anchors[vid] = ctrl.vehicles[vid].anchor
+	# ---- try_arrange_swap backward-compat tests ----
+	# Find two vehicles with compatible footprints so their swap is physically legal.
 	var vehicle_ids: Array = ctrl.vehicles.keys()
 	assert(vehicle_ids.size() >= 3, "Need at least 3 vehicles to test swap")
-	var a_id: int = int(vehicle_ids[0])
-	var b_id: int = int(vehicle_ids[1])
+	var a_id: int = -1
+	var b_id: int = -1
+	for id_1 in vehicle_ids:
+		for id_2 in vehicle_ids:
+			if id_1 < id_2 and ctrl.vehicles[id_1].footprint.size() == ctrl.vehicles[id_2].footprint.size():
+				var shape_match: bool = true
+				for off in ctrl.vehicles[id_1].footprint:
+					if not ctrl.vehicles[id_2].footprint.has(off):
+						shape_match = false
+						break
+				if shape_match:
+					a_id = id_1
+					b_id = id_2
+					break
+		if a_id != -1:
+			break
+	assert(a_id != -1 and b_id != -1, "Must find two compatible-footprint vehicles for swap test")
 
-	# 1) Try arranging two identical ids — should fail (no-op).
+	# Re-load so arrange is fresh (try_arrange_swap consumes it).
+	ctrl.load_level(lvl)
+	assert(ctrl.is_arrange_available(), "Arrange must be available after reload")
+
+	# Same-id swap must fail.
 	assert(not ctrl.try_arrange_swap(a_id, a_id), "Arrange with same id twice must fail")
 
-	# 2) Arrange the two buses. Expect anchors swapped.
+	# Valid swap must succeed and rebuild board occupancy.
+	var pre_a_anchor: Vector2i = ctrl.vehicles[a_id].anchor
+	var pre_b_anchor: Vector2i = ctrl.vehicles[b_id].anchor
 	assert(ctrl.try_arrange_swap(a_id, b_id), "Arrange swap must succeed")
 	await create_timer(0.05).timeout
 	var post_a_anchor: Vector2i = ctrl.vehicles[a_id].anchor
 	var post_b_anchor: Vector2i = ctrl.vehicles[b_id].anchor
-	var pre_a_anchor: Vector2i = pre_anchors[a_id]
-	var pre_b_anchor: Vector2i = pre_anchors[b_id]
 	assert(post_a_anchor == pre_b_anchor, "Bus a should take bus b's old anchor")
 	assert(post_b_anchor == pre_a_anchor, "Bus b should take bus a's old anchor")
-	print("  [PASS] Arrange swapped anchors correctly\n")
+	# Verify board grid was rebuilt correctly.
+	for offset in ctrl.vehicles[a_id].footprint:
+		var cell: Vector2i = ctrl.vehicles[a_id].anchor + offset
+		assert(ctrl.board.get_vehicle_at(cell) == a_id,
+			"Board grid must reflect bus a's new position (cell %s)" % str(cell))
+	for offset in ctrl.vehicles[b_id].footprint:
+		var cell: Vector2i = ctrl.vehicles[b_id].anchor + offset
+		assert(ctrl.board.get_vehicle_at(cell) == b_id,
+			"Board grid must reflect bus b's new position (cell %s)" % str(cell))
+	print("  [PASS] try_arrange_swap: anchors + board grid rebuilt correctly\n")
 
-	# 3) Arrange is now used — second call must fail.
+	# Second call must fail (single-use).
 	assert(not ctrl.try_arrange_swap(a_id, b_id), "Second Arrange attempt must fail (single-use)")
 	assert(not ctrl.is_arrange_available(), "is_arrange_available must now be false")
-	print("  [PASS] Arrange is single-use per level\n")
+	print("  [PASS] try_arrange_swap is single-use per level\n")
 
-	# 4) Jumble: pick on-board buses, snapshot colors, run jumble, ensure
-	#    every bus changes to an alternative color, multiset of colors is conserved,
-	#    and NO new colors are added.
+	# ---- try_arrange_intelligent tests ----
+	ctrl.load_level(lvl)
+	assert(ctrl.is_arrange_available(), "Arrange must be available after second reload")
+
+	var result: Dictionary = ctrl.try_arrange_intelligent()
+	await create_timer(0.05).timeout
+	# Result must be a valid dictionary.
+	assert(result.has("ok"), "try_arrange_intelligent must return dict with 'ok' key")
+	if result["ok"]:
+		assert(result.has("moves"), "ok=true result must have 'moves' key")
+		var moves: Array = result["moves"]
+		assert(moves.size() >= 1, "At least one move when ok=true")
+		# All moved vehicles must be at their new anchors with correct grid state.
+		for m in moves:
+			var vid: int = m["vehicle_id"]
+			var new_anchor: Vector2i = m["new_anchor"]
+			assert(ctrl.vehicles[vid].anchor == new_anchor,
+				"Vehicle %d anchor must match new_anchor %s" % [vid, str(new_anchor)])
+			for offset in ctrl.vehicles[vid].footprint:
+				var cell: Vector2i = ctrl.vehicles[vid].anchor + offset
+				assert(ctrl.board.get_vehicle_at(cell) == vid,
+					"Board grid must reflect moved vehicle %d at cell %s" % [vid, str(cell)])
+		assert(not ctrl.is_arrange_available(), "Arrange must be consumed after intelligent use")
+		print("  [PASS] try_arrange_intelligent returned ok=true with valid moves and board state\n")
+	else:
+		# ok=false means no improvement found — booster should NOT be consumed.
+		assert(ctrl.is_arrange_available(), "Arrange must NOT be consumed when ok=false")
+		print("  [PASS] try_arrange_intelligent returned ok=false, booster not consumed\n")
+
+	# Second call must fail (single-use, if first call consumed it).
+	if result["ok"]:
+		var result2: Dictionary = ctrl.try_arrange_intelligent()
+		assert(not result2.get("ok", false), "Second intelligent arrange must fail (single-use)")
+		print("  [PASS] try_arrange_intelligent is single-use per level\n")
+
+	# ---- Jumble tests ----
+	ctrl.load_level(lvl)
 	var on_board_ids: Array = []
 	var pre_jumble_colors: Dictionary = {}
 	var pre_color_counts: Dictionary = {}
@@ -84,12 +144,12 @@ func _run_test() -> void:
 	assert(pre_color_counts == post_color_counts, "Color multiset must be strictly conserved (no orphan passenger demand)")
 	print("  [PASS] Jumble changed ALL bus colors to alternatives with zero new colors added\n")
 
-	# 5) Jumble is single-use.
+	# Jumble is single-use.
 	assert(not ctrl.try_jumble_buses(), "Second Jumble attempt must fail (single-use)")
 	assert(not ctrl.is_jumble_available(), "is_jumble_available must now be false")
 	print("  [PASS] Jumble is single-use per level\n")
 
-	# 6) Restart level → both power-ups reset.
+	# Restart level → both power-ups reset.
 	ctrl.restart_level()
 	assert(ctrl.is_arrange_available(), "Arrange must reset on restart")
 	assert(ctrl.is_jumble_available(), "Jumble must reset on restart")

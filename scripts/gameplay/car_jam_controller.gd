@@ -86,6 +86,8 @@ var _vip_used_this_level: bool = false
 # Arrange / Jumble power-ups: single-use per level, reset on load_level/restart_level.
 var _arrange_used_this_level: bool = false
 var _jumble_used_this_level: bool = false
+# Set to true while the arrange animation is playing to block double-activation.
+var _arrange_animating: bool = false
 
 func load_level(lvl: CarJamLevelData) -> void:
 	# Feature C: reset VIP booster availability BEFORE the rest of load_level runs so any
@@ -268,6 +270,7 @@ func is_jumble_available() -> bool:
 ## parking layout. Both vehicles must currently be ON_BOARD (not already in
 ## motion or parked). Returns true on success, false otherwise (also false if
 ## Arrange has already been used this level).
+## NOTE: This function correctly rebuilds the board occupancy grid after the swap.
 func try_arrange_swap(vehicle_id_a: int, vehicle_id_b: int) -> bool:
 	if _arrange_used_this_level:
 		return false
@@ -281,11 +284,23 @@ func try_arrange_swap(vehicle_id_a: int, vehicle_id_b: int) -> bool:
 		return false
 	if vb.state != VehicleModel.VehicleState.ON_BOARD:
 		return false
-	# Swap board positions and reset anchors. Both vehicles keep their original
-	# initial_anchor; only the live anchor changes so escape checks re-evaluate.
-	var tmp_anchor: Vector2i = va.anchor
-	va.anchor = vb.anchor
-	vb.anchor = tmp_anchor
+	# Snapshot grid so we can roll back if placement fails.
+	var grid_snap: Array = board.snapshot()
+	var old_a: Vector2i = va.anchor
+	var old_b: Vector2i = vb.anchor
+	# Remove both from grid, then place at swapped anchors.
+	board.remove_vehicle(vehicle_id_a)
+	board.remove_vehicle(vehicle_id_b)
+	va.anchor = old_b
+	vb.anchor = old_a
+	var ok_a: bool = board.place_vehicle(va)
+	var ok_b: bool = board.place_vehicle(vb)
+	if not ok_a or not ok_b:
+		# Roll back.
+		board.restore(grid_snap)
+		va.anchor = old_a
+		vb.anchor = old_b
+		return false
 	_arrange_used_this_level = true
 	arrange_available_changed.emit(false)
 	powerup_used.emit("arrange")
@@ -293,6 +308,222 @@ func try_arrange_swap(vehicle_id_a: int, vehicle_id_b: int) -> bool:
 	print("[CarJamController] Arrange used: swapped bus %d (new anchor %s) with bus %d (new anchor %s)" %
 		[vehicle_id_a, str(va.anchor), vehicle_id_b, str(vb.anchor)])
 	return true
+
+## Intelligent Automatic Arrange Booster.
+## Searches for the best single-bus relocation or 2-bus swap that maximises
+## the number of escapable buses. Commits atomically and emits signals.
+## Returns { "ok": true, "moves": [{ "vehicle_id": int, "old_anchor": Vector2i,
+##           "new_anchor": Vector2i }, ...] }
+## or      { "ok": false } if no valid move was found or booster unavailable.
+const HARD_MAX_CANDIDATES: int = 200
+
+func try_arrange_intelligent() -> Dictionary:
+	if _arrange_used_this_level:
+		return {"ok": false}
+	if state != GameState.PLAYING:
+		return {"ok": false}
+	if _arrange_animating:
+		return {"ok": false}
+
+	var b_size: Vector2i = board.get_size()
+
+	# Collect all ON_BOARD vehicles.
+	var on_board: Array[VehicleModel] = []
+	for vid in vehicles:
+		var v: VehicleModel = vehicles[vid]
+		if v != null and v.state == VehicleModel.VehicleState.ON_BOARD:
+			on_board.append(v)
+
+	if on_board.is_empty():
+		return {"ok": false}
+
+	# Measure baseline dispatchability and passenger priority color.
+	var baseline_escapable: Dictionary = {}
+	var baseline_escapable_count: int = 0
+	for v in on_board:
+		var can_esc: bool = board.check_swept_escape(v).get("can_escape", false)
+		baseline_escapable[v.id] = can_esc
+		if can_esc:
+			baseline_escapable_count += 1
+
+	var head_color: String = ""
+	if queue != null:
+		head_color = queue.get_head_color()
+
+	var best_result: Dictionary = {"ok": false}
+	var best_score: int = 0
+	var best_dist: float = INF
+
+	var candidates_checked: int = 0
+
+	# ---- Phase 1: Single-bus relocations ----
+	for va_r in on_board:
+		if candidates_checked >= HARD_MAX_CANDIDATES:
+			break
+		var grid_snap: Array = board.snapshot()
+		var old_anchor: Vector2i = va_r.anchor
+
+		# Temporarily vacate va_r from the grid.
+		board.remove_vehicle(va_r.id)
+
+		for ty in b_size.y:
+			for tx in b_size.x:
+				if candidates_checked >= HARD_MAX_CANDIDATES:
+					break
+				var new_anchor := Vector2i(tx, ty)
+				if new_anchor == old_anchor:
+					continue
+				# Check that va_r footprint at new_anchor is fully in-bounds and empty.
+				var valid := true
+				for offset in va_r.footprint:
+					var cell := new_anchor + offset
+					if not board.in_bounds(cell) or board.get_vehicle_at(cell) != -1:
+						valid = false
+						break
+				if not valid:
+					continue
+
+				candidates_checked += 1
+				# Tentatively place va_r at new_anchor.
+				va_r.anchor = new_anchor
+				board.place_vehicle(va_r)
+
+				# Score this arrangement against baseline.
+				var escapable: int = 0
+				var newly_unblocked: int = 0
+				var priority_unblocked: int = 0
+				for v2 in on_board:
+					if board.check_swept_escape(v2).get("can_escape", false):
+						escapable += 1
+						if not baseline_escapable.get(v2.id, false):
+							newly_unblocked += 1
+							if head_color != "" and v2.color_id == head_color:
+								priority_unblocked += 1
+
+				# Must not degrade overall escapability, and must provide genuine improvement.
+				if escapable >= baseline_escapable_count and (escapable > baseline_escapable_count or newly_unblocked > 0):
+					var score: int = (priority_unblocked * 100) + (newly_unblocked * 20) + (escapable * 5)
+					var dist: float = float((new_anchor - old_anchor).length())
+					if score > best_score or (score == best_score and dist < best_dist):
+						best_score = score
+						best_dist = dist
+						best_result = {
+							"ok": true,
+							"moves": [{"vehicle_id": va_r.id, "old_anchor": old_anchor, "new_anchor": new_anchor}]
+						}
+
+				# Undo tentative placement.
+				board.remove_vehicle(va_r.id)
+				va_r.anchor = old_anchor
+
+		# Restore grid (va_r was removed for the inner loop).
+		board.restore(grid_snap)
+
+	# ---- Phase 2: 2-bus swaps (identical footprint shape only) ----
+	for i in on_board.size():
+		if candidates_checked >= HARD_MAX_CANDIDATES:
+			break
+		var va2: VehicleModel = on_board[i]
+		for j in range(i + 1, on_board.size()):
+			if candidates_checked >= HARD_MAX_CANDIDATES:
+				break
+			var vb2: VehicleModel = on_board[j]
+			if va2.footprint.size() != vb2.footprint.size():
+				continue
+			var shapes_match: bool = true
+			for fp_off in va2.footprint:
+				if not vb2.footprint.has(fp_off):
+					shapes_match = false
+					break
+			if not shapes_match:
+				continue
+
+			candidates_checked += 1
+			var grid_snap2: Array = board.snapshot()
+			var old_a2: Vector2i = va2.anchor
+			var old_b2: Vector2i = vb2.anchor
+
+			board.remove_vehicle(va2.id)
+			board.remove_vehicle(vb2.id)
+			va2.anchor = old_b2
+			vb2.anchor = old_a2
+			var ok_a2: bool = board.place_vehicle(va2)
+			var ok_b2: bool = board.place_vehicle(vb2)
+
+			if ok_a2 and ok_b2:
+				var escapable2: int = 0
+				var newly_unblocked2: int = 0
+				var priority_unblocked2: int = 0
+				for v2 in on_board:
+					if board.check_swept_escape(v2).get("can_escape", false):
+						escapable2 += 1
+						if not baseline_escapable.get(v2.id, false):
+							newly_unblocked2 += 1
+							if head_color != "" and v2.color_id == head_color:
+								priority_unblocked2 += 1
+
+				if escapable2 >= baseline_escapable_count and (escapable2 > baseline_escapable_count or newly_unblocked2 > 0):
+					# Slight penalty vs 1-bus moves for moving 2 buses when tie-breaking
+					var score2: int = (priority_unblocked2 * 100) + (newly_unblocked2 * 20) + (escapable2 * 5) - 2
+					var dist2: float = float((old_b2 - old_a2).length()) * 2.0
+					if score2 > best_score or (score2 == best_score and dist2 < best_dist):
+						best_score = score2
+						best_dist = dist2
+						best_result = {
+							"ok": true,
+							"moves": [
+								{"vehicle_id": va2.id, "old_anchor": old_a2, "new_anchor": old_b2},
+								{"vehicle_id": vb2.id, "old_anchor": old_b2, "new_anchor": old_a2}
+							]
+						}
+
+			# Always restore.
+			board.restore(grid_snap2)
+			va2.anchor = old_a2
+			vb2.anchor = old_b2
+
+	if not best_result.get("ok", false):
+		return {"ok": false}
+
+	# Commit the best move atomically.
+	var moves: Array = best_result["moves"]
+	var commit_snap: Array = board.snapshot()
+	var anchor_snaps: Dictionary = {}
+	for m in moves:
+		anchor_snaps[m["vehicle_id"]] = vehicles[m["vehicle_id"]].anchor
+
+	# Remove all moved vehicles first, then place at new positions.
+	for m in moves:
+		board.remove_vehicle(m["vehicle_id"])
+	for m in moves:
+		var vm: VehicleModel = vehicles[m["vehicle_id"]]
+		vm.anchor = m["new_anchor"]
+		var placed: bool = board.place_vehicle(vm)
+		if not placed:
+			# Verification failed — roll back everything.
+			board.restore(commit_snap)
+			for m2 in moves:
+				vehicles[m2["vehicle_id"]].anchor = anchor_snaps[m2["vehicle_id"]]
+			return {"ok": false}
+
+	# Verify placements.
+	for m in moves:
+		var vm: VehicleModel = vehicles[m["vehicle_id"]]
+		for offset in vm.footprint:
+			var cell := vm.anchor + offset
+			if board.get_vehicle_at(cell) != vm.id:
+				# Verification failed — roll back.
+				board.restore(commit_snap)
+				for m2 in moves:
+					vehicles[m2["vehicle_id"]].anchor = anchor_snaps[m2["vehicle_id"]]
+				return {"ok": false}
+
+	_arrange_used_this_level = true
+	arrange_available_changed.emit(false)
+	powerup_used.emit("arrange")
+	board_updated.emit()
+	print("[CarJamController] Intelligent Arrange used: %d move(s), escapable after=%d" % [moves.size(), best_score])
+	return best_result
 
 ## Jumble booster: Permutes all ON_BOARD bus colors so that each bus changes to an
 ## alternative color (different from its current color), strictly preserving the multiset
@@ -377,6 +608,9 @@ func _maybe_unlock_plus_bay() -> void:
 
 func tap_vehicle(vehicle_id: int) -> bool:
 	var t0 = Time.get_ticks_msec()
+	if _arrange_animating:
+		print("[QA %d] Tap Bus %d | REJECTED: Arrange animating" % [t0, vehicle_id])
+		return false
 	var v_log = vehicles.get(vehicle_id, null)
 	var state_str = "NULL" if v_log == null else str(v_log.state)
 	var can_disp = false if v_log == null else v_log.can_dispatch()
