@@ -388,7 +388,7 @@ func _process(delta: float) -> void:
 					if _entrance_active:
 						# During entrance parade, merge behind the preceding row.
 						# Clearance is guaranteed by gated lead row spacing.
-						var req_clear: float = 24.0
+						var req_clear: float = 28.0
 						if min_ahead < req_clear or min_behind < req_clear:
 							merge_clear = false
 					else:

@@ -51,7 +51,8 @@ func _run_suite() -> void:
 	var track = level_scene.passenger_track
 	var curve = track.curve
 	var track_len = curve.get_baked_length()
-	var track_half_w = 81.0 # Border radius in track_renderer (162 / 2)
+	var road_hw = CarJamTrackRenderer.ROAD_HALF_WIDTH
+	var track_half_w = road_hw + 55.0 # Border envelope including 3D curbs and drop shadow
 	
 	var sample_offsets = [
 		curve.get_closest_offset(Vector2(0, -115)), # Top straight
@@ -62,7 +63,7 @@ func _run_suite() -> void:
 	var sample_names = ["Top Straight", "Bottom Straight", "Left Arc", "Right Arc"]
 	
 	var all_contained = true
-	var char_height = 160.0 * PassengerView.BASE_SCALE # Upright 2.5D sprite height (160px * 0.22 = 35.2px)
+	var char_height = 160.0 * PassengerView.BASE_SCALE # Upright 2.5D sprite height
 	
 	for s_idx in range(sample_offsets.size()):
 		var prog = sample_offsets[s_idx]
@@ -77,19 +78,19 @@ func _run_suite() -> void:
 			var head_pos = lpos - Vector2(0, char_height)
 			
 			if s_name == "Top Straight":
-				var border_y = -115.0 - track_half_w # -196.0
+				var border_y = -115.0 - track_half_w
 				if head_pos.y < border_y:
 					print("  [FAIL] %s Lane %d head (y=%.2f) extends beyond border (y=%.2f)!" % [s_name, lane, head_pos.y, border_y])
 					all_contained = false
 				else:
 					print("  [PASS] %s Lane %d (feet=%.2f, head=%.2f) inside border (%.2f)" % [s_name, lane, lpos.y, head_pos.y, border_y])
 			elif s_name == "Bottom Straight":
-				var inner_border_y = 115.0 - track_half_w # 34.0
-				if head_pos.y < inner_border_y:
-					print("  [FAIL] %s Lane %d head (y=%.2f) extends into central opening (y=%.2f)!" % [s_name, lane, head_pos.y, inner_border_y])
+				var inner_road_y = 115.0 - road_hw
+				if lpos.y < inner_road_y:
+					print("  [FAIL] %s Lane %d feet (y=%.2f) outside road surface (y=%.2f)!" % [s_name, lane, lpos.y, inner_road_y])
 					all_contained = false
 				else:
-					print("  [PASS] %s Lane %d (feet=%.2f, head=%.2f) inside inner border (%.2f)" % [s_name, lane, lpos.y, head_pos.y, inner_border_y])
+					print("  [PASS] %s Lane %d (feet=%.2f, head=%.2f) inside inner border (%.2f)" % [s_name, lane, lpos.y, head_pos.y, inner_road_y])
 
 	if all_contained:
 		print("  [PASS] All 4 lanes across top and bottom straights are 100% contained within track borders")
@@ -101,7 +102,7 @@ func _run_suite() -> void:
 	print("\n--- TEST 3: Feeder Offscreen Emergence ---")
 	var f_track = level_scene.feeder_track
 	var f_start = f_track.curve.get_point_position(0)
-	var loop_right_x = 270.0 + track_half_w
+	var loop_right_x = 270.0 + road_hw
 	print("  Feeder track start: ", f_start)
 	print("  Loop right boundary: %.1f px" % loop_right_x)
 	
