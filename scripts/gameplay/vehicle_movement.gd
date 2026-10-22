@@ -60,41 +60,51 @@ static func animate_dispatch(
 	var exit_dist: float = start_pos.distance_to(_legacy_exit_pos)
 	var exit_point: Vector2 = _legacy_exit_pos if exit_dist >= 40.0 else start_pos + forward_world * 140.0
 
-	# Keep strictly inside screen frame (zero out-of-bounds driving):
-	# Board buses occupy X in [-100, 100], Y in [560, 810].
-	# Bypass at X = -165.0 / +165.0 clears all board buses while staying 100% inside frame.
-	var half_frame_w: float = 175.0
-	var vp = vehicle_node.get_viewport()
-	if vp != null:
-		var v_size = vp.get_visible_rect().size
-		if v_size.x > 100.0:
-			half_frame_w = maxf(160.0, v_size.x * 0.5 - 32.0)
-
-	var BYPASS_LEFT_X: float = -half_frame_w
-	var BYPASS_RIGHT_X: float = half_frame_w
-	var BYPASS_BOTTOM_Y: float = 855.0
-	var CORRIDOR_TOP_Y: float = corridor_pos.y
+	# Dynamically compute viewport safe boundaries in vehicle parent local space
+	var parent_node = vehicle_node.get_parent()
+	var safe_min_x: float = -200.0
+	var safe_max_x: float = 200.0
+	var safe_min_y: float = -600.0
+	var safe_max_y: float = 600.0
+	if parent_node != null and vehicle_node.is_inside_tree() and vehicle_node.get_viewport() != null:
+		var vp = vehicle_node.get_viewport()
+		var v_rect = vp.get_visible_rect()
+		var vp_xf = parent_node.get_viewport_transform()
+		var top_left_local: Vector2 = parent_node.to_local(vp_xf.affine_inverse() * Vector2(40.0, 40.0))
+		var btm_right_local: Vector2 = parent_node.to_local(vp_xf.affine_inverse() * (v_rect.size - Vector2(40.0, 40.0)))
+		safe_min_x = minf(top_left_local.x, btm_right_local.x)
+		safe_max_x = maxf(top_left_local.x, btm_right_local.x)
+		safe_min_y = minf(top_left_local.y, btm_right_local.y)
+		safe_max_y = maxf(top_left_local.y, btm_right_local.y)
 
 	var pts: Array[Vector2] = []
 	pts.append(start_pos)
-	pts.append(exit_point)
 
-	if exit_point.y > 540.0:
-		# Exited to side or bottom; navigate around board perimeter
-		if forward_world.y > 0.4 or exit_point.y >= 880.0:
-			# Exited DOWN: turn around bottom corner towards target slot side
-			var side_x = BYPASS_LEFT_X if slot_pos.x <= 0.0 else BYPASS_RIGHT_X
-			pts.append(Vector2(exit_point.x, maxf(exit_point.y, BYPASS_BOTTOM_Y)))
-			pts.append(Vector2(side_x, maxf(exit_point.y, BYPASS_BOTTOM_Y)))
-			pts.append(Vector2(side_x, CORRIDOR_TOP_Y))
-		elif forward_world.x < -0.1 or exit_point.x <= 0.0:
-			# Exited LEFT: follow left highway up to top corridor
-			pts.append(Vector2(minf(exit_point.x, BYPASS_LEFT_X), exit_point.y))
-			pts.append(Vector2(minf(exit_point.x, BYPASS_LEFT_X), CORRIDOR_TOP_Y))
-		else:
-			# Exited RIGHT: follow right highway up to top corridor
-			pts.append(Vector2(maxf(exit_point.x, BYPASS_RIGHT_X), exit_point.y))
-			pts.append(Vector2(maxf(exit_point.x, BYPASS_RIGHT_X), CORRIDOR_TOP_Y))
+	# Clamp exit_point inside screen safe bounds
+	var clamped_exit = Vector2(
+		clampf(exit_point.x, safe_min_x, safe_max_x),
+		clampf(exit_point.y, safe_min_y, safe_max_y)
+	)
+	pts.append(clamped_exit)
+
+	# Perimeter bypass around puzzle board if exiting downwards or sideways
+	if forward_world.y > 0.2:
+		# Exiting DOWN: turn around bottom corner towards target slot side
+		var bottom_y = clampf(exit_point.y + 40.0, exit_point.y, safe_max_y - 20.0)
+		var side_x = (safe_min_x + 25.0) if slot_pos.x <= 0.0 else (safe_max_x - 25.0)
+		pts.append(Vector2(clamped_exit.x, bottom_y))
+		pts.append(Vector2(side_x, bottom_y))
+		pts.append(Vector2(side_x, corridor_pos.y))
+	elif forward_world.x < -0.2:
+		# Exiting LEFT: follow left highway up to corridor
+		var side_x = clampf(minf(clamped_exit.x - 20.0, -180.0), safe_min_x + 25.0, -80.0)
+		pts.append(Vector2(side_x, clamped_exit.y))
+		pts.append(Vector2(side_x, corridor_pos.y))
+	elif forward_world.x > 0.2:
+		# Exiting RIGHT: follow right highway up to corridor
+		var side_x = clampf(maxf(clamped_exit.x + 20.0, 180.0), 80.0, safe_max_x - 25.0)
+		pts.append(Vector2(side_x, clamped_exit.y))
+		pts.append(Vector2(side_x, corridor_pos.y))
 
 	pts.append(corridor_pos)
 	pts.append(slot_pos)
@@ -382,9 +392,25 @@ static func animate_vip_flight(
 	var start_scale: Vector2 = vehicle_node.scale
 	var duration: float = 0.95 * duration_mult
 
-	# Quadratic Bezier apex: high in the air above start and slot
+	# Derive front vector and final rotation target matching the parking slot
+	var v_dir: int = vehicle_node.get("vehicle_dir") if vehicle_node.get("vehicle_dir") != null else CarJamVehicleData.Direction.UP
+	var final_rot_target := slot_rotation
+	match v_dir:
+		CarJamVehicleData.Direction.DOWN: final_rot_target = PI + slot_rotation
+		CarJamVehicleData.Direction.UP: final_rot_target = 0.0 + slot_rotation
+		CarJamVehicleData.Direction.LEFT: final_rot_target = PI / 2.0 + slot_rotation
+		CarJamVehicleData.Direction.RIGHT: final_rot_target = -PI / 2.0 + slot_rotation
+
+	# Spawn ground shadow node under the bus in transit_layer
+	var parent_node = vehicle_node.get_parent()
+
+	# Quadratic Bezier apex: high in the air above start and slot, clamped within viewport safe area
 	var mid_x: float = (start_pos.x + slot_pos.x) * 0.5
-	var apex_y: float = minf(start_pos.y, slot_pos.y) - 220.0
+	var apex_y: float = minf(start_pos.y, slot_pos.y) - 200.0
+	if parent_node != null and vehicle_node.is_inside_tree() and vehicle_node.get_viewport() != null:
+		var vp_xf = parent_node.get_viewport_transform()
+		var top_local: Vector2 = parent_node.to_local(vp_xf.affine_inverse() * Vector2(0.0, 50.0))
+		apex_y = maxf(apex_y, top_local.y)
 	var p1 := Vector2(mid_x, apex_y)
 
 	# Dynamic lateral bank direction
@@ -392,8 +418,6 @@ static func animate_vip_flight(
 	var bank_sign: float = signf(lateral_dx) if absf(lateral_dx) > 10.0 else 0.0
 	var max_bank_angle: float = deg_to_rad(14.0) * bank_sign
 
-	# Spawn ground shadow node under the bus in transit_layer
-	var parent_node = vehicle_node.get_parent()
 	var shadow_node: Node2D = null
 	if parent_node != null:
 		shadow_node = Node2D.new()
@@ -413,6 +437,14 @@ static func animate_vip_flight(
 		shadow_node.draw.connect(shadow_draw)
 		shadow_node.queue_redraw()
 
+	# Smoothly transition _base_sprite from board anchor offset & board scale to centered parking
+	if vehicle_node.get("_base_sprite") != null and vehicle_node._base_sprite != null:
+		var spr: Sprite2D = vehicle_node._base_sprite
+		var tw_spr := vehicle_node.create_tween()
+		tw_spr.set_parallel(true)
+		tw_spr.tween_property(spr, "position", Vector2.ZERO, duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tw_spr.tween_property(spr, "scale", Vector2.ONE, duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
 	var flight_method := func(p: float):
 		if not is_instance_valid(vehicle_node):
 			if shadow_node != null and is_instance_valid(shadow_node):
@@ -431,8 +463,8 @@ static func animate_vip_flight(
 		var base_scale: Vector2 = start_scale.lerp(target_scale, p)
 		vehicle_node.scale = base_scale * (1.0 + 0.36 * alt)
 
-		# Smooth rotation blend + dynamic banking tilt
-		var base_rot: float = lerp_angle(start_rot, slot_rotation, p)
+		# Smooth rotation blend to final parking slot orientation + dynamic banking tilt
+		var base_rot: float = lerp_angle(start_rot, final_rot_target, p)
 		var bank: float = max_bank_angle * sin(p * PI)
 		vehicle_node.rotation = base_rot + bank
 
@@ -456,7 +488,10 @@ static func animate_vip_flight(
 			return
 
 		vehicle_node.position = slot_pos
-		vehicle_node.rotation = slot_rotation
+		vehicle_node.rotation = final_rot_target
+		vehicle_node.z_index = 10
+		if vehicle_node.has_method("set_parking_mode"):
+			vehicle_node.set_parking_mode(true)
 
 		if on_land_callback.is_valid():
 			on_land_callback.call()
