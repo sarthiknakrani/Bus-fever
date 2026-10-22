@@ -48,5 +48,11 @@ if [ $FAILED -gt 0 ]; then
     exit 1
 fi
 
+# Reset persistent test coins so user profile always starts at 0 coins
+SAVE_CFG="$HOME/Library/Application Support/Godot/app_userdata/Bus Fever Party Clone/save.cfg"
+if [ -f "$SAVE_CFG" ]; then
+    sed -i '' 's/^coins=.*/coins=0/' "$SAVE_CFG" 2>/dev/null || true
+fi
+
 echo "All headless tests passed successfully!"
 exit 0

@@ -13,8 +13,11 @@ var _hud_ctrl: Control
 var _settings_overlay: Control
 var _settings_panel: PanelContainer
 
+const CoinCounterHUDClass := preload("res://scripts/ui/coin_counter_hud.gd")
+
 var _bg_rect: TextureRect
 var _settings_btn: TextureButton
+var _coin_counter: Control
 var _logo_wrapper: Control
 var _logo_rect: TextureRect
 var _logo_tween: Tween
@@ -126,6 +129,27 @@ func _build_ui() -> void:
 	)
 	_hud_ctrl.add_child(_play_btn)
 
+	# E. Top-left Premium Coin Counter HUD
+	_coin_counter = CoinCounterHUDClass.new()
+	_coin_counter.name = "CoinCounterHUD"
+	_coin_counter.set_custom_action("PLAY NOW!", _on_play_pressed)
+	_hud_ctrl.add_child(_coin_counter)
+
+
+func _play_sfx(sfx_name: String = "ui_click") -> void:
+	var am = get_tree().root.get_node_or_null("AudioManager") if is_inside_tree() and get_tree() and get_tree().root else null
+	if am != null and am.has_method("play"):
+		am.play(sfx_name)
+
+func _get_game_controller() -> Node:
+	if is_inside_tree() and get_tree() and get_tree().root:
+		return get_tree().root.get_node_or_null("GameController")
+	return null
+
+func _get_settings_manager() -> Node:
+	if is_inside_tree() and get_tree() and get_tree().root:
+		return get_tree().root.get_node_or_null("SettingsManager")
+	return null
 
 func _on_play_pressed() -> void:
 	if _is_transitioning:
@@ -133,8 +157,10 @@ func _on_play_pressed() -> void:
 	_is_transitioning = true
 	if _logo_shine_tween != null and _logo_shine_tween.is_valid():
 		_logo_shine_tween.kill()
-	AudioManager.play(AudioManager.SFX_UI)
-	GameController.start_level(GameController.current_level_number)
+	_play_sfx("ui_click")
+	var gc := _get_game_controller()
+	if gc != null and gc.has_method("start_level"):
+		gc.start_level(gc.get("current_level_number") if "current_level_number" in gc else 1)
 	# Safety re-arm if transition takes a moment or is cancelled
 	var t := get_tree()
 	if t != null:
@@ -144,7 +170,7 @@ func _on_play_pressed() -> void:
 
 
 func _on_settings_pressed() -> void:
-	AudioManager.play(AudioManager.SFX_UI)
+	_play_sfx("ui_click")
 	_show_settings_overlay()
 
 
@@ -170,7 +196,7 @@ func _show_settings_overlay() -> void:
 			if event.pressed:
 				scrim_state["pressed"] = true
 			elif scrim_state["pressed"]:
-				AudioManager.play(AudioManager.SFX_UI)
+				_play_sfx("ui_click")
 				if _settings_overlay != null and is_instance_valid(_settings_overlay):
 					_settings_overlay.queue_free()
 					_settings_overlay = null
@@ -252,20 +278,30 @@ func _show_settings_overlay() -> void:
 	toggles.add_theme_constant_override("separation", 10)
 	vbox.add_child(toggles)
 
-	toggles.add_child(_create_custom_toggle("Sound", "res://assets/ui/icons/sound.svg", SettingsManager.sfx_enabled(), func(on):
-		SettingsManager.set_sfx(on)))
-	toggles.add_child(_create_custom_toggle("Music", "res://assets/ui/icons/music.svg", SettingsManager.music_enabled(), func(on):
-		SettingsManager.set_music(on)
-		if on:
-			AudioManager.play_music()
-		else:
-			AudioManager.stop_music()))
-	toggles.add_child(_create_custom_toggle("Vibration", "res://assets/ui/icons/vibration.svg", SettingsManager.haptics_enabled(), func(on):
-		SettingsManager.set_haptics(on)))
+	var sm_mgr = _get_settings_manager()
+	var sfx_on: bool = sm_mgr.sfx_enabled() if sm_mgr and sm_mgr.has_method("sfx_enabled") else true
+	var music_on: bool = sm_mgr.music_enabled() if sm_mgr and sm_mgr.has_method("music_enabled") else true
+	var haptics_on: bool = sm_mgr.haptics_enabled() if sm_mgr and sm_mgr.has_method("haptics_enabled") else true
+
+	toggles.add_child(_create_custom_toggle("Sound", "res://assets/ui/icons/sound.svg", sfx_on, func(on):
+		var s = _get_settings_manager()
+		if s and s.has_method("set_sfx"): s.set_sfx(on)))
+	toggles.add_child(_create_custom_toggle("Music", "res://assets/ui/icons/music.svg", music_on, func(on):
+		var s = _get_settings_manager()
+		if s and s.has_method("set_music"): s.set_music(on)
+		var am = get_tree().root.get_node_or_null("AudioManager") if is_inside_tree() and get_tree() and get_tree().root else null
+		if am:
+			if on and am.has_method("play_music"):
+				am.play_music()
+			elif not on and am.has_method("stop_music"):
+				am.stop_music()))
+	toggles.add_child(_create_custom_toggle("Vibration", "res://assets/ui/icons/vibration.svg", haptics_on, func(on):
+		var s = _get_settings_manager()
+		if s and s.has_method("set_haptics"): s.set_haptics(on)))
 
 	# --- Professional Vector Close Button (44x44 minimum touch target) ---
 	var close_btn := _create_close_button(func():
-		AudioManager.play(AudioManager.SFX_UI)
+		_play_sfx("ui_click")
 		if _settings_overlay != null and is_instance_valid(_settings_overlay):
 			_settings_overlay.queue_free()
 			_settings_overlay = null
@@ -382,7 +418,7 @@ func _create_custom_toggle(text: String, icon_path: String, is_on: bool, on_togg
 
 	var state := {"on": is_on}
 	var toggle_fn = func():
-		AudioManager.play(AudioManager.SFX_UI)
+		_play_sfx("ui_click")
 		state["on"] = not state["on"]
 		var on = state["on"]
 		pill_style.bg_color = Color("22c55e") if on else Color("9ca3af")
@@ -491,11 +527,29 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 		if tex_size.y > 0.0:
 			logo_aspect = tex_size.x / tex_size.y
 
+	# Top safe area calculation for header controls
+	var safe_top: float = 28.0
+	if DisplayServer.has_method("get_display_safe_area"):
+		var safe_rect = DisplayServer.get_display_safe_area()
+		if safe_rect.position.y > 0:
+			safe_top = maxf(28.0, safe_rect.position.y + 6.0)
+
+	var s_size: float = 64.0
+
+	# Responsive Coin Counter sizing: scaled proportionally to viewport width
+	var c_h: float = clampf(vp_size.x * 0.082, 28.0, 36.0)
+	var c_w: float = c_h * 4.0
+	if _coin_counter != null and is_instance_valid(_coin_counter):
+		_coin_counter.custom_minimum_size = Vector2(c_w, c_h)
+		_coin_counter.size = Vector2(c_w, c_h)
+		# Vertically center-aligned with the settings button
+		var c_y: float = safe_top + (s_size - c_h) * 0.5
+		_coin_counter.position = Vector2(20.0, c_y)
+
 	# Top-right Settings button (explicit positioning matching visual button)
 	if _settings_btn != null and is_instance_valid(_settings_btn):
-		var s_size: float = 64.0
 		_settings_btn.size = Vector2(s_size, s_size)
-		_settings_btn.position = Vector2(vp_size.x - s_size - 24.0, 28.0)
+		_settings_btn.position = Vector2(vp_size.x - s_size - 24.0, safe_top)
 		_settings_btn.pivot_offset = Vector2(s_size * 0.5, s_size * 0.5)
 		_settings_btn.rotation = 0.0
 

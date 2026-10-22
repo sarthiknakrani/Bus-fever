@@ -89,9 +89,13 @@ var result_subtitle_label: Label
 var result_icon: TextureRect
 var _result_outcome: String = ""  # "victory" or "failure" — guards which buttons are shown
 
-var coin_counter_wrapper: PanelContainer
-var coin_counter_icon: TextureRect
+const CoinCounterHUDClass := preload("res://scripts/ui/coin_counter_hud.gd")
+
+var coin_counter_wrapper: Control
+var coin_counter_icon: Control
 var coin_balance_label: Label
+var victory_coin_counter: Control
+var gameplay_coin_counter: Control
 var reward_badge: PanelContainer
 var reward_badge_label: Label
 var _session_run_id: String = ""
@@ -1047,6 +1051,8 @@ func _load_current_level() -> void:
 		reward_badge.visible = false
 	if coin_counter_wrapper != null:
 		coin_counter_wrapper.visible = false
+	if gameplay_coin_counter != null:
+		gameplay_coin_counter.visible = false
 	if result_subtitle_label != null:
 		result_subtitle_label.visible = false
 		result_subtitle_label.text = ""
@@ -1937,6 +1943,8 @@ func _on_puzzle_failed() -> void:
 		reward_badge.visible = false
 	if coin_counter_wrapper != null:
 		coin_counter_wrapper.visible = false
+	if gameplay_coin_counter != null:
+		gameplay_coin_counter.visible = false
 	result_subtitle_label.text = "No parking spaces left!"
 	result_subtitle_label.visible = true
 	result_retry_btn.visible = true
@@ -2173,7 +2181,17 @@ func _format_number(n: int) -> String:
 func _start_victory_celebration(old_coins: int, new_coins: int) -> void:
 	_stop_celebration_effects()
 
-	if coin_counter_wrapper != null:
+	if gameplay_coin_counter != null:
+		gameplay_coin_counter.visible = false
+
+	if victory_coin_counter != null:
+		victory_coin_counter.visible = true
+		victory_coin_counter.set_displayed_balance(old_coins)
+		victory_coin_counter.scale = Vector2(0.8, 0.8)
+		var ctw = create_tween()
+		ctw.tween_property(victory_coin_counter, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		_celebration_tweens.append(ctw)
+	elif coin_counter_wrapper != null:
 		coin_counter_wrapper.visible = true
 		coin_counter_wrapper.scale = Vector2(0.8, 0.8)
 		var ctw = create_tween()
@@ -2286,7 +2304,9 @@ func _launch_coin_flight_animation(old_coins: int, new_coins: int) -> void:
 		start_pos = reward_badge.global_position + reward_badge.size * 0.5
 
 	var target_pos: Vector2 = Vector2(40, 40)
-	if coin_counter_icon != null and coin_counter_icon.is_inside_tree():
+	if victory_coin_counter != null and is_instance_valid(victory_coin_counter):
+		target_pos = victory_coin_counter.get_coin_target_global_pos()
+	elif coin_counter_icon != null and coin_counter_icon.is_inside_tree():
 		target_pos = coin_counter_icon.global_position + coin_counter_icon.size * 0.5
 
 	var coin_tex = load("res://assets/ui/icons/coin.svg")
@@ -2332,7 +2352,9 @@ func _launch_coin_flight_animation(old_coins: int, new_coins: int) -> void:
 				_play_sfx("coin")
 
 				# Punch counter icon
-				if coin_counter_icon != null and is_instance_valid(coin_counter_icon):
+				if victory_coin_counter != null and is_instance_valid(victory_coin_counter):
+					victory_coin_counter.pulse_coin_icon()
+				elif coin_counter_icon != null and is_instance_valid(coin_counter_icon):
 					coin_counter_icon.scale = Vector2(1.28, 1.28)
 					var p_tw = create_tween()
 					p_tw.tween_property(coin_counter_icon, "scale", Vector2.ONE, 0.12)
@@ -2341,7 +2363,9 @@ func _launch_coin_flight_animation(old_coins: int, new_coins: int) -> void:
 				# Update roll label
 				var fraction: float = float(i + 1) / float(total_coins)
 				var roll_val: int = int(round(lerp(float(old_coins), float(new_coins), fraction)))
-				if coin_balance_label != null and is_instance_valid(coin_balance_label):
+				if victory_coin_counter != null and is_instance_valid(victory_coin_counter):
+					victory_coin_counter.set_displayed_balance(roll_val)
+				elif coin_balance_label != null and is_instance_valid(coin_balance_label):
 					coin_balance_label.text = _format_number(roll_val)
 			)
 			_celebration_tweens.append(fly_tw)
@@ -2352,7 +2376,9 @@ func _launch_coin_flight_animation(old_coins: int, new_coins: int) -> void:
 	var final_tw = create_tween()
 	final_tw.tween_interval(0.065 * total_coins + 0.55)
 	final_tw.tween_callback(func():
-		if coin_balance_label != null and is_instance_valid(coin_balance_label):
+		if victory_coin_counter != null and is_instance_valid(victory_coin_counter):
+			victory_coin_counter.set_displayed_balance(new_coins)
+		elif coin_balance_label != null and is_instance_valid(coin_balance_label):
 			coin_balance_label.text = _format_number(new_coins)
 	)
 	_celebration_tweens.append(final_tw)
@@ -2371,6 +2397,12 @@ func _build_hud() -> void:
 	safe_area_root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	safe_area_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud.add_child(safe_area_root)
+
+	# Gameplay Coin Counter HUD (kept hidden during active puzzle play to prevent track occlusion)
+	gameplay_coin_counter = CoinCounterHUDClass.new()
+	gameplay_coin_counter.name = "GameplayCoinCounter"
+	gameplay_coin_counter.visible = false
+	safe_area_root.add_child(gameplay_coin_counter)
 
 	# TopBar: Level 1, Restart, Pause
 	top_bar = Control.new()
@@ -2780,59 +2812,19 @@ func _build_hud() -> void:
 	result_overlay.add_child(res_bg)
 	_result_scrim = res_bg
 
-	# Top-left Coin Balance Pill (Requirement 4)
-	coin_counter_wrapper = PanelContainer.new()
-	coin_counter_wrapper.name = "ResultCoinCounter"
-	coin_counter_wrapper.anchor_left = 0.0
-	coin_counter_wrapper.anchor_top = 0.0
-	coin_counter_wrapper.anchor_right = 0.0
-	coin_counter_wrapper.anchor_bottom = 0.0
-	coin_counter_wrapper.offset_left = 24.0
-	coin_counter_wrapper.offset_top = 28.0
-	coin_counter_wrapper.visible = false
+	# Top-left Coin Balance Pill (Using reusable CoinCounterHUD)
+	victory_coin_counter = CoinCounterHUDClass.new()
+	victory_coin_counter.name = "ResultCoinCounter"
+	victory_coin_counter.size = Vector2(176, 44)
+	victory_coin_counter.offset_left = 24.0
+	victory_coin_counter.offset_top = 28.0
+	victory_coin_counter.visible = false
+	result_overlay.add_child(victory_coin_counter)
 
-	var coin_pill_style := StyleBoxFlat.new()
-	coin_pill_style.bg_color = Color(0.08, 0.10, 0.15, 0.92) # sleek dark glossy slate
-	coin_pill_style.corner_radius_top_left = 20
-	coin_pill_style.corner_radius_top_right = 20
-	coin_pill_style.corner_radius_bottom_left = 20
-	coin_pill_style.corner_radius_bottom_right = 20
-	coin_pill_style.border_width_left = 2
-	coin_pill_style.border_width_top = 2
-	coin_pill_style.border_width_right = 2
-	coin_pill_style.border_width_bottom = 3
-	coin_pill_style.border_color = Color("f59e0b") # warm gold border
-	coin_pill_style.content_margin_left = 12
-	coin_pill_style.content_margin_right = 16
-	coin_pill_style.content_margin_top = 6
-	coin_pill_style.content_margin_bottom = 6
-	coin_pill_style.shadow_color = Color(0, 0, 0, 0.4)
-	coin_pill_style.shadow_size = 10
-	coin_pill_style.shadow_offset = Vector2(0, 3)
-	coin_counter_wrapper.add_theme_stylebox_override("panel", coin_pill_style)
-
-	var coin_hbox := HBoxContainer.new()
-	coin_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	coin_hbox.add_theme_constant_override("separation", 8)
-	coin_counter_wrapper.add_child(coin_hbox)
-
-	coin_counter_icon = TextureRect.new()
-	coin_counter_icon.texture = load("res://assets/ui/icons/coin.svg")
-	coin_counter_icon.custom_minimum_size = Vector2(28, 28)
-	coin_counter_icon.ignore_texture_size = true
-	coin_counter_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	coin_counter_icon.pivot_offset = Vector2(14, 14)
-	coin_hbox.add_child(coin_counter_icon)
-
-	coin_balance_label = Label.new()
-	coin_balance_label.text = "0"
-	coin_balance_label.add_theme_font_size_override("font_size", 20)
-	coin_balance_label.add_theme_color_override("font_color", Color("fef08a")) # bright warm gold
-	coin_balance_label.add_theme_color_override("font_outline_color", Color("451a03"))
-	coin_balance_label.add_theme_constant_override("outline_size", 4)
-	coin_hbox.add_child(coin_balance_label)
-
-	result_overlay.add_child(coin_counter_wrapper)
+	# Compatibility bindings
+	coin_counter_wrapper = victory_coin_counter
+	coin_counter_icon = victory_coin_counter.coin_target_node
+	coin_balance_label = victory_coin_counter.balance_label
 
 	var res_center := CenterContainer.new()
 	res_center.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -3367,14 +3359,29 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 		var track_screen_y = (vp_size.y / 2.0) + (track_y * scale_factor)
 		garden_bg.update_layout(vp_size, track_screen_y, scale_factor, divider_screen_y)
 
-	if coin_counter_wrapper != null:
-		var safe_top: float = 28.0
-		if DisplayServer.has_method("get_display_safe_area"):
-			var safe_rect = DisplayServer.get_display_safe_area()
-			if safe_rect.position.y > 0:
-				safe_top = maxf(28.0, safe_rect.position.y + 8.0)
+	var safe_top: float = 28.0
+	if DisplayServer.has_method("get_display_safe_area"):
+		var safe_rect = DisplayServer.get_display_safe_area()
+		if safe_rect.position.y > 0:
+			safe_top = maxf(28.0, safe_rect.position.y + 6.0)
+
+	var c_h: float = clampf(vp_size.x * 0.082, 28.0, 36.0)
+	var c_w: float = c_h * 4.0
+
+	if victory_coin_counter != null and is_instance_valid(victory_coin_counter):
+		var v_h: float = clampf(vp_size.x * 0.088, 30.0, 38.0)
+		var v_w: float = v_h * 4.0
+		victory_coin_counter.custom_minimum_size = Vector2(v_w, v_h)
+		victory_coin_counter.size = Vector2(v_w, v_h)
+		victory_coin_counter.position = Vector2(20.0, safe_top)
+	elif coin_counter_wrapper != null:
 		coin_counter_wrapper.offset_top = safe_top
-		coin_counter_wrapper.offset_left = 24.0
+		coin_counter_wrapper.offset_left = 20.0
+
+	if gameplay_coin_counter != null and is_instance_valid(gameplay_coin_counter):
+		gameplay_coin_counter.custom_minimum_size = Vector2(c_w, c_h)
+		gameplay_coin_counter.size = Vector2(c_w, c_h)
+		gameplay_coin_counter.position = Vector2(20.0, safe_top + 52.0)
 
 func _update_feeder_curve(p0: Vector2) -> void:
 	if feeder_track == null or passenger_track == null or passenger_track.curve == null:
