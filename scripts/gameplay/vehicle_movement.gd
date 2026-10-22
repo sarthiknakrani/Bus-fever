@@ -9,6 +9,30 @@ const TARGET_PASSENGER_BOARDING_RATE: float = 30.0
 ## Handles smooth 2D visual tweening for vehicle dispatch and departure.
 ## Separated from authoritative simulation logic for clean restart safety and testability.
 
+static func animate_dispatch_plan(
+	vehicle_node: Node2D,
+	plan: BusMotionPlan,
+	controller: Node,
+	duration_mult: float = 1.0
+) -> void:
+	if vehicle_node == null or not is_instance_valid(vehicle_node) or plan == null:
+		return
+	animate_dispatch(
+		vehicle_node,
+		plan.start_pos,
+		plan.board_clear_point,
+		plan.approach_corridor_pos,
+		plan.final_slot_pos,
+		plan.session_token,
+		controller,
+		plan.vehicle_id,
+		plan.slot_id,
+		plan.final_scale,
+		duration_mult,
+		plan.final_slot_rot,
+		plan
+	)
+
 static func animate_dispatch(
 	vehicle_node: Node2D,
 	start_pos: Vector2,
@@ -21,142 +45,122 @@ static func animate_dispatch(
 	slot_id: int,
 	target_scale: Vector2,
 	duration_mult: float = 1.0,
-	slot_rotation: float = 0.0
+	slot_rotation: float = 0.0,
+	motion_plan: BusMotionPlan = null
 ) -> void:
 	if vehicle_node == null or not is_instance_valid(vehicle_node):
 		return
 
 	vehicle_node.z_index = 100 + slot_id
 
-	# -----------------------------------------------------------------
-	# BOARD-TO-PARKING DRIVING SEQUENCE
-	#
-	# Stage A: Drive STRAIGHT along the puzzle arrow direction (in world
-	#          space, after the board's 45-deg rotation) to clear the
-	#          puzzle footprint. Front follows forward direction.
-	# Stage B: Curve through the explicit corridor waypoint, sitting
-	#          BELOW the parking strip, until the bus is directly under
-	#          its target slot. The turn is gradual, not a snap.
-	# Stage C: From the corridor waypoint, drive into the bay along its
-	#          aligned parking axis (matching slot_rotation).
-	# Stage D: Settle exactly on slot_pos with final rotation matching slot.
-	# -----------------------------------------------------------------
 	var tw := vehicle_node.create_tween()
 
-	# -------------------------------------------------------------------------
-	# BOARD-TO-PARKING ROUTING (Zero-Overlap Perimeter Clearance)
-	#
-	# Stage A: Drive along puzzle arrow to clear the board footprint.
-	# Stage B: If exiting to the side or down, follow outer perimeter corridor
-	#          around the board so the bus NEVER cuts across other buses.
-	# Stage C: Enter top approach corridor below the assigned parking bay.
-	# Stage D: Settle exactly on slot_pos with final rotation matching slot.
-	# -------------------------------------------------------------------------
-	var forward_world: Vector2 = (_legacy_exit_pos - start_pos)
-	if forward_world.length_squared() < 0.0001:
-		forward_world = Vector2(0, -1)
-	forward_world = forward_world.normalized()
-
-	var exit_dist: float = start_pos.distance_to(_legacy_exit_pos)
-	var exit_point: Vector2 = _legacy_exit_pos if exit_dist >= 40.0 else start_pos + forward_world * 140.0
-
-	# Dynamically compute viewport safe boundaries in vehicle parent local space
-	var parent_node = vehicle_node.get_parent()
-	var safe_min_x: float = -200.0
-	var safe_max_x: float = 200.0
-	var safe_min_y: float = -600.0
-	var safe_max_y: float = 600.0
-	if parent_node != null and vehicle_node.is_inside_tree() and vehicle_node.get_viewport() != null:
-		var vp = vehicle_node.get_viewport()
-		var v_rect = vp.get_visible_rect()
-		var vp_xf = parent_node.get_viewport_transform()
-		var top_left_local: Vector2 = parent_node.to_local(vp_xf.affine_inverse() * Vector2(40.0, 40.0))
-		var btm_right_local: Vector2 = parent_node.to_local(vp_xf.affine_inverse() * (v_rect.size - Vector2(40.0, 40.0)))
-		safe_min_x = minf(top_left_local.x, btm_right_local.x)
-		safe_max_x = maxf(top_left_local.x, btm_right_local.x)
-		safe_min_y = minf(top_left_local.y, btm_right_local.y)
-		safe_max_y = maxf(top_left_local.y, btm_right_local.y)
-
-	var pts: Array[Vector2] = []
-	pts.append(start_pos)
-
-	# Clamp exit_point inside screen safe bounds
-	var clamped_exit = Vector2(
-		clampf(exit_point.x, safe_min_x, safe_max_x),
-		clampf(exit_point.y, safe_min_y, safe_max_y)
-	)
-	pts.append(clamped_exit)
-
-	# Perimeter bypass around puzzle board if exiting downwards or sideways
-	if forward_world.y > 0.2:
-		# Exiting DOWN: turn around bottom corner towards target slot side
-		var bottom_y = clampf(exit_point.y + 40.0, exit_point.y, safe_max_y - 20.0)
-		var side_x = (safe_min_x + 38.0) if slot_pos.x <= 0.0 else (safe_max_x - 38.0)
-		pts.append(Vector2(clamped_exit.x, bottom_y))
-		pts.append(Vector2(side_x, bottom_y))
-		pts.append(Vector2(side_x, corridor_pos.y))
-	elif forward_world.x < -0.2:
-		# Exiting LEFT: follow left highway up to corridor
-		var side_x = clampf(minf(clamped_exit.x - 20.0, -180.0), safe_min_x + 38.0, -80.0)
-		pts.append(Vector2(side_x, clamped_exit.y))
-		pts.append(Vector2(side_x, corridor_pos.y))
-	elif forward_world.x > 0.2:
-		# Exiting RIGHT: follow right highway up to corridor
-		var side_x = clampf(maxf(clamped_exit.x + 20.0, 180.0), 80.0, safe_max_x - 38.0)
-		pts.append(Vector2(side_x, clamped_exit.y))
-		pts.append(Vector2(side_x, corridor_pos.y))
-
-	pts.append(corridor_pos)
-	pts.append(slot_pos)
-
-	var in_tangent := Vector2(0.0, 32.0).rotated(slot_rotation)
-	var curve := Curve2D.new()
-	var exit_seg_len: float = start_pos.distance_to(clamped_exit)
-	for i in range(pts.size()):
-		var p = pts[i]
-		var in_tan = Vector2.ZERO
-		var out_tan = Vector2.ZERO
-		if i == 0:
-			# Stage A: Strictly straight initial escape along arrow direction
-			out_tan = forward_world * (exit_seg_len * 0.4)
-		elif i == 1:
-			# Stage A completion: In-tangent ensures segment 0->1 is 100% straight
-			in_tan = -forward_world * (exit_seg_len * 0.4)
-			if pts.size() > 2:
-				var next_d = (pts[2] - pts[1]).normalized()
-				out_tan = next_d * minf(50.0, pts[1].distance_to(pts[2]) * 0.35)
-		elif i == pts.size() - 1:
-			in_tan = in_tangent
-		else:
-			var prev_p = pts[i - 1]
-			var next_p = pts[i + 1]
-			var seg_d = (next_p - prev_p).normalized() * minf(50.0, prev_p.distance_to(p) * 0.35)
-			in_tan = -seg_d
-			out_tan = seg_d
-		curve.add_point(p, in_tan, out_tan)
-
-	# Calculate normalized progress t when the bus reaches clamped_exit (clears board)
-	var total_curve_len: float = curve.get_baked_length()
-	var stage_a_offset: float = curve.get_closest_offset(clamped_exit)
-	var clear_t: float = clampf(stage_a_offset / total_curve_len, 0.1, 0.7) if total_curve_len > 0.0 else 0.3
+	var curve: Curve2D = null
+	var clear_t: float = 0.3
+	var front_native := Vector2(0, -1)
+	var final_rot_target := slot_rotation
+	var v_dir: int = vehicle_node.get("vehicle_dir") if vehicle_node.get("vehicle_dir") != null else CarJamVehicleData.Direction.UP
 	var board_cleared_ref: Array[bool] = [false]
 
-	# Derive front vector (the bus sprite's "front" in its NATIVE puzzle orientation).
-	var v_dir: int = vehicle_node.get("vehicle_dir") if vehicle_node.get("vehicle_dir") != null else CarJamVehicleData.Direction.UP
-	var front_native := Vector2(0, -1)
-	match v_dir:
-		CarJamVehicleData.Direction.DOWN: front_native = Vector2(0, 1)
-		CarJamVehicleData.Direction.UP: front_native = Vector2(0, -1)
-		CarJamVehicleData.Direction.LEFT: front_native = Vector2(-1, 0)
-		CarJamVehicleData.Direction.RIGHT: front_native = Vector2(1, 0)
+	if motion_plan != null:
+		curve = motion_plan.curve
+		clear_t = motion_plan.clear_t
+		front_native = motion_plan.front_native
+		final_rot_target = motion_plan.final_rot_target
+	else:
+		# Fallback / legacy curve generation
+		var forward_world: Vector2 = (_legacy_exit_pos - start_pos)
+		if forward_world.length_squared() < 0.0001:
+			forward_world = Vector2(0, -1)
+		forward_world = forward_world.normalized()
 
-	# Final rotation the bus should be in when parked aligned with slot_rotation.
-	var final_rot_target := slot_rotation
-	match v_dir:
-		CarJamVehicleData.Direction.DOWN: final_rot_target = PI + slot_rotation
-		CarJamVehicleData.Direction.UP: final_rot_target = 0.0 + slot_rotation
-		CarJamVehicleData.Direction.LEFT: final_rot_target = PI / 2.0 + slot_rotation
-		CarJamVehicleData.Direction.RIGHT: final_rot_target = -PI / 2.0 + slot_rotation
+		var exit_dist: float = start_pos.distance_to(_legacy_exit_pos)
+		var exit_point: Vector2 = _legacy_exit_pos if exit_dist >= 40.0 else start_pos + forward_world * 140.0
+
+		var parent_node = vehicle_node.get_parent()
+		var safe_min_x: float = -200.0
+		var safe_max_x: float = 200.0
+		var safe_min_y: float = -600.0
+		var safe_max_y: float = 600.0
+		if parent_node != null and vehicle_node.is_inside_tree() and vehicle_node.get_viewport() != null:
+			var vp = vehicle_node.get_viewport()
+			var v_rect = vp.get_visible_rect()
+			var vp_xf = parent_node.get_viewport_transform()
+			var top_left_local: Vector2 = parent_node.to_local(vp_xf.affine_inverse() * Vector2(40.0, 40.0))
+			var btm_right_local: Vector2 = parent_node.to_local(vp_xf.affine_inverse() * (v_rect.size - Vector2(40.0, 40.0)))
+			safe_min_x = minf(top_left_local.x, btm_right_local.x)
+			safe_max_x = maxf(top_left_local.x, btm_right_local.x)
+			safe_min_y = minf(top_left_local.y, btm_right_local.y)
+			safe_max_y = maxf(top_left_local.y, btm_right_local.y)
+
+		var pts: Array[Vector2] = []
+		pts.append(start_pos)
+
+		var clamped_exit = Vector2(
+			clampf(exit_point.x, safe_min_x, safe_max_x),
+			clampf(exit_point.y, safe_min_y, safe_max_y)
+		)
+		pts.append(clamped_exit)
+
+		if forward_world.y > 0.2:
+			var bottom_y = clampf(exit_point.y + 40.0, exit_point.y, safe_max_y - 20.0)
+			var side_x = (safe_min_x + 38.0) if slot_pos.x <= 0.0 else (safe_max_x - 38.0)
+			pts.append(Vector2(clamped_exit.x, bottom_y))
+			pts.append(Vector2(side_x, bottom_y))
+			pts.append(Vector2(side_x, corridor_pos.y))
+		elif forward_world.x < -0.2:
+			var side_x = clampf(minf(clamped_exit.x - 20.0, -180.0), safe_min_x + 38.0, -80.0)
+			pts.append(Vector2(side_x, clamped_exit.y))
+			pts.append(Vector2(side_x, corridor_pos.y))
+		elif forward_world.x > 0.2:
+			var side_x = clampf(maxf(clamped_exit.x + 20.0, 180.0), 80.0, safe_max_x - 38.0)
+			pts.append(Vector2(side_x, clamped_exit.y))
+			pts.append(Vector2(side_x, corridor_pos.y))
+
+		pts.append(corridor_pos)
+		pts.append(slot_pos)
+
+		var in_tangent := Vector2(0.0, 32.0).rotated(slot_rotation)
+		curve = Curve2D.new()
+		var exit_seg_len: float = start_pos.distance_to(clamped_exit)
+		for i in range(pts.size()):
+			var p = pts[i]
+			var in_tan = Vector2.ZERO
+			var out_tan = Vector2.ZERO
+			if i == 0:
+				out_tan = forward_world * (exit_seg_len * 0.4)
+			elif i == 1:
+				in_tan = -forward_world * (exit_seg_len * 0.4)
+				if pts.size() > 2:
+					var next_d = (pts[2] - pts[1]).normalized()
+					out_tan = next_d * minf(50.0, pts[1].distance_to(pts[2]) * 0.35)
+			elif i == pts.size() - 1:
+				in_tan = in_tangent
+			else:
+				var prev_p = pts[i - 1]
+				var next_p = pts[i + 1]
+				var seg_d = (next_p - prev_p).normalized() * minf(50.0, prev_p.distance_to(p) * 0.35)
+				in_tan = -seg_d
+				out_tan = seg_d
+			curve.add_point(p, in_tan, out_tan)
+
+		var total_curve_len: float = curve.get_baked_length()
+		var stage_a_offset: float = curve.get_closest_offset(clamped_exit)
+		clear_t = clampf(stage_a_offset / total_curve_len, 0.1, 0.7) if total_curve_len > 0.0 else 0.3
+
+		match v_dir:
+			CarJamVehicleData.Direction.DOWN:
+				front_native = Vector2(0, 1)
+				final_rot_target = PI + slot_rotation
+			CarJamVehicleData.Direction.UP:
+				front_native = Vector2(0, -1)
+				final_rot_target = 0.0 + slot_rotation
+			CarJamVehicleData.Direction.LEFT:
+				front_native = Vector2(-1, 0)
+				final_rot_target = PI / 2.0 + slot_rotation
+			CarJamVehicleData.Direction.RIGHT:
+				front_native = Vector2(1, 0)
+				final_rot_target = -PI / 2.0 + slot_rotation
 
 	var start_scale: Vector2 = vehicle_node.scale
 	var duration: float = BUS_ARRIVAL_DURATION * duration_mult

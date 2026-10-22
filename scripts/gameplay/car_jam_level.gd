@@ -1614,28 +1614,7 @@ func _on_vehicle_dispatch_started(vehicle_id: int, slot_id: int, corridor: Array
 	vv.global_scale = orig_global_scale
 
 	var target_slot_pos := _get_slot_world_pos(slot_id)
-	var exit_cell: Vector2i = corridor.back() if not corridor.is_empty() else vv.vehicle_footprint[0]
-
-	# Calculate exactly how many cells to push forward to clear the board
-	var push_cells = float(vv.vehicle_footprint.size()) + 0.6
-	var dir_vec = CarJamVehicleData.dir_to_vector(vv.vehicle_dir)
-	var final_exit_coord = Vector2(exit_cell) + Vector2(dir_vec) * push_cells
-
-	# Calculate local position on the board
-	var lx = final_exit_coord.x - float(controller.level_data.board_size.x - 1) / 2.0
-	var ly = final_exit_coord.y - float(controller.level_data.board_size.y - 1) / 2.0
-	var exit_local = Vector2(lx, ly) * CELL_SIZE
-
-	# Convert to world_root space (which is transit_layer's space)
-	var exit_pos = board_root.transform * exit_local
-
 	var slot_rot: float = slot_views[slot_id].rotation if slot_id < slot_views.size() else deg_to_rad(-22.0)
-
-	# CORRIDOR WAYPOINT — positioned along the -22.0° entry axis directly behind the
-	# assigned parking bay. The vehicle drives along its puzzle exit corridor, curves
-	# cleanly through this approach waypoint, and drives into the bay aligned at -22.0°.
-	var approach_offset := Vector2(0.0, ParkingSlotView.SLOT_HEIGHT + 16.0).rotated(slot_rot)
-	var corridor_pos := target_slot_pos + approach_offset
 
 	# Authoritative parking slot dimensions from ParkingSlotView (SLOT_WIDTH = 53.0, SLOT_HEIGHT = 94.0)
 	# All normalized short buses have canonical canvas 62x110 and body 48x102 (V) / 46x102 (H).
@@ -1648,19 +1627,51 @@ func _on_vehicle_dispatch_started(vehicle_id: int, slot_id: int, corridor: Array
 		final_scale = minf(scale_w, scale_h)
 	var final_scale_vec := Vector2(final_scale, final_scale)
 
-	VehicleMovement.animate_dispatch(
-		vv,
-		vv.position,
-		exit_pos,
-		corridor_pos,
-		target_slot_pos,
-		controller.session_token,
-		controller,
+	# Compute viewport safe area in transit_layer local coordinates
+	var vp = get_viewport()
+	var safe_bounds := Rect2(-200.0, -600.0, 400.0, 1200.0)
+	if vp != null and transit_layer != null and transit_layer.is_inside_tree():
+		var v_rect := vp.get_visible_rect()
+		var vp_xf := transit_layer.get_viewport_transform()
+		var top_left_local: Vector2 = transit_layer.to_local(vp_xf.affine_inverse() * Vector2(40.0, 40.0))
+		var btm_right_local: Vector2 = transit_layer.to_local(vp_xf.affine_inverse() * (v_rect.size - Vector2(40.0, 40.0)))
+		var min_x = minf(top_left_local.x, btm_right_local.x)
+		var max_x = maxf(top_left_local.x, btm_right_local.x)
+		var min_y = minf(top_left_local.y, btm_right_local.y)
+		var max_y = maxf(top_left_local.y, btm_right_local.y)
+		safe_bounds = Rect2(min_x, min_y, max_x - min_x, max_y - min_y)
+
+	var vm: VehicleModel = controller.vehicles.get(vehicle_id, null) if controller != null else null
+	var v_anchor: Vector2i = vm.anchor if vm != null else (vv.vehicle_footprint[0] if not vv.vehicle_footprint.is_empty() else Vector2i.ZERO)
+	var b_size: Vector2i = controller.level_data.board_size if controller != null and controller.level_data != null else Vector2i(8, 8)
+
+	var motion_plan := BusMotionPlan.compute_motion_plan(
 		vehicle_id,
+		controller.session_token if controller != null else 0,
 		slot_id,
+		vv.position,
+		vv.rotation,
+		vv.scale,
+		vv.vehicle_dir,
+		v_anchor,
+		vv.vehicle_footprint,
+		b_size,
+		CELL_SIZE,
+		board_root.transform if board_root != null else Transform2D.IDENTITY,
+		corridor,
+		target_slot_pos,
+		slot_rot,
 		final_scale_vec,
-		bus_movement_duration_multiplier,
-		slot_rot
+		safe_bounds,
+		0.35, # safety_margin_cells
+		bus_movement_duration_multiplier
+	)
+
+	VehicleMovement.animate_dispatch_plan(
+		vv,
+		motion_plan,
+		controller,
+		bus_movement_duration_multiplier
 	)
 
 func _on_vehicle_parked(vehicle_id: int, slot_id: int) -> void:
