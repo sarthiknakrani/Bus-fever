@@ -8,6 +8,7 @@ class_name CoinCounterHUD
 signal plus_pressed()
 
 const COUNTER_TEXTURE_PATH := "res://assets/ui/coins/coin_counter_blank_plus.png"
+const ClayStyle := preload("res://scripts/ui/style_helpers.gd")
 
 var texture_rect: TextureRect
 var balance_label: Label
@@ -292,26 +293,24 @@ func show_earn_coins_popup() -> void:
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	popup_root.add_child(center)
 
-	# 3. Modal Wrapper Card
+	# 3. Modal Wrapper Card (Claymorphic)
 	var card := PanelContainer.new()
 	card.name = "Card"
 	card.custom_minimum_size = Vector2(320, 290)
 	card.pivot_offset = Vector2(160, 145)
 	card.modulate.a = 1.0
 
-	var card_style := StyleBoxFlat.new()
-	card_style.bg_color = Color(1.0, 0.99, 0.97, 1.0) # solid warm cream white
-	card_style.set_corner_radius_all(24)
-	card_style.border_width_left = 3
-	card_style.border_width_top = 3
-	card_style.border_width_right = 3
-	card_style.border_width_bottom = 5
-	card_style.border_color = Color("f59e0b") # warm gold border
-	card_style.shadow_color = Color(0, 0, 0, 0.40)
-	card_style.shadow_size = 16
-	card_style.shadow_offset = Vector2(0, 6)
+	var card_style := ClayStyle.create_clay_panel(Color("fffdf7"), Color("f59e0b"), 28, 6, 22, 8, Color(0, 0, 0, 0.28))
 	card.add_theme_stylebox_override("panel", card_style)
 	center.add_child(card)
+
+	var card_gloss := Panel.new()
+	card_gloss.set_anchors_preset(Control.PRESET_FULL_RECT)
+	card_gloss.anchor_bottom = 0.5
+	card_gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var cg_style := ClayStyle.create_clay_highlight_style(28, 0.22)
+	card_gloss.add_theme_stylebox_override("panel", cg_style)
+	card.add_child(card_gloss)
 
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 20)
@@ -350,13 +349,10 @@ func show_earn_coins_popup() -> void:
 	close_btn.focus_mode = Control.FOCUS_NONE
 	close_btn.add_theme_font_size_override("font_size", 16)
 	close_btn.add_theme_color_override("font_color", Color("475569"))
-	var close_style := StyleBoxFlat.new()
-	close_style.bg_color = Color("ffffff")
-	close_style.set_corner_radius_all(17)
-	close_style.shadow_size = 4
-	close_style.shadow_color = Color(0, 0, 0, 0.2)
+	var close_style := ClayStyle.create_clay_button_style(Color("ffffff"), Color("cbd5e1"), 17, 3, 6, 2, 0.20)
 	close_btn.add_theme_stylebox_override("normal", close_style)
 	close_btn.add_theme_stylebox_override("pressed", close_style)
+	ClayStyle.apply_clay_squish(close_btn, 2.0, 0.90)
 	close_btn.pressed.connect(func():
 		_play_ui_sfx()
 		_close_popup(popup_root)
@@ -382,7 +378,7 @@ func show_earn_coins_popup() -> void:
 	desc_lbl.add_theme_color_override("font_color", Color("334155"))
 	vbox.add_child(desc_lbl)
 
-	# Action Button
+	# Claymorphic Action Button
 	var act_btn := Button.new()
 	act_btn.text = _custom_action_title
 	act_btn.custom_minimum_size = Vector2(200, 48)
@@ -391,19 +387,15 @@ func show_earn_coins_popup() -> void:
 	act_btn.add_theme_font_size_override("font_size", 18)
 	act_btn.add_theme_color_override("font_color", Color.WHITE)
 
-	var btn_style := StyleBoxFlat.new()
-	btn_style.bg_color = Color("22c55e") # vibrant green
-	btn_style.set_corner_radius_all(16)
-	btn_style.border_width_bottom = 4
-	btn_style.border_color = Color("15803d")
+	var btn_style := ClayStyle.create_clay_button_style(Color("22c55e"), Color("15803d"), 20, 5, 12, 4, 0.25)
 	act_btn.add_theme_stylebox_override("normal", btn_style)
 
-	var btn_pressed_style := StyleBoxFlat.new()
+	var btn_pressed_style := btn_style.duplicate()
 	btn_pressed_style.bg_color = Color("16a34a")
-	btn_pressed_style.set_corner_radius_all(16)
-	btn_pressed_style.border_width_top = 2
-	btn_pressed_style.border_color = Color("15803d")
+	btn_pressed_style.border_width_bottom = 2
 	act_btn.add_theme_stylebox_override("pressed", btn_pressed_style)
+
+	ClayStyle.apply_clay_squish(act_btn, 3.0, 0.94)
 
 	act_btn.pressed.connect(func():
 		_play_ui_sfx()

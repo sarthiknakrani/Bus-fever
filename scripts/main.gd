@@ -8,12 +8,13 @@ const BG_COLOR := Color("cfe8ff")
 const PLAY_FRONT := Color("4ade80")
 const PLAY_BACK := Color("15803d")
 
+const ClayStyle := preload("res://scripts/ui/style_helpers.gd")
+const CoinCounterHUDClass := preload("res://scripts/ui/coin_counter_hud.gd")
+
 var _root_ctrl: Control
 var _hud_ctrl: Control
 var _settings_overlay: Control
 var _settings_panel: PanelContainer
-
-const CoinCounterHUDClass := preload("res://scripts/ui/coin_counter_hud.gd")
 
 var _bg_rect: TextureRect
 var _settings_btn: TextureButton
@@ -99,14 +100,7 @@ func _build_ui() -> void:
 	_settings_btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	_settings_btn.focus_mode = Control.FOCUS_NONE
 	_settings_btn.pressed.connect(_on_settings_pressed)
-	_settings_btn.button_down.connect(func():
-		var tw := _settings_btn.create_tween()
-		tw.tween_property(_settings_btn, "scale", Vector2(0.90, 0.90), 0.06).set_trans(Tween.TRANS_QUAD)
-	)
-	_settings_btn.button_up.connect(func():
-		var tw := _settings_btn.create_tween()
-		tw.tween_property(_settings_btn, "scale", Vector2.ONE, 0.08).set_trans(Tween.TRANS_QUAD)
-	)
+	ClayStyle.apply_clay_squish(_settings_btn, 3.0, 0.91)
 	_hud_ctrl.add_child(_settings_btn)
 
 	# D. Bottom-center Play button (Glossy 3D Candy Orange Button - static)
@@ -119,14 +113,7 @@ func _build_ui() -> void:
 	_play_btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	_play_btn.focus_mode = Control.FOCUS_NONE
 	_play_btn.pressed.connect(_on_play_pressed)
-	_play_btn.button_down.connect(func():
-		var tw := _play_btn.create_tween()
-		tw.tween_property(_play_btn, "scale", Vector2(0.94, 0.94), 0.06).set_trans(Tween.TRANS_QUAD)
-	)
-	_play_btn.button_up.connect(func():
-		var tw := _play_btn.create_tween()
-		tw.tween_property(_play_btn, "scale", Vector2.ONE, 0.08).set_trans(Tween.TRANS_QUAD)
-	)
+	ClayStyle.apply_clay_squish(_play_btn, 4.0, 0.93)
 	_hud_ctrl.add_child(_play_btn)
 
 	# E. Top-left Premium Coin Counter HUD
@@ -220,26 +207,16 @@ func _show_settings_overlay() -> void:
 
 	_settings_panel = PanelContainer.new()
 	_settings_panel.name = "PanelContainer"
-	var ps := StyleBoxFlat.new()
-	ps.bg_color = Color("fcf8ef")
-	ps.border_width_bottom = 4
-	ps.border_color = Color("e0d2b8")
-	ps.set_corner_radius_all(24)
-	ps.shadow_color = Color(0, 0, 0, 0.3)
-	ps.shadow_size = 9
-	ps.shadow_offset = Vector2(0, 6)
+	var ps := ClayStyle.create_clay_panel(Color("fffdf7"), Color("e6d8c3"), 28, 6, 22, 8, Color(0, 0, 0, 0.25))
 	_settings_panel.add_theme_stylebox_override("panel", ps)
 	wrapper.add_child(_settings_panel)
 	_settings_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	
-	# Subtle gloss Panel OVER the settings panel
+	# Subtle clay gloss Panel OVER the settings panel
 	var pop_gloss := Panel.new()
 	pop_gloss.name = "GlossPanel"
 	pop_gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var pg_style := StyleBoxFlat.new()
-	pg_style.bg_color = Color(1, 1, 1, 0.18) # Clean subtle gloss, does not wash out title
-	pg_style.corner_radius_top_left = 24
-	pg_style.corner_radius_top_right = 24
+	var pg_style := ClayStyle.create_clay_highlight_style(28, 0.22)
 	pop_gloss.add_theme_stylebox_override("panel", pg_style)
 	wrapper.add_child(pop_gloss)
 	pop_gloss.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -346,33 +323,34 @@ func _create_custom_toggle(text: String, icon_path: String, is_on: bool, on_togg
 	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(lbl)
 
-	# Procedural 3D toggle pill (no PNG — sharp at any resolution)
-	const PILL_W := 52.0
-	const PILL_H := 30.0
-	const KNOB := 21.0
+	# Procedural Clay toggle pill
+	const PILL_W := 54.0
+	const PILL_H := 32.0
+	const KNOB := 22.0
 	const PAD := 5.0
 
 	var pill := Panel.new()
 	pill.custom_minimum_size = Vector2(PILL_W, PILL_H)
 	pill.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
-	var pill_style := StyleBoxFlat.new()
-	pill_style.bg_color = Color("22c55e") if is_on else Color("d1d5db")
-	pill_style.set_corner_radius_all(int(PILL_H / 2))
+	var pill_style := ClayStyle.create_clay_pill(
+		Color("22c55e") if is_on else Color("cbd5e1"),
+		Color("15803d") if is_on else Color("94a3b8"),
+		3, 8, 2, 0.16
+	)
 	pill.add_theme_stylebox_override("panel", pill_style)
 	
-	var t_gloss = Panel.new()
+	var t_gloss := Panel.new()
 	t_gloss.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	t_gloss.anchor_bottom = 0.5
+	t_gloss.anchor_bottom = 0.48
 	t_gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var tg_style = StyleBoxFlat.new()
-	tg_style.bg_color = Color(1, 1, 1, 0.4)
+	var tg_style := ClayStyle.create_clay_highlight_style(int(PILL_H / 2), 0.32)
 	t_gloss.add_theme_stylebox_override("panel", tg_style)
 	pill.add_child(t_gloss)
 	
 	# Shine animation for toggles that are ON
 	if is_on:
 		var shine = ColorRect.new()
-		shine.color = Color(1, 1, 1, 0.5)
+		shine.color = Color(1, 1, 1, 0.4)
 		shine.rotation_degrees = 25
 		shine.size = Vector2(10, 100)
 		shine.position = Vector2(-50, -20)
@@ -394,14 +372,7 @@ func _create_custom_toggle(text: String, icon_path: String, is_on: bool, on_togg
 		(PILL_W - KNOB - PAD) if is_on else PAD,
 		(PILL_H - KNOB) / 2.0
 	)
-	var knob_style := StyleBoxFlat.new()
-	knob_style.bg_color = Color.WHITE
-	knob_style.set_corner_radius_all(int(KNOB / 2))
-	knob_style.border_width_bottom = 2
-	knob_style.border_color = Color("e5e7eb")
-	knob_style.shadow_color = Color(0, 0, 0, 0.20)
-	knob_style.shadow_size = 3
-	knob_style.shadow_offset = Vector2(0, 1)
+	var knob_style := ClayStyle.create_clay_button_style(Color("ffffff"), Color("cbd5e1"), int(KNOB / 2), 3, 5, 2, 0.22)
 	knob.add_theme_stylebox_override("panel", knob_style)
 	inside.add_child(knob)
 
@@ -420,10 +391,12 @@ func _create_custom_toggle(text: String, icon_path: String, is_on: bool, on_togg
 	var toggle_fn = func():
 		_play_sfx("ui_click")
 		state["on"] = not state["on"]
-		var on = state["on"]
-		pill_style.bg_color = Color("22c55e") if on else Color("9ca3af")
-		pill_style.border_color = Color("14532d") if on else Color("4b5563")
-		knob.position.x = (PILL_W - KNOB - PAD) if on else PAD
+		var on: bool = state["on"]
+		pill_style.bg_color = Color("22c55e") if on else Color("cbd5e1")
+		pill_style.border_color = Color("15803d") if on else Color("94a3b8")
+		var target_x: float = (PILL_W - KNOB - PAD) if on else PAD
+		var ktw := knob.create_tween()
+		ktw.tween_property(knob, "position:x", target_x, 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		on_toggle.call(on)
 
 	hit.pressed.connect(toggle_fn)
@@ -445,59 +418,41 @@ func _create_close_button(on_close: Callable) -> Button:
 	btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	btn.focus_mode = Control.FOCUS_NONE
 	
-	var c_style = StyleBoxFlat.new()
-	c_style.bg_color = Color("ef4444")
-	c_style.set_corner_radius_all(22)
-	c_style.shadow_color = Color(0, 0, 0, 0.35)
-	c_style.shadow_size = 5
-	c_style.shadow_offset = Vector2(0, 3)
-	c_style.border_width_bottom = 3
-	c_style.border_color = Color("b91c1c")
+	var c_style := ClayStyle.create_clay_button_style(Color("ef4444"), Color("b91c1c"), 22, 4, 10, 4, 0.25)
 	btn.add_theme_stylebox_override("normal", c_style)
 	
-	var c_hover = c_style.duplicate()
+	var c_hover := c_style.duplicate()
 	c_hover.bg_color = Color("f87171")
 	btn.add_theme_stylebox_override("hover", c_hover)
 	
-	var c_pressed = c_style.duplicate()
+	var c_pressed := c_style.duplicate()
 	c_pressed.bg_color = Color("dc2626")
-	c_pressed.shadow_size = 1
-	c_pressed.shadow_offset = Vector2(0, 1)
+	c_pressed.border_width_bottom = 2
+	c_pressed.shadow_size = 4
+	c_pressed.shadow_offset = Vector2(0, 2)
 	btn.add_theme_stylebox_override("pressed", c_pressed)
 	
-	var cg = Panel.new()
+	var cg := Panel.new()
 	cg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	cg.anchor_bottom = 0.5
 	cg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var cgs = StyleBoxFlat.new()
-	cgs.bg_color = Color(1, 1, 1, 0.35)
-	cgs.corner_radius_top_left = 22
-	cgs.corner_radius_top_right = 22
+	var cgs := ClayStyle.create_clay_highlight_style(22, 0.35)
 	cg.add_theme_stylebox_override("panel", cgs)
 	btn.add_child(cg)
 	
-	var icon = TextureRect.new()
+	var icon := TextureRect.new()
 	icon.texture = load("res://assets/ui/icons/close.svg")
 	icon.ignore_texture_size = true
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon.custom_minimum_size = Vector2(18, 18)
 	icon.size = Vector2(18, 18)
-	icon.position = Vector2(13, 12)
+	icon.position = Vector2(13, 11)
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	btn.add_child(icon)
 	
 	btn.pivot_offset = Vector2(22, 22)
-	btn.button_down.connect(func():
-		var tw = btn.create_tween()
-		tw.tween_property(btn, "scale", Vector2(0.92, 0.92), 0.05).set_trans(Tween.TRANS_QUAD)
-	)
-	btn.button_up.connect(func():
-		var tw = btn.create_tween()
-		tw.tween_property(btn, "scale", Vector2.ONE, 0.08).set_trans(Tween.TRANS_QUAD)
-	)
-	btn.pressed.connect(func():
-		on_close.call()
-	)
+	ClayStyle.apply_clay_squish(btn, 2.5, 0.90)
+	btn.pressed.connect(on_close)
 	btn.gui_input.connect(func(event: InputEvent):
 		if event is InputEventScreenTouch and not event.pressed:
 			on_close.call()

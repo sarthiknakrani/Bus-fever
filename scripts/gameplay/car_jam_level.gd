@@ -90,6 +90,7 @@ var result_icon: TextureRect
 var _result_outcome: String = ""  # "victory" or "failure" — guards which buttons are shown
 
 const CoinCounterHUDClass := preload("res://scripts/ui/coin_counter_hud.gd")
+const ClayStyle := preload("res://scripts/ui/style_helpers.gd")
 
 var coin_counter_wrapper: Control
 var coin_counter_icon: Control
@@ -2424,31 +2425,26 @@ func _build_hud() -> void:
 	btn_restart.ignore_texture_size = true
 	btn_restart.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
 	btn_restart.custom_minimum_size = Vector2(50, 50)
-	btn_restart.button_down.connect(func():
-		var tw = btn_restart.create_tween()
-		tw.tween_property(btn_restart, "scale", Vector2(0.9, 0.9), 0.05).set_trans(Tween.TRANS_QUAD)
-	)
-	btn_restart.button_up.connect(func():
-		var tw = btn_restart.create_tween()
-		tw.tween_property(btn_restart, "scale", Vector2.ONE, 0.1).set_trans(Tween.TRANS_QUAD)
-	)
 	btn_restart.pivot_offset = Vector2(25, 25)
+	ClayStyle.apply_clay_squish(btn_restart, 3.0, 0.91)
 	btn_restart.pressed.connect(_on_restart_pressed)
 	top_bar.add_child(btn_restart)
 
 	level_title_label = Label.new()
 	var top_gc = get_tree().root.get_node_or_null("GameController") if is_inside_tree() and get_tree() and get_tree().root else null
 	level_title_label.text = "Level " + str(top_gc.current_level_number if top_gc else 1)
-	level_title_label.add_theme_font_size_override("font_size", 30)
-	level_title_label.add_theme_color_override("font_color", Color("ffffff"))
-	level_title_label.add_theme_color_override("font_outline_color", Color("1e293b"))
-	level_title_label.add_theme_constant_override("outline_size", 6)
-	level_title_label.add_theme_color_override("font_shadow_color", Color(0,0,0,0.5))
-	level_title_label.add_theme_constant_override("shadow_offset_y", 4)
+	level_title_label.add_theme_font_size_override("font_size", 22)
+	level_title_label.add_theme_color_override("font_color", Color("1e3a8a")) # rich navy text
+	var title_pill := ClayStyle.create_clay_pill(Color("ffffff"), Color("cbd5e1"), 4, 12, 4, 0.18)
+	title_pill.content_margin_left = 20
+	title_pill.content_margin_right = 20
+	title_pill.content_margin_top = 4
+	title_pill.content_margin_bottom = 6
+	level_title_label.add_theme_stylebox_override("normal", title_pill)
 	level_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	level_title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	level_title_label.anchor_left = 0.25
-	level_title_label.anchor_right = 0.75
+	level_title_label.anchor_left = 0.24
+	level_title_label.anchor_right = 0.76
 	level_title_label.anchor_top = 0.0
 	level_title_label.anchor_bottom = 1.0
 	top_bar.add_child(level_title_label)
@@ -2459,21 +2455,14 @@ func _build_hud() -> void:
 	btn_pause.ignore_texture_size = true
 	btn_pause.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
 	btn_pause.custom_minimum_size = Vector2(50, 50)
-	btn_pause.button_down.connect(func():
-		var tw = btn_pause.create_tween()
-		tw.tween_property(btn_pause, "scale", Vector2(0.9, 0.9), 0.05).set_trans(Tween.TRANS_QUAD)
-	)
-	btn_pause.button_up.connect(func():
-		var tw = btn_pause.create_tween()
-		tw.tween_property(btn_pause, "scale", Vector2.ONE, 0.1).set_trans(Tween.TRANS_QUAD)
-	)
 	btn_pause.pivot_offset = Vector2(25, 25)
 	btn_pause.anchor_left = 1.0
 	btn_pause.offset_left = -50.0
+	ClayStyle.apply_clay_squish(btn_pause, 3.0, 0.91)
 	btn_pause.pressed.connect(_on_pause_pressed)
 	top_bar.add_child(btn_pause)
 
-	# BoosterBar (VIP, Arrange, Jumble) with original Premium 3D PNGs
+	# BoosterBar (VIP, Arrange, Jumble) with Claymorphic squircle buttons
 	booster_bar = Control.new()
 	booster_bar.name = "BoosterBar"
 	booster_bar.anchor_left = 0.0
@@ -2505,9 +2494,21 @@ func _build_hud() -> void:
 		var btn_container = Control.new()
 		btn_container.custom_minimum_size = Vector2(56, 56)
 
+		var clay_base := Panel.new()
+		clay_base.set_anchors_preset(Control.PRESET_FULL_RECT)
+		clay_base.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var c_style := ClayStyle.create_clay_button_style(Color("f8fafc"), Color("cbd5e1"), 18, 5, 10, 4, 0.22)
+		clay_base.add_theme_stylebox_override("panel", c_style)
+		btn_container.add_child(clay_base)
+
+		var clay_gloss := Panel.new()
+		clay_gloss.set_anchors_preset(Control.PRESET_TOP_WIDE)
+		clay_gloss.anchor_bottom = 0.48
+		clay_gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		clay_gloss.add_theme_stylebox_override("panel", ClayStyle.create_clay_highlight_style(18, 0.30))
+		btn_container.add_child(clay_gloss)
+
 		var btn := TextureButton.new()
-		btn.texture_normal = load("res://assets/ui/gameplay_buttons/base_booster_normal.svg")
-		btn.texture_pressed = load("res://assets/ui/gameplay_buttons/base_booster_pressed.svg")
 		btn.ignore_texture_size = true
 		btn.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
 		btn.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -2519,28 +2520,15 @@ func _build_hud() -> void:
 		icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
 		icon_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		# slight padding inside the SVG base
-		icon_rect.offset_left = 10
-		icon_rect.offset_right = -10
-		icon_rect.offset_top = 8
-		icon_rect.offset_bottom = -14
+		icon_rect.offset_left = 8
+		icon_rect.offset_right = -8
+		icon_rect.offset_top = 6
+		icon_rect.offset_bottom = -12
 		btn.add_child(icon_rect)
-		
-		# Premium glossy pressed effect
-		btn.button_down.connect(func():
-			var tw = btn.create_tween()
-			tw.tween_property(btn, "position:y", 4.0, 0.05).set_trans(Tween.TRANS_QUAD)
-			tw.parallel().tween_property(btn, "modulate", Color(0.85, 0.85, 0.85), 0.05)
-		)
-		btn.button_up.connect(func():
-			var tw = btn.create_tween()
-			tw.tween_property(btn, "position:y", 0.0, 0.1).set_trans(Tween.TRANS_QUAD)
-			tw.parallel().tween_property(btn, "modulate", Color.WHITE, 0.1)
-		)
 		
 		btn_container.add_child(btn)
 
-		# Add a premium 3D green '+' circle badge
+		# Add a clay green '+' circle badge
 		var plus := Label.new()
 		plus.text = "+"
 		plus.add_theme_font_size_override("font_size", 14)
@@ -2548,18 +2536,10 @@ func _build_hud() -> void:
 		plus.add_theme_color_override("font_outline_color", Color("064e3b"))
 		plus.add_theme_constant_override("outline_size", 2)
 		
-		var p_style = StyleBoxFlat.new()
-		p_style.bg_color = Color("22c55e")
-		p_style.corner_radius_top_left = 9
-		p_style.corner_radius_top_right = 9
-		p_style.corner_radius_bottom_left = 9
-		p_style.corner_radius_bottom_right = 9
-		p_style.border_width_bottom = 2
-		p_style.border_color = Color("14532d")
-		p_style.border_blend = false
-		p_style.shadow_color = Color(0, 0, 0, 0.5)
-		p_style.shadow_size = 1
-		p_style.shadow_offset = Vector2(0, 1)
+		var p_style := ClayStyle.create_clay_button_style(Color("22c55e"), Color("15803d"), 10, 2, 4, 2, 0.25)
+		p_style.border_width_top = 1
+		p_style.border_width_left = 1
+		p_style.border_width_right = 1
 		plus.add_theme_stylebox_override("normal", p_style)
 		
 		plus.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -2567,6 +2547,8 @@ func _build_hud() -> void:
 		plus.size = Vector2(18, 18)
 		plus.position = Vector2(40, -4)
 		btn_container.add_child(plus)
+
+		ClayStyle.apply_clay_squish(btn, 3.0, 0.92, btn_container)
 
 		# Wire the existing premium booster button to the controller-side logic for
 		# VIP / Arrange / Jumble. Each is single-use per level; the button stays in the
@@ -2622,29 +2604,16 @@ func _build_hud() -> void:
 
 	var p_panel := PanelContainer.new()
 	p_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var p_style_panel = StyleBoxFlat.new()
-	p_style_panel.bg_color = Color("fcf8ef")
-	p_style_panel.corner_radius_top_left = 24
-	p_style_panel.corner_radius_top_right = 24
-	p_style_panel.corner_radius_bottom_left = 24
-	p_style_panel.corner_radius_bottom_right = 24
-	p_style_panel.shadow_color = Color(0,0,0,0.3)
-	p_style_panel.shadow_size = 9
-	p_style_panel.shadow_offset = Vector2(0, 6)
-	p_style_panel.border_width_bottom = 4
-	p_style_panel.border_color = Color("e0d2b8")
+	var p_style_panel := ClayStyle.create_clay_panel(Color("fffdf7"), Color("e6d8c3"), 28, 6, 22, 8, Color(0, 0, 0, 0.25))
 	p_panel.add_theme_stylebox_override("panel", p_style_panel)
 	p_wrapper.add_child(p_panel)
 
-	# Glossy top
-	var pop_gloss = Panel.new()
+	# Glossy clay top sheen
+	var pop_gloss := Panel.new()
 	pop_gloss.set_anchors_preset(Control.PRESET_FULL_RECT)
 	pop_gloss.anchor_bottom = 0.5
 	pop_gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var pg_style = StyleBoxFlat.new()
-	pg_style.bg_color = Color(1, 1, 1, 0.18) # Clean subtle gloss, does not wash out title
-	pg_style.corner_radius_top_left = 24
-	pg_style.corner_radius_top_right = 24
+	var pg_style := ClayStyle.create_clay_highlight_style(28, 0.22)
 	pop_gloss.add_theme_stylebox_override("panel", pg_style)
 	p_wrapper.add_child(pop_gloss)
 
@@ -2704,81 +2673,77 @@ func _build_hud() -> void:
 			get_tree().root.get_node("SettingsManager").set_haptics(on)
 	))
 
-	# D. Bottom buttons
+	# D. Bottom buttons (Claymorphic Restart & Home)
 	var btm_hbox = HBoxContainer.new()
 	btm_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	btm_hbox.add_theme_constant_override("separation", 12)
 	pb_vbox.add_child(btm_hbox)
 
 	var p_btn_restart := TextureButton.new()
-	p_btn_restart.texture_normal = load("res://assets/ui/settings_buttons/restart_normal.svg")
-	p_btn_restart.texture_pressed = load("res://assets/ui/settings_buttons/restart_pressed.svg")
 	p_btn_restart.ignore_texture_size = true
-	p_btn_restart.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
-	p_btn_restart.custom_minimum_size = Vector2(98, 42)
+	p_btn_restart.custom_minimum_size = Vector2(100, 44)
 	
+	var pr_panel := Panel.new()
+	pr_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	pr_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var pr_style := ClayStyle.create_clay_button_style(Color("22c55e"), Color("15803d"), 18, 4, 8, 3, 0.25)
+	pr_panel.add_theme_stylebox_override("panel", pr_style)
+	p_btn_restart.add_child(pr_panel)
+
+	var pr_gloss := Panel.new()
+	pr_gloss.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	pr_gloss.anchor_bottom = 0.48
+	pr_gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pr_gloss.add_theme_stylebox_override("panel", ClayStyle.create_clay_highlight_style(18, 0.28))
+	p_btn_restart.add_child(pr_gloss)
+
 	var r_lbl = Label.new()
 	r_lbl.text = "Restart"
 	r_lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
 	r_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	r_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	r_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	r_lbl.add_theme_font_size_override("font_size", 15)
 	r_lbl.add_theme_color_override("font_color", Color.WHITE)
 	r_lbl.add_theme_color_override("font_outline_color", Color("14532d"))
-	r_lbl.add_theme_constant_override("outline_size", 4)
-	r_lbl.offset_top = -4
-	r_lbl.offset_bottom = -4
+	r_lbl.add_theme_constant_override("outline_size", 3)
 	p_btn_restart.add_child(r_lbl)
 	
-	p_btn_restart.button_down.connect(func():
-		r_lbl.offset_top = 2
-		r_lbl.offset_bottom = 2
-		var tw = p_btn_restart.create_tween()
-		tw.tween_property(p_btn_restart, "scale", Vector2(0.96, 0.96), 0.05)
-	)
-	p_btn_restart.button_up.connect(func():
-		r_lbl.offset_top = -4
-		r_lbl.offset_bottom = -4
-		var tw = p_btn_restart.create_tween()
-		tw.tween_property(p_btn_restart, "scale", Vector2.ONE, 0.1)
-	)
-	p_btn_restart.pivot_offset = Vector2(49, 21)
+	ClayStyle.apply_clay_squish(p_btn_restart, 2.5, 0.92)
 	p_btn_restart.pressed.connect(_direct_restart)
 	btm_hbox.add_child(p_btn_restart)
 
 	var p_btn_home := TextureButton.new()
-	p_btn_home.texture_normal = load("res://assets/ui/settings_buttons/home_normal.svg")
-	p_btn_home.texture_pressed = load("res://assets/ui/settings_buttons/home_pressed.svg")
 	p_btn_home.ignore_texture_size = true
-	p_btn_home.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
-	p_btn_home.custom_minimum_size = Vector2(98, 42)
+	p_btn_home.custom_minimum_size = Vector2(100, 44)
 	
+	var ph_panel := Panel.new()
+	ph_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ph_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var ph_style := ClayStyle.create_clay_button_style(Color("fb923c"), Color("c2410c"), 18, 4, 8, 3, 0.25)
+	ph_panel.add_theme_stylebox_override("panel", ph_style)
+	p_btn_home.add_child(ph_panel)
+
+	var ph_gloss := Panel.new()
+	ph_gloss.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	ph_gloss.anchor_bottom = 0.48
+	ph_gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ph_gloss.add_theme_stylebox_override("panel", ClayStyle.create_clay_highlight_style(18, 0.28))
+	p_btn_home.add_child(ph_gloss)
+
 	var h_lbl = Label.new()
 	h_lbl.text = "Home"
 	h_lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
 	h_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	h_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	h_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	h_lbl.add_theme_font_size_override("font_size", 15)
 	h_lbl.add_theme_color_override("font_color", Color.WHITE)
-	h_lbl.add_theme_color_override("font_outline_color", Color("9a3412"))
-	h_lbl.add_theme_constant_override("outline_size", 4)
-	h_lbl.offset_top = -4
-	h_lbl.offset_bottom = -4
+	h_lbl.add_theme_color_override("font_outline_color", Color("7c2d12"))
+	h_lbl.add_theme_constant_override("outline_size", 3)
 	p_btn_home.add_child(h_lbl)
 	
-	p_btn_home.button_down.connect(func():
-		h_lbl.offset_top = 2
-		h_lbl.offset_bottom = 2
-		var tw = p_btn_home.create_tween()
-		tw.tween_property(p_btn_home, "scale", Vector2(0.96, 0.96), 0.05)
-	)
-	p_btn_home.button_up.connect(func():
-		h_lbl.offset_top = -4
-		h_lbl.offset_bottom = -4
-		var tw = p_btn_home.create_tween()
-		tw.tween_property(p_btn_home, "scale", Vector2.ONE, 0.1)
-	)
-	p_btn_home.pivot_offset = Vector2(49, 21)
+	ClayStyle.apply_clay_squish(p_btn_home, 2.5, 0.92)
 	p_btn_home.pressed.connect(func():
 		get_tree().paused = false
 		var p_gc = get_tree().root.get_node_or_null("GameController") if get_tree() and get_tree().root else null
@@ -2841,28 +2806,8 @@ func _build_hud() -> void:
 	_victory_panel_style.corner_radius_top_left = 32
 	_victory_panel_style.corner_radius_top_right = 32
 	_victory_panel_style.corner_radius_bottom_left = 32
-	_victory_panel_style.corner_radius_bottom_right = 32
-	_victory_panel_style.shadow_color = Color(1.0, 0.78, 0.25, 0.40) # rich golden celebration glow
-	_victory_panel_style.shadow_size = 28
-	_victory_panel_style.shadow_offset = Vector2(0, 6)
-	_victory_panel_style.border_width_left = 3
-	_victory_panel_style.border_width_top = 3
-	_victory_panel_style.border_width_right = 3
-	_victory_panel_style.border_width_bottom = 6
-	_victory_panel_style.border_color = Color("f59e0b")
-
-	# Create a darker alarm-themed panel style specifically for the failure screen (Requirement 1)
-	_failure_panel_style = StyleBoxFlat.new()
-	_failure_panel_style.bg_color = Color("1f1b2e") # deep charcoal background
-	_failure_panel_style.corner_radius_top_left = 32
-	_failure_panel_style.corner_radius_top_right = 32
-	_failure_panel_style.corner_radius_bottom_left = 32
-	_failure_panel_style.corner_radius_bottom_right = 32
-	_failure_panel_style.shadow_color = Color(0.937, 0.267, 0.267, 0.45) # red #ef4444 outer glow
-	_failure_panel_style.shadow_size = 30
-	_failure_panel_style.shadow_offset = Vector2(0, 4)
-	_failure_panel_style.border_width_bottom = 4 # 4px red bottom border
-	_failure_panel_style.border_color = Color("ef4444")
+	_victory_panel_style = ClayStyle.create_clay_panel(Color("fffdf5"), Color("f59e0b"), 32, 7, 28, 8, Color(1.0, 0.78, 0.25, 0.40))
+	_failure_panel_style = ClayStyle.create_clay_panel(Color("1f1b2e"), Color("ef4444"), 32, 6, 28, 6, Color(0.937, 0.267, 0.267, 0.45))
 
 	res_panel.add_theme_stylebox_override("panel", _victory_panel_style)
 	res_center.add_child(res_panel)
@@ -2908,24 +2853,11 @@ func _build_hud() -> void:
 	# --- Reward Badge (+50 COINS) ---
 	reward_badge = PanelContainer.new()
 	reward_badge.custom_minimum_size = Vector2(180, 50)
-	var rb_style := StyleBoxFlat.new()
-	rb_style.bg_color = Color("fef3c7") # warm amber / gold badge
-	rb_style.corner_radius_top_left = 25
-	rb_style.corner_radius_top_right = 25
-	rb_style.corner_radius_bottom_left = 25
-	rb_style.corner_radius_bottom_right = 25
-	rb_style.border_width_left = 2
-	rb_style.border_width_top = 2
-	rb_style.border_width_right = 2
-	rb_style.border_width_bottom = 4
-	rb_style.border_color = Color("f59e0b")
-	rb_style.shadow_color = Color(0.96, 0.62, 0.04, 0.3)
-	rb_style.shadow_size = 12
-	rb_style.shadow_offset = Vector2(0, 3)
-	rb_style.content_margin_left = 16
-	rb_style.content_margin_right = 18
-	rb_style.content_margin_top = 6
-	rb_style.content_margin_bottom = 6
+	var rb_style := ClayStyle.create_clay_pill(Color("fef3c7"), Color("f59e0b"), 5, 16, 5, 0.30)
+	rb_style.content_margin_left = 18
+	rb_style.content_margin_right = 20
+	rb_style.content_margin_top = 8
+	rb_style.content_margin_bottom = 8
 	reward_badge.add_theme_stylebox_override("panel", rb_style)
 	reward_badge.pivot_offset = Vector2(90, 25)
 
@@ -2959,14 +2891,25 @@ func _build_hud() -> void:
 	btn_vbox.add_theme_constant_override("separation", 16)
 	res_vbox.add_child(btn_vbox)
 	
-	# --- Button 1: Next Level (text + callback configured at show time) ---
+	# --- Button 1: Next Level (Claymorphic Green Pill) ---
 	var res_btn_level2 := TextureButton.new()
-	res_btn_level2.texture_normal = load("res://assets/ui/settings_buttons/next_normal.svg")
-	res_btn_level2.texture_pressed = load("res://assets/ui/settings_buttons/next_pressed.svg")
 	res_btn_level2.ignore_texture_size = true
-	res_btn_level2.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
 	res_btn_level2.custom_minimum_size = Vector2(160, 56)
-	res_btn_level2.visible = false  # shown only on victory, text set per-level
+	res_btn_level2.visible = false
+
+	var l2_panel := Panel.new()
+	l2_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	l2_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var l2_style := ClayStyle.create_clay_button_style(Color("22c55e"), Color("15803d"), 24, 6, 14, 5, 0.25)
+	l2_panel.add_theme_stylebox_override("panel", l2_style)
+	res_btn_level2.add_child(l2_panel)
+
+	var l2_gloss := Panel.new()
+	l2_gloss.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	l2_gloss.anchor_bottom = 0.48
+	l2_gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	l2_gloss.add_theme_stylebox_override("panel", ClayStyle.create_clay_highlight_style(24, 0.28))
+	res_btn_level2.add_child(l2_gloss)
 
 	var l2_lbl = Label.new()
 	l2_lbl.text = "NEXT"
@@ -2976,38 +2919,35 @@ func _build_hud() -> void:
 	l2_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	l2_lbl.add_theme_font_size_override("font_size", 20)
 	l2_lbl.add_theme_color_override("font_color", Color.WHITE)
-	l2_lbl.add_theme_color_override("font_outline_color", Color("1e3a8a"))
-	l2_lbl.add_theme_constant_override("outline_size", 6)
-	l2_lbl.offset_top = -4
-	l2_lbl.offset_bottom = -4
+	l2_lbl.add_theme_color_override("font_outline_color", Color("14532d"))
+	l2_lbl.add_theme_constant_override("outline_size", 4)
 	res_btn_level2.add_child(l2_lbl)
 
-	res_btn_level2.button_down.connect(func():
-		l2_lbl.offset_top = 2
-		l2_lbl.offset_bottom = 2
-		var tw = res_btn_level2.create_tween()
-		tw.tween_property(res_btn_level2, "scale", Vector2(0.94, 0.94), 0.05)
-	)
-	res_btn_level2.button_up.connect(func():
-		l2_lbl.offset_top = -4
-		l2_lbl.offset_bottom = -4
-		var tw = res_btn_level2.create_tween()
-		tw.tween_property(res_btn_level2, "scale", Vector2.ONE, 0.1)
-	)
-	res_btn_level2.pivot_offset = Vector2(80, 28)
+	ClayStyle.apply_clay_squish(res_btn_level2, 3.0, 0.93)
 	res_btn_level2.pressed.connect(_on_result_next_pressed)
 	btn_vbox.add_child(res_btn_level2)
 	result_btn = res_btn_level2
 	result_btn_label = l2_lbl
 
-	# --- Button 1b: Retry (shown only on failure) ---
+	# --- Button 1b: Retry (Claymorphic Orange Pill) ---
 	var res_btn_retry := TextureButton.new()
-	res_btn_retry.texture_normal = load("res://assets/ui/settings_buttons/restart_normal.svg")
-	res_btn_retry.texture_pressed = load("res://assets/ui/settings_buttons/restart_pressed.svg")
 	res_btn_retry.ignore_texture_size = true
-	res_btn_retry.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
 	res_btn_retry.custom_minimum_size = Vector2(160, 56)
 	res_btn_retry.visible = false
+
+	var retry_panel := Panel.new()
+	retry_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	retry_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var retry_style := ClayStyle.create_clay_button_style(Color("fb923c"), Color("c2410c"), 24, 6, 14, 5, 0.25)
+	retry_panel.add_theme_stylebox_override("panel", retry_style)
+	res_btn_retry.add_child(retry_panel)
+
+	var retry_gloss := Panel.new()
+	retry_gloss.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	retry_gloss.anchor_bottom = 0.48
+	retry_gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	retry_gloss.add_theme_stylebox_override("panel", ClayStyle.create_clay_highlight_style(24, 0.28))
+	res_btn_retry.add_child(retry_gloss)
 
 	var retry_lbl = Label.new()
 	retry_lbl.text = "Retry"
@@ -3018,24 +2958,10 @@ func _build_hud() -> void:
 	retry_lbl.add_theme_font_size_override("font_size", 20)
 	retry_lbl.add_theme_color_override("font_color", Color.WHITE)
 	retry_lbl.add_theme_color_override("font_outline_color", Color("7c2d12"))
-	retry_lbl.add_theme_constant_override("outline_size", 6)
-	retry_lbl.offset_top = -4
-	retry_lbl.offset_bottom = -4
+	retry_lbl.add_theme_constant_override("outline_size", 4)
 	res_btn_retry.add_child(retry_lbl)
 
-	res_btn_retry.button_down.connect(func():
-		retry_lbl.offset_top = 2
-		retry_lbl.offset_bottom = 2
-		var tw = res_btn_retry.create_tween()
-		tw.tween_property(res_btn_retry, "scale", Vector2(0.94, 0.94), 0.05)
-	)
-	res_btn_retry.button_up.connect(func():
-		retry_lbl.offset_top = -4
-		retry_lbl.offset_bottom = -4
-		var tw = res_btn_retry.create_tween()
-		tw.tween_property(res_btn_retry, "scale", Vector2.ONE, 0.1)
-	)
-	res_btn_retry.pivot_offset = Vector2(80, 28)
+	ClayStyle.apply_clay_squish(res_btn_retry, 3.0, 0.93)
 	res_btn_retry.pressed.connect(_on_result_retry_pressed)
 	btn_vbox.add_child(res_btn_retry)
 	result_retry_btn = res_btn_retry
@@ -3050,41 +2976,39 @@ func _build_hud() -> void:
 	result_subtitle_label.visible = false
 	btn_vbox.add_child(result_subtitle_label)
 	
-	# --- Button 2: Home (Failure only) ---
+	# --- Button 2: Home (Claymorphic Slate-Blue Pill) ---
 	var res_btn_home := TextureButton.new()
-	res_btn_home.texture_normal = load("res://assets/ui/settings_buttons/home_normal.svg")
-	res_btn_home.texture_pressed = load("res://assets/ui/settings_buttons/home_pressed.svg")
 	res_btn_home.ignore_texture_size = true
-	res_btn_home.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
 	res_btn_home.custom_minimum_size = Vector2(160, 56)
 	res_btn_home.visible = false
 	
+	var rh_panel := Panel.new()
+	rh_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	rh_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var rh_style := ClayStyle.create_clay_button_style(Color("64748b"), Color("334155"), 24, 6, 14, 5, 0.25)
+	rh_panel.add_theme_stylebox_override("panel", rh_style)
+	res_btn_home.add_child(rh_panel)
+
+	var rh_gloss := Panel.new()
+	rh_gloss.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	rh_gloss.anchor_bottom = 0.48
+	rh_gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rh_gloss.add_theme_stylebox_override("panel", ClayStyle.create_clay_highlight_style(24, 0.28))
+	res_btn_home.add_child(rh_gloss)
+
 	var rh_lbl = Label.new()
 	rh_lbl.text = "Home"
 	rh_lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
 	rh_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	rh_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	rh_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	rh_lbl.add_theme_font_size_override("font_size", 20)
 	rh_lbl.add_theme_color_override("font_color", Color.WHITE)
-	rh_lbl.add_theme_color_override("font_outline_color", Color("9a3412"))
-	rh_lbl.add_theme_constant_override("outline_size", 6)
-	rh_lbl.offset_top = -4
-	rh_lbl.offset_bottom = -4
+	rh_lbl.add_theme_color_override("font_outline_color", Color("1e293b"))
+	rh_lbl.add_theme_constant_override("outline_size", 4)
 	res_btn_home.add_child(rh_lbl)
 	
-	res_btn_home.button_down.connect(func():
-		rh_lbl.offset_top = 2
-		rh_lbl.offset_bottom = 2
-		var tw = res_btn_home.create_tween()
-		tw.tween_property(res_btn_home, "scale", Vector2(0.94, 0.94), 0.05)
-	)
-	res_btn_home.button_up.connect(func():
-		rh_lbl.offset_top = -4
-		rh_lbl.offset_bottom = -4
-		var tw = res_btn_home.create_tween()
-		tw.tween_property(res_btn_home, "scale", Vector2.ONE, 0.1)
-	)
-	res_btn_home.pivot_offset = Vector2(80, 28)
+	ClayStyle.apply_clay_squish(res_btn_home, 3.0, 0.93)
 	res_btn_home.pressed.connect(func():
 		_stop_failure_animations()
 		_play_sfx("ui")
@@ -3096,7 +3020,7 @@ func _build_hud() -> void:
 	btn_vbox.add_child(res_btn_home)
 	result_home_btn = res_btn_home
 
-	# --- Restart Confirmation Popup ---
+	# --- Restart Confirmation Popup (Claymorphic) ---
 	restart_confirm_overlay = Control.new()
 	restart_confirm_overlay.name = "RestartConfirmOverlay"
 	restart_confirm_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -3120,28 +3044,15 @@ func _build_hud() -> void:
 
 	var rc_panel := PanelContainer.new()
 	rc_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var rc_style = StyleBoxFlat.new()
-	rc_style.bg_color = Color("fcf8ef")
-	rc_style.corner_radius_top_left = 32
-	rc_style.corner_radius_top_right = 32
-	rc_style.corner_radius_bottom_left = 32
-	rc_style.corner_radius_bottom_right = 32
-	rc_style.shadow_color = Color(0, 0, 0, 0.3)
-	rc_style.shadow_size = 14
-	rc_style.shadow_offset = Vector2(0, 8)
-	rc_style.border_width_bottom = 6
-	rc_style.border_color = Color("e0d2b8")
+	var rc_style := ClayStyle.create_clay_panel(Color("fffdf7"), Color("e6d8c3"), 28, 6, 22, 8, Color(0, 0, 0, 0.25))
 	rc_panel.add_theme_stylebox_override("panel", rc_style)
 	rc_wrapper.add_child(rc_panel)
 
-	var rc_gloss = Panel.new()
+	var rc_gloss := Panel.new()
 	rc_gloss.set_anchors_preset(Control.PRESET_FULL_RECT)
 	rc_gloss.anchor_bottom = 0.5
 	rc_gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var rcg_style = StyleBoxFlat.new()
-	rcg_style.bg_color = Color(1, 1, 1, 0.18)
-	rcg_style.corner_radius_top_left = 32
-	rcg_style.corner_radius_top_right = 32
+	var rcg_style := ClayStyle.create_clay_highlight_style(28, 0.22)
 	rc_gloss.add_theme_stylebox_override("panel", rcg_style)
 	rc_wrapper.add_child(rc_gloss)
 
@@ -3445,69 +3356,7 @@ func _confirm_restart_no() -> void:
 	get_tree().paused = _was_paused_before_confirm
 
 func _create_procedural_glossy_button(btn_text: String, bg_color: Color, border_color: Color, on_click: Callable, min_size: Vector2 = Vector2(104, 44)) -> Control:
-	var wrapper = Control.new()
-	wrapper.custom_minimum_size = min_size
-	
-	var panel = PanelContainer.new()
-	panel.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var style = StyleBoxFlat.new()
-	style.bg_color = bg_color
-	style.corner_radius_top_left = 12
-	style.corner_radius_top_right = 12
-	style.corner_radius_bottom_left = 12
-	style.corner_radius_bottom_right = 12
-	style.border_width_bottom = 4
-	style.border_color = border_color
-	style.shadow_color = Color(0,0,0,0.2)
-	style.shadow_size = 3
-	style.shadow_offset = Vector2(0, 3)
-	panel.add_theme_stylebox_override("panel", style)
-	wrapper.add_child(panel)
-	
-	var gloss = Panel.new()
-	gloss.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	gloss.anchor_bottom = 0.5
-	gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var g_style = StyleBoxFlat.new()
-	g_style.bg_color = Color(1, 1, 1, 0.3)
-	g_style.corner_radius_top_left = 12
-	g_style.corner_radius_top_right = 12
-	gloss.add_theme_stylebox_override("panel", g_style)
-	wrapper.add_child(gloss)
-	
-	var lbl = Label.new()
-	lbl.text = btn_text
-	lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
-	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	lbl.add_theme_font_size_override("font_size", 16)
-	lbl.add_theme_color_override("font_color", Color.WHITE)
-	lbl.add_theme_color_override("font_outline_color", border_color)
-	lbl.add_theme_constant_override("outline_size", 3)
-	wrapper.add_child(lbl)
-	
-	var btn = Button.new()
-	btn.set_anchors_preset(Control.PRESET_FULL_RECT)
-	btn.flat = true
-	btn.modulate = Color(1,1,1,0.01)
-	btn.button_down.connect(func():
-		var tw = wrapper.create_tween()
-		tw.tween_property(wrapper, "position:y", 3.0, 0.05)
-		tw.parallel().tween_property(panel, "theme_override_styles/panel:border_width_bottom", 1, 0.05)
-		tw.parallel().tween_property(panel, "theme_override_styles/panel:shadow_size", 0, 0.05)
-		tw.parallel().tween_property(panel, "theme_override_styles/panel:shadow_offset", Vector2(0,0), 0.05)
-	)
-	btn.button_up.connect(func():
-		var tw = wrapper.create_tween()
-		tw.tween_property(wrapper, "position:y", 0.0, 0.1)
-		tw.parallel().tween_property(panel, "theme_override_styles/panel:border_width_bottom", 4, 0.1)
-		tw.parallel().tween_property(panel, "theme_override_styles/panel:shadow_size", 3, 0.1)
-		tw.parallel().tween_property(panel, "theme_override_styles/panel:shadow_offset", Vector2(0,3), 0.1)
-	)
-	btn.pressed.connect(on_click)
-	wrapper.add_child(btn)
-	
-	return wrapper
+	return ClayStyle.create_clay_button(btn_text, bg_color, border_color, on_click, min_size, 16, 20, 4, border_color, 2)
 
 func _setup_toast_ui() -> void:
 	if _toast_container != null:
@@ -3531,24 +3380,14 @@ func _setup_toast_ui() -> void:
 	_toast_panel = PanelContainer.new()
 	_toast_panel.name = "ToastPanel"
 	_toast_panel.visible = false
-	var sb = StyleBoxFlat.new()
-	sb.bg_color = Color(0.14, 0.16, 0.22, 0.94)
-	sb.set_corner_radius_all(12)
-	sb.border_width_left = 1
-	sb.border_width_top = 1
-	sb.border_width_right = 1
-	sb.border_width_bottom = 2
-	sb.border_color = Color(0.95, 0.35, 0.35, 0.85)
-	sb.shadow_color = Color(0, 0, 0, 0.30)
-	sb.shadow_size = 4
-	sb.shadow_offset = Vector2(0, 2)
+	var sb := ClayStyle.create_clay_pill(Color(0.14, 0.16, 0.24, 0.96), Color(0.95, 0.35, 0.35, 0.90), 3, 10, 4, 0.28)
 	_toast_panel.add_theme_stylebox_override("panel", sb)
 	
 	var m = MarginContainer.new()
-	m.add_theme_constant_override("margin_left", 14)
-	m.add_theme_constant_override("margin_right", 14)
-	m.add_theme_constant_override("margin_top", 4)
-	m.add_theme_constant_override("margin_bottom", 4)
+	m.add_theme_constant_override("margin_left", 18)
+	m.add_theme_constant_override("margin_right", 18)
+	m.add_theme_constant_override("margin_top", 6)
+	m.add_theme_constant_override("margin_bottom", 6)
 	_toast_panel.add_child(m)
 	
 	var hb = HBoxContainer.new()
@@ -3935,31 +3774,33 @@ func _create_custom_toggle(text: String, icon_path: String, is_on: bool, on_togg
 	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(lbl)
 
-	const PILL_W := 52.0
-	const PILL_H := 30.0
-	const KNOB := 21.0
+	# Procedural Clay toggle pill
+	const PILL_W := 54.0
+	const PILL_H := 32.0
+	const KNOB := 22.0
 	const PAD := 5.0
 
 	var pill := Panel.new()
 	pill.custom_minimum_size = Vector2(PILL_W, PILL_H)
 	pill.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
-	var pill_style := StyleBoxFlat.new()
-	pill_style.bg_color = Color("22c55e") if is_on else Color("d1d5db")
-	pill_style.set_corner_radius_all(int(PILL_H / 2))
+	var pill_style := ClayStyle.create_clay_pill(
+		Color("22c55e") if is_on else Color("cbd5e1"),
+		Color("15803d") if is_on else Color("94a3b8"),
+		3, 8, 2, 0.16
+	)
 	pill.add_theme_stylebox_override("panel", pill_style)
 	
-	var t_gloss = Panel.new()
+	var t_gloss := Panel.new()
 	t_gloss.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	t_gloss.anchor_bottom = 0.5
+	t_gloss.anchor_bottom = 0.48
 	t_gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var tg_style = StyleBoxFlat.new()
-	tg_style.bg_color = Color(1, 1, 1, 0.4)
+	var tg_style := ClayStyle.create_clay_highlight_style(int(PILL_H / 2), 0.32)
 	t_gloss.add_theme_stylebox_override("panel", tg_style)
 	pill.add_child(t_gloss)
 	
 	if is_on:
 		var shine = ColorRect.new()
-		shine.color = Color(1, 1, 1, 0.5)
+		shine.color = Color(1, 1, 1, 0.4)
 		shine.rotation_degrees = 25
 		shine.size = Vector2(10, 100)
 		shine.position = Vector2(-50, -20)
@@ -3980,14 +3821,7 @@ func _create_custom_toggle(text: String, icon_path: String, is_on: bool, on_togg
 		(PILL_W - KNOB - PAD) if is_on else PAD,
 		(PILL_H - KNOB) / 2.0
 	)
-	var knob_style := StyleBoxFlat.new()
-	knob_style.bg_color = Color.WHITE
-	knob_style.set_corner_radius_all(int(KNOB / 2))
-	knob_style.border_width_bottom = 2
-	knob_style.border_color = Color("e5e7eb")
-	knob_style.shadow_color = Color(0, 0, 0, 0.20)
-	knob_style.shadow_size = 3
-	knob_style.shadow_offset = Vector2(0, 1)
+	var knob_style := ClayStyle.create_clay_button_style(Color("ffffff"), Color("cbd5e1"), int(KNOB / 2), 3, 5, 2, 0.22)
 	knob.add_theme_stylebox_override("panel", knob_style)
 	inside.add_child(knob)
 
@@ -4005,9 +3839,12 @@ func _create_custom_toggle(text: String, icon_path: String, is_on: bool, on_togg
 	hit.pressed.connect(func():
 		_play_sfx("ui")
 		state["on"] = not state["on"]
-		var on = state["on"]
-		pill_style.bg_color = Color("22c55e") if on else Color("9ca3af")
-		knob.position.x = (PILL_W - KNOB - PAD) if on else PAD
+		var on: bool = state["on"]
+		pill_style.bg_color = Color("22c55e") if on else Color("cbd5e1")
+		pill_style.border_color = Color("15803d") if on else Color("94a3b8")
+		var target_x: float = (PILL_W - KNOB - PAD) if on else PAD
+		var ktw := knob.create_tween()
+		ktw.tween_property(knob, "position:x", target_x, 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		on_toggle.call(on)
 	)
 
@@ -4024,56 +3861,40 @@ func _create_close_button(on_close: Callable) -> Button:
 	btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	btn.focus_mode = Control.FOCUS_NONE
 	
-	var c_style = StyleBoxFlat.new()
-	c_style.bg_color = Color("ef4444")
-	c_style.set_corner_radius_all(22)
-	c_style.shadow_color = Color(0, 0, 0, 0.35)
-	c_style.shadow_size = 5
-	c_style.shadow_offset = Vector2(0, 3)
-	c_style.border_width_bottom = 3
-	c_style.border_color = Color("b91c1c")
+	var c_style := ClayStyle.create_clay_button_style(Color("ef4444"), Color("b91c1c"), 22, 4, 10, 4, 0.25)
 	btn.add_theme_stylebox_override("normal", c_style)
 	
-	var c_hover = c_style.duplicate()
+	var c_hover := c_style.duplicate()
 	c_hover.bg_color = Color("f87171")
 	btn.add_theme_stylebox_override("hover", c_hover)
 	
-	var c_pressed = c_style.duplicate()
+	var c_pressed := c_style.duplicate()
 	c_pressed.bg_color = Color("dc2626")
-	c_pressed.shadow_size = 1
-	c_pressed.shadow_offset = Vector2(0, 1)
+	c_pressed.border_width_bottom = 2
+	c_pressed.shadow_size = 4
+	c_pressed.shadow_offset = Vector2(0, 2)
 	btn.add_theme_stylebox_override("pressed", c_pressed)
 	
-	var cg = Panel.new()
+	var cg := Panel.new()
 	cg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	cg.anchor_bottom = 0.5
 	cg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var cgs = StyleBoxFlat.new()
-	cgs.bg_color = Color(1, 1, 1, 0.35)
-	cgs.corner_radius_top_left = 22
-	cgs.corner_radius_top_right = 22
+	var cgs := ClayStyle.create_clay_highlight_style(22, 0.35)
 	cg.add_theme_stylebox_override("panel", cgs)
 	btn.add_child(cg)
 	
-	var icon = TextureRect.new()
+	var icon := TextureRect.new()
 	icon.texture = load("res://assets/ui/icons/close.svg")
 	icon.ignore_texture_size = true
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon.custom_minimum_size = Vector2(18, 18)
 	icon.size = Vector2(18, 18)
-	icon.position = Vector2(13, 12)
+	icon.position = Vector2(13, 11)
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	btn.add_child(icon)
 	
 	btn.pivot_offset = Vector2(22, 22)
-	btn.button_down.connect(func():
-		var tw = btn.create_tween()
-		tw.tween_property(btn, "scale", Vector2(0.92, 0.92), 0.05).set_trans(Tween.TRANS_QUAD)
-	)
-	btn.button_up.connect(func():
-		var tw = btn.create_tween()
-		tw.tween_property(btn, "scale", Vector2.ONE, 0.08).set_trans(Tween.TRANS_QUAD)
-	)
+	ClayStyle.apply_clay_squish(btn, 2.5, 0.90)
 	btn.pressed.connect(func():
 		_play_sfx("ui")
 		on_close.call()
