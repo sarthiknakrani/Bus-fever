@@ -190,6 +190,8 @@ var _last_starvation_diagnostic: Dictionary = {}
 var _vehicle_incoming_runners: Dictionary = {} # vehicle_id -> int
 var _runner_spawn_timer: float = 0.0
 const RUNNER_SPAWN_INTERVAL: float = 0.035
+var _departure_queue: Array[Dictionary] = []
+var _is_bus_departing: bool = false
 
 @export var passenger_normal_speed: float = 335.0
 @export var passenger_sprint_speed: float = 380.0
@@ -218,7 +220,7 @@ func _calc_lane_pos(center_pos: Vector2, normal: Vector2, lane: int) -> Vector2:
 	# Natural gentle convergence near gateway neck (x in [-60, 60] and y > 80.0)
 	if absf(center_pos.x) < 60.0 and center_pos.y > 80.0:
 		var neck_factor: float = clampf(1.0 - (absf(center_pos.x) / 60.0), 0.0, 1.0)
-		dynamic_spacing = lerpf(dynamic_spacing, 23.5, neck_factor * 0.25)
+		dynamic_spacing = lerpf(dynamic_spacing, 15.5, neck_factor * 0.25)
 	var lane_offset: float = (float(lane) - 1.5) * dynamic_spacing
 	return center_pos + normal * lane_offset
 
@@ -389,8 +391,10 @@ func _process(delta: float) -> void:
 					if _entrance_active:
 						# During entrance parade, merge behind the preceding row.
 						# Clearance is guaranteed by gated lead row spacing.
-						var req_clear: float = 28.0
-						if min_ahead < req_clear or min_behind < req_clear:
+						var req_clear: float = 28.5
+						if min_ahead < req_clear:
+							merge_clear = false
+						if _circulating_rows.size() >= 30 and min_behind < req_clear:
 							merge_clear = false
 					else:
 						# In normal circulation mode, only merge into genuine vacated gaps (>= 48px)
@@ -507,8 +511,9 @@ func _process(delta: float) -> void:
 					else:
 						speed = base_circ_spd
 				else:
-					if dist_ahead < ROW_SPACING * 0.88:
-						speed = base_circ_spd * 0.82
+					if dist_ahead < ROW_SPACING:
+						var brake_fac = clampf((dist_ahead - MIN_ROW_GAP) / (ROW_SPACING - MIN_ROW_GAP + 1.0), 0.0, 1.0)
+						speed = base_circ_spd * (0.2 + 0.8 * brake_fac)
 					else:
 						speed = base_circ_spd
 
@@ -1110,6 +1115,8 @@ func _setup_visuals(lvl: CarJamLevelData) -> void:
 	_feeder_rows.clear()
 	_pending_feeder_rows.clear()
 	_lead_feeder_committed = false
+	_departure_queue.clear()
+	_is_bus_departing = false
 	if is_instance_valid(passenger_track):
 		passenger_track.queue_free()
 		passenger_track = null
@@ -1359,6 +1366,8 @@ func _init_passenger_track() -> void:
 	_feeder_rows.clear()
 	_pending_feeder_rows.clear()
 	_lead_feeder_committed = false
+	_departure_queue.clear()
+	_is_bus_departing = false
 
 	# Passenger queue sequence
 	var all_queue_p: Array[Dictionary] = []
@@ -1742,8 +1751,18 @@ func _on_boarding_started(vehicle_id: int, _color_id: String, _count: int, _slot
 
 func _on_vehicle_filled(vehicle_id: int, slot_id: int) -> void:
 	print("[QA %d] Bus %d boarding completed." % [Time.get_ticks_msec(), vehicle_id])
+	if _is_bus_departing:
+		print("[QA %d] Bus %d departure queued (another bus currently departing)." % [Time.get_ticks_msec(), vehicle_id])
+		_departure_queue.append({"vehicle_id": vehicle_id, "slot_id": slot_id})
+		return
+	_start_vehicle_departure(vehicle_id, slot_id)
+
+func _start_vehicle_departure(vehicle_id: int, slot_id: int) -> void:
+	_is_bus_departing = true
 	var vv: VehicleView = vehicle_views.get(vehicle_id, null)
 	if vv == null:
+		_is_bus_departing = false
+		_check_next_departure()
 		return
 
 	_play_sfx("depart")
@@ -1777,6 +1796,11 @@ func _on_vehicle_filled(vehicle_id: int, slot_id: int) -> void:
 		road_y
 	)
 
+func _check_next_departure() -> void:
+	if not _is_bus_departing and not _departure_queue.is_empty():
+		var next_dep: Dictionary = _departure_queue.pop_front()
+		_start_vehicle_departure(next_dep["vehicle_id"], next_dep["slot_id"])
+
 func _on_vehicle_departed(vehicle_id: int, slot_id: int) -> void:
 	if slot_id < slot_views.size():
 		slot_views[slot_id].set_state(CarJamParkingManager.SlotState.EMPTY)
@@ -1785,6 +1809,8 @@ func _on_vehicle_departed(vehicle_id: int, slot_id: int) -> void:
 		if vv.get_parent() != null:
 			vv.get_parent().remove_child(vv)
 		vv.queue_free()
+	_is_bus_departing = false
+	_check_next_departure()
 	_re_evaluate_waiting_queues()
 
 func _re_evaluate_waiting_queues() -> void:
@@ -3230,7 +3256,7 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 	var track_y = track_bottom - (track_h / 2.0)
 	var plat_top = parking_y - (parking_h / 2.0) - 18.0
 	var separator_y = divider_y
-	departure_road_y = divider_y - 58.5 # Centerline of the grey platform roadway apron
+	departure_road_y = divider_y - 36.0 # Centerline of the grey platform roadway apron
 
 	# Lower elements: centered inside the 60% bottom space (between divider_y and btm_safe_y)
 	var avail_lower_h = btm_safe_y - divider_y

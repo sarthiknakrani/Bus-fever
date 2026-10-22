@@ -202,16 +202,16 @@ func test_dispatch_in_frame_all_resolutions() -> void:
 
 					if forward_world.y > 0.2:
 						var bottom_y = clampf(exit_pt.y + 40.0, exit_pt.y, safe_max_y - 20.0)
-						var side_x = (safe_min_x + 25.0) if target_slot_pos.x <= 0.0 else (safe_max_x - 25.0)
+						var side_x = (safe_min_x + 38.0) if target_slot_pos.x <= 0.0 else (safe_max_x - 38.0)
 						pts.append(Vector2(clamped_exit.x, bottom_y))
 						pts.append(Vector2(side_x, bottom_y))
 						pts.append(Vector2(side_x, corridor_pos.y))
 					elif forward_world.x < -0.2:
-						var side_x = clampf(minf(clamped_exit.x - 20.0, -180.0), safe_min_x + 25.0, -80.0)
+						var side_x = clampf(minf(clamped_exit.x - 20.0, -180.0), safe_min_x + 38.0, -80.0)
 						pts.append(Vector2(side_x, clamped_exit.y))
 						pts.append(Vector2(side_x, corridor_pos.y))
 					elif forward_world.x > 0.2:
-						var side_x = clampf(maxf(clamped_exit.x + 20.0, 180.0), 80.0, safe_max_x - 25.0)
+						var side_x = clampf(maxf(clamped_exit.x + 20.0, 180.0), 80.0, safe_max_x - 38.0)
 						pts.append(Vector2(side_x, clamped_exit.y))
 						pts.append(Vector2(side_x, corridor_pos.y))
 
