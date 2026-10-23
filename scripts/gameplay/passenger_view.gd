@@ -24,6 +24,8 @@ const BASE_SCALE := 0.31
 const IDLE_FRAME := 6
 const RUN_FRAMES := 6
 const TOTAL_FRAMES := 8
+const STRIDE_DISTANCE: float = 36.0
+@export var stride_distance: float = STRIDE_DISTANCE
 
 func set_movement_direction(tangent: Vector2) -> void:
 	if absf(tangent.x) > 0.2:
@@ -135,7 +137,7 @@ func _process(delta: float) -> void:
 		else:
 			# Real Running Cycle synchronized directly with movement distance
 			# Frame changes smoothly across all 8 running frames with actual travel speed (stride ~ 36px)
-			_anim_time += moved_dist / 36.0
+			_anim_time += moved_dist / maxf(1.0, stride_distance)
 			if _is_animated and _char_sprite != null:
 				var norm_t: float = wrapf(_anim_time + _phase_offset, 0.0, 1.0)
 				var run_frame: int = clampi(int(floor(norm_t * float(RUN_FRAMES))), 0, RUN_FRAMES - 1)
