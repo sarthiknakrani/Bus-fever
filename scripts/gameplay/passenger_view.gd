@@ -52,7 +52,7 @@ func setup(p_col_id: String, p_id: int = 0, p_lane: int = 0) -> void:
 	if t_shadow != null:
 		_shadow.texture = t_shadow
 	_shadow.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
-	_shadow.position = Vector2(0, 0)
+	_shadow.position = Vector2(0, 16.0)
 	_shadow.scale = Vector2(BASE_SCALE * 1.5, BASE_SCALE * 0.75)
 	_shadow.modulate = Color(0, 0, 0, 0.45)
 	_shadow.z_index = -1
@@ -90,9 +90,9 @@ func setup(p_col_id: String, p_id: int = 0, p_lane: int = 0) -> void:
 		else:
 			_is_animated = false
 	
-	# In our 192x192 canvas, ground contact is at y = 180 (84px below center 96)
-	# Setting offset to Vector2(0, -84) aligns feet precisely at (0, 0) in local space
-	_char_sprite.offset = Vector2(0, -84)
+	# In our 192x192 canvas, 3D passenger circle (80x80) is centered at y = 141 (45px below frame center 96)
+	# Setting offset to Vector2(0, -45) centers the 3D clay sphere precisely at (0, 0) in local space
+	_char_sprite.offset = Vector2(0, -45)
 	_visual_node.add_child(_char_sprite)
 	
 	_visual_node.scale = Vector2(BASE_SCALE, BASE_SCALE)
@@ -180,8 +180,8 @@ func animate_jump(delay: float) -> void:
 		var tw_s := create_tween()
 		if delay > 0.0:
 			tw_s.tween_interval(delay)
-		tw_s.tween_property(_shadow, "scale", Vector2(0.18, 0.095), 0.08)
-		tw_s.tween_property(_shadow, "scale", Vector2(0.36, 0.19), 0.08)
+		tw_s.tween_property(_shadow, "scale", Vector2(BASE_SCALE * 0.75, BASE_SCALE * 0.38), 0.08)
+		tw_s.tween_property(_shadow, "scale", Vector2(BASE_SCALE * 1.5, BASE_SCALE * 0.75), 0.08)
 
 func _load_interim_sprite(path: String) -> Texture2D:
 	if ResourceLoader.exists(path):

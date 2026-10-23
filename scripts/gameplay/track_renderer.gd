@@ -16,8 +16,8 @@ var outer_meet_pt := Vector2.ZERO
 var inner_meet_ang: float = -0.65
 var outer_meet_ang: float = 0.09
 
-# Snug geometry constants: tight fit to 4-across passengers (76.5px total passenger span)
-const ROAD_HALF_WIDTH: float = 43.0
+# Snug geometry constants: tight fit to 4-across passengers (86.1px total passenger span)
+const ROAD_HALF_WIDTH: float = 45.0
 const GATEWAY_HALF_WIDTH: float = 67.5 # 1.5X width (was 45.0) for spacious crosswalk path
 
 const COLOR_ROAD := Color("767786") # Authoritative road grey matching PlatformView
@@ -115,8 +115,8 @@ func _draw() -> void:
 	var r_center: float = 115.0
 	var c_left := Vector2(-straight_x, 0.0)
 	var c_right := Vector2(straight_x, 0.0)
-	var r_outer: float = r_center + ROAD_HALF_WIDTH # 168.0
-	var r_inner: float = r_center - ROAD_HALF_WIDTH # 62.0
+	var r_outer: float = r_center + ROAD_HALF_WIDTH # 160.0
+	var r_inner: float = r_center - ROAD_HALF_WIDTH # 70.0
 	var w: float = ROAD_HALF_WIDTH
 	var x_gate: float = GATEWAY_HALF_WIDTH
 	var plat_y: float = 196.0 # Connects seamlessly to platform apron at W2 waypoint
@@ -433,6 +433,20 @@ func _draw_road_camber(straight_x: float, r_center: float, c_l: Vector2, c_r: Ve
 	draw_polyline(c_pts, Color(1.0, 1.0, 1.0, 0.07), 16.0, true)
 	draw_polyline(c_pts, Color(1.0, 1.0, 1.0, 0.05), 6.0, true)
 
+	# Feeder road camber crown highlight matching the oval
+	if feeder_curve != null:
+		var f_pts = feeder_curve.get_baked_points()
+		if f_pts.size() >= 2:
+			var f_camber_pts := PackedVector2Array()
+			for pt in f_pts:
+				if pt.distance_to(c_r) <= (r_center + ROAD_HALF_WIDTH - 2.0):
+					break
+				f_camber_pts.append(pt)
+			if f_camber_pts.size() >= 2:
+				draw_polyline(f_camber_pts, Color(1.0, 1.0, 1.0, 0.09), 32.0, true)
+				draw_polyline(f_camber_pts, Color(1.0, 1.0, 1.0, 0.07), 16.0, true)
+				draw_polyline(f_camber_pts, Color(1.0, 1.0, 1.0, 0.05), 6.0, true)
+
 func _draw_gateway_crosswalk(x_gate: float, r_outer: float, plat_y: float) -> void:
 	# 7 white 3D zebra crosswalk bars spanning across 1.5X gateway width (135px)
 	var num_bars := 7
@@ -483,6 +497,26 @@ func _draw_lane_guidelines(straight_x: float, r_center: float, c_l: Vector2, c_r
 			var ang = PI / 2.0 - (float(i) / 24.0) * PI
 			pts.append(c_r + Vector2(cos(ang), sin(ang)) * r_div)
 		_draw_dashed_path(pts, COLOR_LANE_MARKING, 1.8, 9.0, 11.0)
+
+	# Feeder 3 dashed lane divider guidelines matching the oval
+	if feeder_curve != null:
+		var f_pts = feeder_curve.get_baked_points()
+		if f_pts.size() >= 2:
+			for l_off in lane_divs:
+				var f_div_pts := PackedVector2Array()
+				for i in range(f_pts.size()):
+					var pt = f_pts[i]
+					var t: Vector2
+					if i < f_pts.size() - 1:
+						t = (f_pts[i + 1] - pt).normalized()
+					else:
+						t = (pt - f_pts[i - 1]).normalized()
+					var n = Vector2(-t.y, t.x)
+					var p_lane = pt + n * l_off
+					if p_lane.distance_to(c_r) <= (r_center + ROAD_HALF_WIDTH - 2.0):
+						break
+					f_div_pts.append(p_lane)
+				_draw_dashed_path(f_div_pts, COLOR_LANE_MARKING, 1.8, 9.0, 11.0)
 
 func _draw_dashed_path(pts: PackedVector2Array, col: Color, width: float, dash_len: float, gap_len: float) -> void:
 	if pts.size() < 2: return

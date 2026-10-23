@@ -33,7 +33,7 @@ func _build_lagoon_accents() -> void:
 
 func _on_draw_lagoon() -> void:
 	var sx: float = 105.0
-	var r: float = 62.0
+	var r: float = 70.0 # Matches r_inner = r_center (115.0) - ROAD_HALF_WIDTH (45.0) = 70.0
 	var cl := Vector2(-sx, 0.0)
 	var cr := Vector2(sx, 0.0)
 	var n_arc := 36
