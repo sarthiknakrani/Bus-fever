@@ -142,8 +142,8 @@ func _process(delta: float) -> void:
 				_char_sprite.frame = run_frame
 			
 			if _char_sprite != null:
-				# Subtle forward lean in running direction
-				_char_sprite.rotation = facing_sign * deg_to_rad(2.5)
+				# Completely stable running without up/down bobbing or tilting
+				_char_sprite.rotation = 0.0
 				_char_sprite.position.y = 0.0
 				_char_sprite.scale = Vector2(facing_sign, 1.0)
 			
