@@ -23,7 +23,7 @@ const COLOR_CURB_FACE := Color("4b4d5a") # Vertical 3D curb wall face
 const COLOR_CURB_HIGHLIGHT := Color("ffffff")
 const COLOR_CURB_BEVEL := Color("a5abc2")
 const COLOR_CURB_BEVEL_OUTER := Color("868ba0")
-const COLOR_SHADOW := Color(0.04, 0.10, 0.04, 0.22)
+const COLOR_SHADOW := Color(0.01, 0.08, 0.20, 0.28) # Soft contact shadow onto water
 const COLOR_PLAYFIELD := Color("d2d5e4") # Swatch 1 light lavender playfield
 
 func setup_full(
@@ -197,7 +197,7 @@ func _draw() -> void:
 	const PLAT_WALL_H: float = 8.0
 	const PLAT_WALL_LEFT := Color("343746")
 	const PLAT_WALL_RIGHT := Color("292b36")
-	const PLAT_WALL_SHADOW := Color(0.01, 0.05, 0.01, 0.40)
+	const PLAT_WALL_SHADOW := Color(0.01, 0.06, 0.18, 0.40)
 
 	_draw_platform_wall_quads(left_curb, PLAT_WALL_H, PLAT_WALL_LEFT)
 	_draw_platform_wall_quads(right_curb, PLAT_WALL_H, PLAT_WALL_RIGHT)

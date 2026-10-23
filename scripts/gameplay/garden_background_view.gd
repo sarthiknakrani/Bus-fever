@@ -1,45 +1,42 @@
 extends Control
 class_name GardenBackgroundView
 
-## Production-Quality 2.5D Stylized Garden Environment
-## Renders a polished casual mobile puzzle park/garden surface with:
-## - Manicured lawn mower diagonal striping with sunlit ambient gradient
-## - Volumetric 2.5D green cartoon trees & lush hedge clusters
-## - Clean stone garden accents and contact drop shadows
-## 100% cohesive, clean green casual game art style, zero clutter.
+## Stylized 3D Tropical Water Environment
+## Renders a vibrant, casual-mobile 3D ocean/lagoon water surface behind the elevated track:
+## - Deep tropical Caribbean turquoise & azure gradient water
+## - 2.5D perspective wave bands with sunlit crest highlights and trough shadows
+## - Dynamic animated wave drift, organic caustics, and sparkling diamond sun glints
+## - Shoreline contact foam hugging the elevated concrete track and platform walls
+## - Charming 3D toy nautical lifebuoys bobbing with water physics
+## - 100% clean, crisp casual puzzle game art style, zero clutter.
 
-const COLOR_LAWN_LIGHT := Color("6cbf4b") # Light grass green #6CBF4B matching reference
-const COLOR_LAWN_DARK := Color("61b241")  # Medium lawn green #61B241 matching reference
-const COLOR_TREE_SHADOW := Color("1b3607")# Deep shadow under tree canopy
-const COLOR_TREE_BODY := Color("3b7512")  # Lush green tree foliage
-const COLOR_TREE_LIGHT := Color("6dc220") # Sunlit tree highlight
-const COLOR_TREE_TIP := Color("9ae63c")   # Brightest top-left sun specular
-const COLOR_BUSH_SHADOW := Color("23420b")# Dark base shadow
-const COLOR_BUSH_BODY := Color("468615")  # Rich foliage body
-const COLOR_BUSH_LIGHT := Color("78d428") # Sunlit foliage highlight
-const COLOR_STONE_DARK := Color("475569") # Stone base
-const COLOR_STONE_MID := Color("64748b")  # Stone body
-const COLOR_STONE_LIGHT := Color("cbd5e1")# Stone rim highlight
-const COLOR_FLOWER_CREAM := Color("fffde6")# Tiny daisy petal
-const COLOR_FLOWER_GOLD := Color("ffd13b")# Tiny daisy core
-const COLOR_PLAYFIELD := Color("d2d5e4")  # Swatch 1 lavender playfield below 44%
+# Water Color Palette
+const COLOR_OCEAN_DEEP := Color("0369a1")       # Deep Caribbean ocean blue
+const COLOR_OCEAN_MID := Color("0284c7")        # Vibrant cerulean mid-water
+const COLOR_OCEAN_CYAN := Color("0ea5e9")       # Sunlit tropical cyan
+const COLOR_OCEAN_SHALLOW := Color("38bdf8")    # Sunlit shallow aqua
+const COLOR_OCEAN_DARK_BASE := Color("024e75")  # Deep base near bottom divider
+const COLOR_WAVE_CREST := Color(0.90, 0.98, 1.0, 0.65) # Bright wave foam crest
+const COLOR_WAVE_SHADOW := Color(0.01, 0.12, 0.30, 0.28) # Trough drop shadow
+const COLOR_GLINT := Color(1.0, 1.0, 1.0, 0.90) # Sparkling sun glint
+const COLOR_PLAYFIELD := Color("d2d5e4")        # Swatch 1 lavender playfield below 44%
 
-var lawn_tex: Texture2D
 var vp_size := Vector2.ZERO
 var track_screen_y: float = -1.0
 var scale_factor: float = 1.0
 var divider_screen_y: float = -1.0
+var _water_time: float = 0.0
 
 func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_anchors_preset(Control.PRESET_FULL_RECT)
-	if ResourceLoader.exists("res://assets/sprites/environment/stylized_garden_lawn.png"):
-		lawn_tex = ResourceLoader.load("res://assets/sprites/environment/stylized_garden_lawn.png") as Texture2D
-	if lawn_tex == null:
-		var img := Image.new()
-		var p := ProjectSettings.globalize_path("res://assets/sprites/environment/stylized_garden_lawn.png")
-		if img.load(p) == OK:
-			lawn_tex = ImageTexture.create_from_image(img)
+
+func _ready() -> void:
+	set_process(true)
+
+func _process(delta: float) -> void:
+	_water_time += delta
+	queue_redraw()
 
 func update_layout(p_vp_size: Vector2, p_track_screen_y: float, p_scale_factor: float, p_divider_screen_y: float) -> void:
 	vp_size = p_vp_size
@@ -59,125 +56,153 @@ func _draw() -> void:
 		return
 
 	var div_y = divider_screen_y if divider_screen_y > 0.0 else (0.44 * h)
+	var sc = scale_factor if scale_factor > 0.0 else 1.0
+	var tr_y = track_screen_y if track_screen_y > 0.0 else (h * 0.20)
 
-	# 1. Base 45-Degree Diagonal Striped Manicured Lawn
-	if lawn_tex != null:
-		draw_texture_rect(lawn_tex, Rect2(0, 0, w, div_y), true)
-	else:
-		draw_rect(Rect2(0, 0, w, div_y), COLOR_LAWN_DARK)
-		var stripe_w: float = 56.5
-		var num_stripes: int = int((w + div_y) / stripe_w) + 4
-		for i in range(-2, num_stripes, 2):
-			var x0 = float(i) * stripe_w
-			var pts = PackedVector2Array([
-				Vector2(x0, 0),
-				Vector2(x0 + stripe_w, 0),
-				Vector2(x0 + stripe_w + div_y, div_y),
-				Vector2(x0 + div_y, div_y)
-			])
-			draw_colored_polygon(pts, COLOR_LAWN_LIGHT)
-
-	# 2. Sunlit Ambient Gradient Overlay
-	var light_pts = PackedVector2Array([
+	# 1. Base 3D Tropical Ocean Gradient Polygon
+	var base_pts = PackedVector2Array([
 		Vector2(0, 0), Vector2(w, 0),
 		Vector2(w, div_y), Vector2(0, div_y)
 	])
-	var light_cols = PackedColorArray([
-		Color(1.0, 0.98, 0.88, 0.06), Color(1.0, 0.98, 0.88, 0.06),
-		Color(0.1, 0.35, 0.08, 0.05), Color(0.1, 0.35, 0.08, 0.05)
+	var base_cols = PackedColorArray([
+		COLOR_OCEAN_MID, COLOR_OCEAN_CYAN,
+		COLOR_OCEAN_DEEP, COLOR_OCEAN_DARK_BASE
 	])
-	draw_polygon(light_pts, light_cols)
+	draw_polygon(base_pts, base_cols)
 
-	# 3. 2.5D Volumetric Green Trees & Garden Hedges
-	var tr_y = track_screen_y if track_screen_y > 0.0 else (h * 0.20)
-	var sc = scale_factor if scale_factor > 0.0 else 1.0
-	var track_left_x = (w / 2.0) - (207.0 * sc) # Left apex outer edge (105 + 167.5)
-	var track_top_y = tr_y - (167.5 * sc)
+	# 2. Diagonal Sunlit Caustic Shimmer Overlay (top-left sunlight)
+	var sun_pts = PackedVector2Array([
+		Vector2(0, 0), Vector2(w * 0.72, 0),
+		Vector2(w * 0.38, div_y), Vector2(0, div_y)
+	])
+	var sun_cols = PackedColorArray([
+		Color(0.24, 0.88, 0.98, 0.30), Color(0.18, 0.78, 0.95, 0.16),
+		Color(0.04, 0.52, 0.78, 0.06), Color(0.10, 0.65, 0.85, 0.22)
+	])
+	draw_polygon(sun_pts, sun_cols)
 
-	# Group A: Left Garden Grove (Clean Volumetric Green Tree & Shrub Cluster)
-	var tree_l_pos = Vector2(maxf(44.0, track_left_x * 0.42), clampf(tr_y - 25.0 * sc, 90.0, div_y - 55.0))
-	var bush_l1_pos = Vector2(maxf(32.0, track_left_x * 0.26), clampf(tr_y + 45.0 * sc, 115.0, div_y - 42.0))
-	var bush_l2_pos = Vector2(maxf(48.0, track_left_x * 0.65), clampf(tr_y + 85.0 * sc, 135.0, div_y - 36.0))
+	# 3. 2.5D Perspective Wave Bands
+	var num_bands: int = 28
+	var t = _water_time
+	for k in range(num_bands):
+		var norm_k: float = float(k) / float(num_bands)
+		# Power-based perspective compression toward top horizon
+		var y_base: float = div_y * pow(norm_k, 1.32) + 5.0
+		var wave_amp: float = lerpf(2.2, 7.5, norm_k)
+		var k_speed: float = lerpf(1.4, 0.8, norm_k)
+		var k_phase: float = k * 1.35 + t * k_speed
 
-	_draw_volumetric_tree(tree_l_pos, clampf(36.0 * sc, 24.0, 48.0))
-	_draw_cartoon_bush_cluster(bush_l1_pos, clampf(28.0 * sc, 18.0, 38.0), 4)
-	_draw_cartoon_bush_cluster(bush_l2_pos, clampf(24.0 * sc, 16.0, 32.0), 3)
+		var pts := PackedVector2Array()
+		var shadow_pts := PackedVector2Array()
+		var steps: int = 40
 
-	# Group B: Top-Left Garden Bed
-	if track_top_y > 75.0:
-		var top_l_x = (w / 2.0) - (130.0 * sc)
-		if top_l_x > 95.0:
-			_draw_volumetric_tree(Vector2(top_l_x, track_top_y - 12.0 * sc), clampf(24.0 * sc, 16.0, 32.0))
+		for s in range(steps + 1):
+			var x: float = (float(s) / float(steps)) * w
+			var y_off: float = sin(x * 0.022 + k_phase) * wave_amp + cos(x * 0.013 - k_phase * 0.7) * (wave_amp * 0.45)
+			var pt := Vector2(x, y_base + y_off)
+			pts.append(pt)
+			shadow_pts.append(Vector2(x, y_base + y_off + lerpf(2.0, 4.5, norm_k)))
 
-	# Group C: Upper-Right Corner Accent (near screen edge, clear of pause button & feeder chute)
-	var bush_r_pos = Vector2(w - 32.0, minf(45.0, tr_y - 125.0 * sc))
-	_draw_cartoon_bush_cluster(bush_r_pos, clampf(24.0 * sc, 16.0, 32.0), 3)
+		# Volumetric wave trough shadow
+		var shadow_alpha = lerpf(0.12, 0.30, norm_k)
+		draw_polyline(shadow_pts, Color(0.01, 0.14, 0.32, shadow_alpha), lerpf(3.5, 7.5, norm_k), true)
 
-	# Group D: Delicate daisy dots scattered on the lawn
-	_draw_tiny_flower(Vector2(tree_l_pos.x + 24.0, tree_l_pos.y + 28.0), 3.2)
-	_draw_tiny_flower(Vector2(bush_l1_pos.x + 20.0, bush_l1_pos.y - 14.0), 2.8)
-	_draw_tiny_flower(Vector2(bush_l2_pos.x - 12.0, bush_l2_pos.y + 16.0), 2.6)
+		# Sunlit wave crest highlight
+		var crest_alpha = lerpf(0.35, 0.75, norm_k)
+		draw_polyline(pts, Color(0.88, 0.98, 1.0, crest_alpha), lerpf(1.8, 3.8, norm_k), true)
 
-	# 4. Solid Playfield Grounding below the 44% Divider line
+	# 4. Shoreline Contact Foam Lapping Around Track & Pier
+	var track_left_x = (w / 2.0) - (207.0 * sc)
+	var foam_pulse = sin(t * 2.4) * 2.0
+	var pier_foam_pts := PackedVector2Array()
+	var n_foam := 24
+	for i in range(n_foam + 1):
+		var ang = lerpf(-PI * 0.45, PI * 0.45, float(i) / float(n_foam))
+		var fx = (w / 2.0) + cos(ang + PI) * (185.0 * sc + foam_pulse)
+		var fy = tr_y + sin(ang) * (135.0 * sc + foam_pulse * 0.8)
+		pier_foam_pts.append(Vector2(fx, fy))
+	draw_polyline(pier_foam_pts, Color(0.70, 0.92, 1.0, 0.35), 10.0 * sc, false)
+	draw_polyline(pier_foam_pts, Color(1.0, 1.0, 1.0, 0.65), 3.5 * sc, false)
+
+	# 5. Sparkling Diamond Sun Glints
+	var glint_seeds = [
+		Vector2(w * 0.16, div_y * 0.22),
+		Vector2(w * 0.31, div_y * 0.15),
+		Vector2(w * 0.12, div_y * 0.68),
+		Vector2(w * 0.22, div_y * 0.82),
+		Vector2(w * 0.84, div_y * 0.25),
+		Vector2(w * 0.88, div_y * 0.72),
+		Vector2(w * 0.72, div_y * 0.86)
+	]
+	for idx in range(glint_seeds.size()):
+		var gp = glint_seeds[idx]
+		var phase = idx * 1.7 + t * 3.2
+		var pulse = maxf(0.0, sin(phase))
+		if pulse > 0.15:
+			_draw_diamond_glint(gp, 6.0 * pulse * sc, Color(1.0, 1.0, 1.0, pulse * 0.85))
+
+	# 6. Charming 3D Toy Nautical Lifebuoys Bobbing in Water
+	# Buoy A: Foreground Left
+	var buoy_y_bob = sin(t * 2.2) * 4.0
+	var buoy_pos = Vector2(maxf(50.0, track_left_x * 0.40), clampf(tr_y + 15.0 * sc + buoy_y_bob, 130.0, div_y - 60.0))
+	var buoy_rot = sin(t * 2.2) * 0.08
+	_draw_3d_lifebuoy(buoy_pos, 27.0 * sc, buoy_rot, buoy_y_bob)
+
+	# Buoy B: Distant Background Upper-Left
+	var buoy2_y_bob = sin(t * 2.5 + 1.2) * 2.5
+	var buoy2_pos = Vector2(maxf(75.0, track_left_x * 0.68), clampf(tr_y - 95.0 * sc + buoy2_y_bob, 70.0, div_y - 120.0))
+	var buoy2_rot = sin(t * 2.5 + 1.2) * 0.06
+	_draw_3d_lifebuoy(buoy2_pos, 16.0 * sc, buoy2_rot, buoy2_y_bob)
+
+	# 7. Solid Clean Lavender Playfield below the 44% Divider
 	if h > div_y:
 		draw_rect(Rect2(0, div_y, w, h - div_y), COLOR_PLAYFIELD)
 
-## 2.5D Volumetric Green Cartoon Tree with layered spherical lobes
-func _draw_volumetric_tree(center: Vector2, radius: float) -> void:
-	# Ground contact shadow
-	draw_circle(center + Vector2(0, radius * 0.48), radius * 0.90, Color(0.04, 0.12, 0.04, 0.22))
+## Draws an authentic 3D toy lifebuoy with realistic water shadow, red quadrants, and glossy specular
+func _draw_3d_lifebuoy(pos: Vector2, rad: float, rot: float, bob: float) -> void:
+	# 1. Soft underwater contact shadow
+	var shadow_offset = Vector2(2.0, 9.0 + bob * 0.4)
+	draw_circle(pos + shadow_offset, rad * 1.06, Color(0.01, 0.10, 0.24, 0.38))
 
-	var lobes = [
-		Vector2(0, 0),
-		Vector2(-radius * 0.45, radius * 0.12),
-		Vector2(radius * 0.45, radius * 0.12),
-		Vector2(-radius * 0.25, -radius * 0.38),
-		Vector2(radius * 0.25, -radius * 0.38),
-		Vector2(0, -radius * 0.25)
-	]
+	# 2. Main white torus base
+	draw_circle(pos, rad, Color.WHITE)
 
-	# Deep base shadow lobes
-	for p in lobes:
-		draw_circle(center + p, radius * 0.60, COLOR_TREE_SHADOW)
+	# 3. Vibrant red sectors (4 quadrants)
+	for base_ang in [0.0, 90.0, 180.0, 270.0]:
+		var a0 = rot + deg_to_rad(base_ang - 18.0)
+		var a1 = rot + deg_to_rad(base_ang + 18.0)
+		var stripe_pts := PackedVector2Array([pos])
+		for st in 8:
+			var a = lerpf(a0, a1, float(st) / 7.0)
+			stripe_pts.append(pos + Vector2(cos(a), sin(a)) * (rad + 0.5))
+		draw_colored_polygon(stripe_pts, Color("eb3241"))
 
-	# Main rich green foliage body
-	for p in lobes:
-		draw_circle(center + p + Vector2(-1.0, -radius * 0.08), radius * 0.54, COLOR_TREE_BODY)
+	# 4. Center hole revealing the blue ocean beneath
+	draw_circle(pos, rad * 0.48, COLOR_OCEAN_MID)
 
-	# Sunlit highlight domes
-	for p in lobes:
-		draw_circle(center + p + Vector2(-radius * 0.12, -radius * 0.18), radius * 0.38, COLOR_TREE_LIGHT)
+	# 5. Volumetric 3D Shading:
+	# Inner shadow rim
+	draw_arc(pos, rad * 0.48, 0, TAU, 32, Color(0.0, 0.0, 0.0, 0.22), 2.2)
+	# Outer subtle bevel rim
+	draw_arc(pos, rad - 0.8, 0, TAU, 32, Color(0.0, 0.0, 0.0, 0.14), 1.5)
+	# Sunlit glossy top-left specular highlight
+	draw_circle(pos + Vector2(-rad * 0.42, -rad * 0.42), rad * 0.24, Color(1.0, 1.0, 1.0, 0.75))
 
-	# Brightest sunlit glint
-	draw_circle(center + Vector2(-radius * 0.18, -radius * 0.32), radius * 0.22, COLOR_TREE_TIP)
-
-## Stylized 3-tone foliage bush
-func _draw_cartoon_bush_cluster(center: Vector2, radius: float, count: int) -> void:
-	var offsets = [
-		Vector2(0, 0),
-		Vector2(-radius * 0.45, radius * 0.15),
-		Vector2(radius * 0.45, radius * 0.15),
-		Vector2(-radius * 0.25, -radius * 0.35),
-		Vector2(radius * 0.25, -radius * 0.35)
-	]
-
-	draw_circle(center + Vector2(0, radius * 0.42), radius * 0.85, Color(0.04, 0.12, 0.04, 0.22))
-
-	for k in range(mini(count, offsets.size())):
-		var p = center + offsets[k]
-		draw_circle(p, radius * 0.62, COLOR_BUSH_SHADOW)
-
-	for k in range(mini(count, offsets.size())):
-		var p = center + offsets[k] + Vector2(-1.0, -radius * 0.08)
-		draw_circle(p, radius * 0.56, COLOR_BUSH_BODY)
-
-	for k in range(mini(count, offsets.size())):
-		var p = center + offsets[k] + Vector2(-radius * 0.12, -radius * 0.18)
-		draw_circle(p, radius * 0.38, COLOR_BUSH_LIGHT)
-
-func _draw_tiny_flower(pos: Vector2, sz: float) -> void:
-	draw_circle(pos + Vector2(-sz * 0.6, 0), sz * 0.45, COLOR_FLOWER_CREAM)
-	draw_circle(pos + Vector2(sz * 0.6, 0), sz * 0.45, COLOR_FLOWER_CREAM)
-	draw_circle(pos + Vector2(0, -sz * 0.6), sz * 0.45, COLOR_FLOWER_CREAM)
-	draw_circle(pos + Vector2(0, sz * 0.6), sz * 0.45, COLOR_FLOWER_CREAM)
-	draw_circle(pos, sz * 0.45, COLOR_FLOWER_GOLD)
+## Draws a crisp sparkling diamond glint star
+func _draw_diamond_glint(pos: Vector2, sz: float, col: Color) -> void:
+	var pts = PackedVector2Array([
+		pos + Vector2(0, -sz),
+		pos + Vector2(sz * 0.35, 0),
+		pos + Vector2(0, sz),
+		pos + Vector2(-sz * 0.35, 0)
+	])
+	draw_colored_polygon(pts, col)
+	var pts2 = PackedVector2Array([
+		pos + Vector2(-sz, 0),
+		pos + Vector2(0, sz * 0.35),
+		pos + Vector2(sz, 0),
+		pos + Vector2(0, -sz * 0.35)
+	])
+	draw_colored_polygon(pts2, col)
+	# Center bright pin
+	draw_circle(pos, sz * 0.22, Color.WHITE)

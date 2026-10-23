@@ -279,9 +279,11 @@ func _draw() -> void:
 	_draw_wall_base_shadow_tapered(curb_left, WALL_H, COLOR_WALL_SHADOW, 5.0, true, -10.0, 25.0)
 	_draw_wall_base_shadow_tapered(curb_right, WALL_H, COLOR_WALL_SHADOW, 5.0, true, -5.0, 25.0)
 
-	# Step C: 100% Solid, seamless grey road surface (zero gaps / zero green seams)
-	# Draw solid outer road surface covering track & feeder seamlessly
-	draw_colored_polygon(outer_road, COLOR_ROAD)
+	# Step C: 100% Solid, seamless grey road surface with inner lagoon hole
+	# Subtract curb_inner hole from outer_road so the 3D lagoon water shows through
+	var road_polys = Geometry2D.clip_polygons(outer_road, curb_inner)
+	for p in road_polys:
+		draw_colored_polygon(p, COLOR_ROAD)
 
 	# Step D: 3D Road Camber & Lighting (Crowned asphalt center ribbon + gutter ambient occlusion)
 	_draw_road_camber(straight_x, r_center, c_left, c_right, n_arc)
@@ -290,33 +292,11 @@ func _draw() -> void:
 	draw_polyline(curb_right, Color(0.08, 0.09, 0.12, 0.38), 6.0, true)
 	draw_polyline(curb_inner, Color(0.08, 0.09, 0.12, 0.38), 6.0, true)
 
-	# Step E: Terraced Sunken Central Garden Courtyard (Deep 3D perspective inside inner hole)
-	# 1. Base sunken courtyard fill
-	const COLOR_SUNKEN_BASE := Color("488828")
-	draw_colored_polygon(curb_inner, COLOR_SUNKEN_BASE)
-
-	# 2. Inset sunken lawn island
-	var curb_inner_inset = PackedVector2Array()
-	var r_inset = r_inner_scaled - 5.0
-	curb_inner_inset.append(Vector2(straight_x_inner, -r_inset))
-	curb_inner_inset.append(Vector2(-straight_x_inner, -r_inset))
-	for i in range(1, n_arc):
-		var ang = -PI / 2.0 - (float(i) / float(n_arc)) * PI
-		curb_inner_inset.append(c_left_inner + Vector2(cos(ang), sin(ang)) * r_inset)
-	curb_inner_inset.append(Vector2(-straight_x_inner, r_inset))
-	curb_inner_inset.append(Vector2(straight_x_inner, r_inset))
-	for i in range(1, n_arc):
-		var ang = PI / 2.0 - (float(i) / float(n_arc)) * PI
-		curb_inner_inset.append(c_right_inner + Vector2(cos(ang), sin(ang)) * r_inset)
-	curb_inner_inset.append(Vector2(straight_x_inner, -r_inset))
-	const COLOR_CENTRAL_LAWN := Color("62b03f")
-	draw_colored_polygon(curb_inner_inset, COLOR_CENTRAL_LAWN)
-
-	# 3. Inner Vertical Retaining Wall (Drops 10.0px downward into the sunken garden on northern rim y <= 15.0)
+	# Step E: 3D Inner Retaining Wall (Drops 10.0px downward into the inner lagoon on northern rim y <= 15.0)
 	const INNER_WALL_H: float = 10.0
 	_draw_wall_quad_strip_tapered(curb_inner, INNER_WALL_H, COLOR_WALL_INNER, false, -15.0, 20.0)
-	# Inner drop shadow cast by the northern deck onto the sunken courtyard lawn
-	_draw_wall_base_shadow_tapered(curb_inner, INNER_WALL_H, Color(0.01, 0.05, 0.01, 0.52), 6.0, false, -15.0, 20.0)
+	# Inner drop shadow cast by the northern deck onto the lagoon water
+	_draw_wall_base_shadow_tapered(curb_inner, INNER_WALL_H, Color(0.01, 0.08, 0.20, 0.38), 6.0, false, -15.0, 20.0)
 
 	# Step F: Faint 4-lane guide markings (subtle dashed guidelines)
 	_draw_lane_guidelines(straight_x, r_center, c_left, c_right)
