@@ -586,26 +586,44 @@ func _draw_shoreline_rocks_and_water(x_gate: float, r_outer: float, plat_y: floa
 func _draw_quay_embankment(x_gate: float, r_outer: float, plat_y: float) -> void:
 	for side in [-1, 1]:
 		var s := float(side)
-		# 1. Vertical Pier Quoin / Embankment Foundation Wall at crosswalk throat edge
+		# 1. Warm Golden Sand Beach Cove Embankment hugging gateway base
+		var sand_cove := PackedVector2Array([
+			Vector2(s * (x_gate + 6.0), r_outer + 4.0),
+			Vector2(s * (x_gate + 115.0), r_outer + 4.0),
+			Vector2(s * (x_gate + 115.0), plat_y + 4.0),
+			Vector2(s * (x_gate + 6.0), plat_y + 4.0)
+		])
+		draw_colored_polygon(sand_cove, Color("eac996"))
+
+		# 2. Wet sand tide fringe
+		var wet_fringe := PackedVector2Array([
+			Vector2(s * (x_gate + 6.0), r_outer + 4.0),
+			Vector2(s * (x_gate + 115.0), r_outer + 4.0),
+			Vector2(s * (x_gate + 115.0), r_outer + 14.0),
+			Vector2(s * (x_gate + 6.0), r_outer + 14.0)
+		])
+		draw_colored_polygon(wet_fringe, Color("ba8f58"))
+
+		# 3. Vertical Pier Quoin / Embankment Foundation Wall at crosswalk throat edge
 		var pier_wall := PackedVector2Array([
 			Vector2(s * x_gate, r_outer),
-			Vector2(s * (x_gate + 10.0), r_outer),
-			Vector2(s * (x_gate + 10.0), plat_y),
+			Vector2(s * (x_gate + 8.0), r_outer),
+			Vector2(s * (x_gate + 8.0), plat_y),
 			Vector2(s * x_gate, plat_y)
 		])
-		draw_colored_polygon(pier_wall, Color("343a48"))
+		draw_colored_polygon(pier_wall, Color("4b505e"))
 
-		# 2. Pier stone coping highlight edge
-		draw_line(Vector2(s * (x_gate + 10.0), r_outer), Vector2(s * (x_gate + 10.0), plat_y), Color("909cb0"), 2.0)
+		# 4. Pier stone coping highlight edge
+		draw_line(Vector2(s * (x_gate + 8.0), r_outer), Vector2(s * (x_gate + 8.0), plat_y), Color("b2bccb"), 2.0)
 
-		# 3. Translucent shallow turquoise water fringe along the pier base
+		# 5. Translucent shallow turquoise water fringe washing over the sand
 		var wash_pts := PackedVector2Array([
-			Vector2(s * (x_gate + 8.0), r_outer + 8.0),
-			Vector2(s * (x_gate + 110.0), r_outer + 8.0),
+			Vector2(s * (x_gate + 6.0), r_outer + 6.0),
+			Vector2(s * (x_gate + 110.0), r_outer + 6.0),
 			Vector2(s * (x_gate + 110.0), r_outer + 18.0),
-			Vector2(s * (x_gate + 8.0), plat_y - 2.0)
+			Vector2(s * (x_gate + 6.0), plat_y - 2.0)
 		])
-		draw_colored_polygon(wash_pts, Color(0.18, 0.85, 0.95, 0.18))
+		draw_colored_polygon(wash_pts, Color(0.18, 0.85, 0.95, 0.22))
 
 ## Draws a prominent, artistically faceted 3D coastal boulder in 2.5D perspective using robust triangles.
 func _draw_chiseled_3d_rock(center: Vector2, rad: float, phase: float, has_moss: bool, is_skerry: bool) -> void:
@@ -636,36 +654,36 @@ func _draw_chiseled_3d_rock(center: Vector2, rad: float, phase: float, has_moss:
 
 	if is_skerry:
 		# Low wet skerry: robust triangles with clear wet stone sheen
-		draw_colored_polygon(PackedVector2Array([center, v_l_bot, v_bot_mid]), Color("3a485a"))
-		draw_colored_polygon(PackedVector2Array([center, v_bot_mid, v_r_mid]), Color("323e4e"))
-		draw_colored_polygon(PackedVector2Array([center, v_r_mid, v_top]), Color("4a5c70"))
-		draw_colored_polygon(PackedVector2Array([center, v_top, v_l_top]), Color("7e96b0"))
-		draw_colored_polygon(PackedVector2Array([center, v_l_top, v_l_bot]), Color("5c7086"))
+		draw_colored_polygon(PackedVector2Array([center, v_l_bot, v_bot_mid]), Color("424f60"))
+		draw_colored_polygon(PackedVector2Array([center, v_bot_mid, v_r_mid]), Color("384352"))
+		draw_colored_polygon(PackedVector2Array([center, v_r_mid, v_top]), Color("546476"))
+		draw_colored_polygon(PackedVector2Array([center, v_top, v_l_top]), Color("8aa0b6"))
+		draw_colored_polygon(PackedVector2Array([center, v_l_top, v_l_bot]), Color("66788e"))
 		draw_line(v_l_top, v_top, Color(1.0, 1.0, 1.0, 0.85), 1.6)
 		return
 
 	# Facet Group 1: Right Shadow Face (Facing away from tropical sun)
-	draw_colored_polygon(PackedVector2Array([center, v_top, v_r_top]), Color("384656"))
-	draw_colored_polygon(PackedVector2Array([center, v_r_top, v_r_mid]), Color("303c4c"))
-	draw_colored_polygon(PackedVector2Array([center, v_r_mid, v_r_bot]), Color("283240"))
-	draw_colored_polygon(PackedVector2Array([center, v_r_bot, v_bot_mid]), Color("2e3846"))
+	draw_colored_polygon(PackedVector2Array([center, v_top, v_r_top]), Color("424c5a"))
+	draw_colored_polygon(PackedVector2Array([center, v_r_top, v_r_mid]), Color("384250"))
+	draw_colored_polygon(PackedVector2Array([center, v_r_mid, v_r_bot]), Color("2e3744"))
+	draw_colored_polygon(PackedVector2Array([center, v_r_bot, v_bot_mid]), Color("343e4c"))
 
 	# Facet Group 2: Left Mid Face (Glancing sunlit facet)
-	draw_colored_polygon(PackedVector2Array([center, v_bot_mid, v_l_bot]), Color("52647a"))
-	draw_colored_polygon(PackedVector2Array([center, v_l_bot, v_l_mid]), Color("60748c"))
-	draw_colored_polygon(PackedVector2Array([v_apex, v_l_mid, v_l_top]), Color("788fa8"))
+	draw_colored_polygon(PackedVector2Array([center, v_bot_mid, v_l_bot]), Color("5c6c80"))
+	draw_colored_polygon(PackedVector2Array([center, v_l_bot, v_l_mid]), Color("6e8096"))
+	draw_colored_polygon(PackedVector2Array([v_apex, v_l_mid, v_l_top]), Color("8496ad"))
 
 	# Facet Group 3: Sunlit Upper Plane
-	draw_colored_polygon(PackedVector2Array([v_apex, v_l_top, v_top]), Color("9cb4cc"))
-	draw_colored_polygon(PackedVector2Array([v_apex, v_top, center]), Color("8aa2ba"))
-	draw_colored_polygon(PackedVector2Array([v_apex, center, v_l_mid]), Color("7288a0"))
+	draw_colored_polygon(PackedVector2Array([v_apex, v_l_top, v_top]), Color("b0c2d6"))
+	draw_colored_polygon(PackedVector2Array([v_apex, v_top, center]), Color("9eb2c6"))
+	draw_colored_polygon(PackedVector2Array([v_apex, center, v_l_mid]), Color("8498ad"))
 
 	# Facet Group 4: Warm Sunny Crown Ridge
 	var crown_p1 := v_apex + Vector2(-rad * 0.18, -rad * 0.12)
 	var crown_p2 := v_apex + Vector2(rad * 0.14, -rad * 0.08)
 	var crown_p3 := v_apex + Vector2(rad * 0.02, rad * 0.14)
-	draw_colored_polygon(PackedVector2Array([v_apex, crown_p1, crown_p3]), Color("d4e4f4"))
-	draw_colored_polygon(PackedVector2Array([v_apex, crown_p3, crown_p2]), Color("b8d0e6"))
+	draw_colored_polygon(PackedVector2Array([v_apex, crown_p1, crown_p3]), Color("e0ecf8"))
+	draw_colored_polygon(PackedVector2Array([v_apex, crown_p3, crown_p2]), Color("c6d8ec"))
 
 	# Optional lush tropical moss cap (pure triangles)
 	if has_moss:
