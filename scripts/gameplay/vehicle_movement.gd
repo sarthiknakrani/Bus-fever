@@ -207,23 +207,6 @@ static func animate_dispatch(
 			v_id, t_arrival_end, t_arrival_end - t_start_sec, BUS_ARRIVAL_DURATION * duration_mult
 		])
 		if is_instance_valid(v_node):
-			if v_node.has_method("set_parking_mode"):
-				v_node.set_parking_mode(true)
-
-			# QA arrival check
-			var dir_str: String = CarJamVehicleData.dir_to_string(v_dir)
-			var front_vec: Vector2 = front_native.rotated(v_node.rotation)
-			var bay_axis: Vector2 = Vector2(0, -1)
-			var ang_diff: float = rad_to_deg(front_vec.angle_to(bay_axis))
-			var center_err: float = v_node.global_position.distance_to(slot_pos)
-
-			print("[QA] ARRIVAL | Bus %d (Orig Dir: %s) -> Slot %d" %
-				[v_id, dir_str, s_id])
-			print("      | Front: (%.2f, %.2f) | BayAxis: (0,-1)" %
-				[front_vec.x, front_vec.y])
-			print("      | Angular err: %.1f deg | Center err: %.1f px" %
-				[ang_diff, center_err])
-
 			v_node.z_index = 10
 			v_node.rotation = final_rot_target
 			v_node.position = slot_pos
@@ -231,6 +214,22 @@ static func animate_dispatch(
 			if v_node.get("_base_sprite") != null and v_node._base_sprite != null:
 				v_node._base_sprite.position = Vector2.ZERO
 				v_node._base_sprite.scale = Vector2.ONE
+			if v_node.has_method("set_parking_mode"):
+				v_node.set_parking_mode(true)
+
+			# QA arrival check
+			var dir_str: String = CarJamVehicleData.dir_to_string(v_dir)
+			var front_vec: Vector2 = front_native.rotated(v_node.rotation)
+			var bay_axis: Vector2 = Vector2(0, -1).rotated(slot_rotation)
+			var ang_diff: float = rad_to_deg(front_vec.angle_to(bay_axis))
+			var center_err: float = v_node.position.distance_to(slot_pos)
+
+			print("[QA] ARRIVAL | Bus %d (Orig Dir: %s) -> Slot %d" %
+				[v_id, dir_str, s_id])
+			print("      | Front: (%.2f, %.2f) | BayAxis: (%.2f, %.2f)" %
+				[front_vec.x, front_vec.y, bay_axis.x, bay_axis.y])
+			print("      | Angular err: %.1f deg | Center err: %.1f px" %
+				[ang_diff, center_err])
 		ctrl.on_vehicle_arrived_at_slot(v_id, s_id, tok)
 
 	tw.tween_callback(lambda_func.bind(

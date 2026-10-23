@@ -1818,11 +1818,27 @@ func _on_vehicle_parked(vehicle_id: int, slot_id: int) -> void:
 	var vv: VehicleView = vehicle_views.get(vehicle_id, null)
 	if vv != null and slot_id < slot_views.size():
 		vv.set_arrow_visible(false)
-		# Reparent to ParkedVehicles
-		var global_xform := vv.global_transform
-		vv.get_parent().remove_child(vv)
+		# Reparent to ParkedVehicles and align squarely with slot
+		if vv.get_parent() != null:
+			vv.get_parent().remove_child(vv)
 		parked_vehicles_node.add_child(vv)
-		vv.global_transform = global_xform
+		
+		# ParkingSlotView and ParkedVehicles are both direct children of parking_root.
+		# Setting slot-local position and authoritative uniform scale guarantees
+		# zero matrix shear or non-uniform distortion across all board orientations.
+		var slot_v: ParkingSlotView = slot_views[slot_id]
+		vv.position = slot_v.position
+		vv.scale = Vector2(VehicleView.BUS_VISUAL_SCALE, VehicleView.BUS_VISUAL_SCALE)
+		if vv.get("_base_sprite") != null and vv._base_sprite != null:
+			vv._base_sprite.position = Vector2.ZERO
+			vv._base_sprite.scale = Vector2.ONE
+			vv._base_sprite.rotation = 0.0
+
+		if vv.has_method("set_parking_mode"):
+			vv.set_parking_mode(true)
+		if vv.has_method("_update_badge_transform"):
+			vv._update_badge_transform()
+
 		slot_views[slot_id].set_state(CarJamParkingManager.SlotState.OCCUPIED)
 
 	_recover_boarding_for_slot(slot_id)

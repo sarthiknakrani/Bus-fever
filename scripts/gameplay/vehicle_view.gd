@@ -103,18 +103,24 @@ func set_parking_mode(in_parking: bool) -> void:
 	if _badge_node != null:
 		_badge_node.visible = in_parking
 		if in_parking:
-			var rear_native := -Vector2(CarJamVehicleData.dir_to_vector(vehicle_dir))
-			_badge_node.global_position = global_position + (rear_native * 38.0).rotated(global_rotation)
-			_badge_node.global_rotation = 0.0
+			_update_badge_transform()
 	if in_parking and _base_sprite != null:
 		_base_sprite.position = Vector2.ZERO
 		_base_sprite.scale = Vector2.ONE
 
 func _process(_delta: float) -> void:
 	if _badge_node != null and _badge_node.visible:
-		var rear_native := -Vector2(CarJamVehicleData.dir_to_vector(vehicle_dir))
-		_badge_node.global_position = global_position + (rear_native * 38.0).rotated(global_rotation)
-		_badge_node.global_rotation = 0.0
+		_update_badge_transform()
+
+func _update_badge_transform() -> void:
+	if _badge_node == null:
+		return
+	# In parking bay (-22 deg), rear of bus is along the longitudinal bay axis Vector2(0, 1).rotated(-22 deg).
+	# Centering badge along this axis at rear bumper (+46px) with 0.0 global rotation ensures it sits
+	# cleanly inside the bottom stencil break gap of its slot without protruding into neighbor bays.
+	var rear_vec := Vector2(0.0, 1.0).rotated(deg_to_rad(-22.0))
+	_badge_node.global_position = global_position + rear_vec * 46.0
+	_badge_node.global_rotation = 0.0
 
 func _build_visuals() -> void:
 	# Clear existing interim visuals
@@ -377,21 +383,8 @@ func play_angry_shake() -> void:
 func set_arrow_visible(p_vis: bool) -> void:
 	if _arrow_sprite != null:
 		_arrow_sprite.visible = p_vis
-	if not p_vis:
-		if _arrow_cover == null:
-			_arrow_cover = ColorRect.new()
-			_arrow_cover.color = vehicle_color
-			_arrow_cover.custom_minimum_size = Vector2(22.0, 32.0)
-			_arrow_cover.size = Vector2(22.0, 32.0)
-			_arrow_cover.position = Vector2(-11.0, -16.0)
-			if _base_sprite != null:
-				_base_sprite.add_child(_arrow_cover)
-			else:
-				add_child(_arrow_cover)
-		_arrow_cover.visible = true
-	else:
-		if _arrow_cover != null:
-			_arrow_cover.visible = false
+	if _arrow_cover != null:
+		_arrow_cover.visible = false
 
 ## Called by the controller after a successful tap on a mystery bus. Animates the
 ## "?" overlay and dark scrim out, then flips is_mystery=false so the bus's true
@@ -442,32 +435,33 @@ func play_boarding_pop() -> void:
 func _setup_capacity_badge() -> void:
 	if _badge_node != null: return
 	
-	# Rounded-rectangle badge (75 x 42 px) matching bus color, styled with white border and bold white text
+	# Compact claymorphism pill badge matching bus color, styled with crisp white border and bold white text
+	# Sized (40 x 24 px) to fit comfortably within the 48px slot without colliding with neighbor slots
 	_badge_node = Node2D.new()
 	_badge_node.name = "CapacityBadge"
-	_badge_node.position = Vector2(0, 52.0)
+	_badge_node.position = Vector2(0, 46.0)
 	_badge_node.visible = false
 	_badge_node.z_index = 10
 
 	var badge_draw := Node2D.new()
 	badge_draw.draw.connect(func():
-		var bw: float = 75.0
-		var bh: float = 42.0
+		var bw: float = 40.0
+		var bh: float = 24.0
 		var rect := Rect2(-bw / 2.0, -bh / 2.0, bw, bh)
 		var ci = badge_draw.get_canvas_item()
 
 		var sb_shadow = StyleBoxFlat.new()
 		sb_shadow.bg_color = Color(0, 0, 0, 0.35)
-		sb_shadow.set_corner_radius_all(10)
-		sb_shadow.draw(ci, Rect2(-bw / 2.0, -bh / 2.0 + 3.0, bw, bh))
+		sb_shadow.set_corner_radius_all(8)
+		sb_shadow.draw(ci, Rect2(-bw / 2.0, -bh / 2.0 + 2.0, bw, bh))
 		
 		var sb_face = StyleBoxFlat.new()
 		sb_face.bg_color = vehicle_color
-		sb_face.set_corner_radius_all(10)
-		sb_face.border_width_left = 3
-		sb_face.border_width_top = 3
-		sb_face.border_width_right = 3
-		sb_face.border_width_bottom = 3
+		sb_face.set_corner_radius_all(8)
+		sb_face.border_width_left = 2
+		sb_face.border_width_top = 2
+		sb_face.border_width_right = 2
+		sb_face.border_width_bottom = 2
 		sb_face.border_color = Color.WHITE
 		sb_face.draw(ci, rect)
 	)
@@ -475,15 +469,15 @@ func _setup_capacity_badge() -> void:
 
 	_badge_label = Label.new()
 	_badge_label.text = str(vehicle_capacity)
-	_badge_label.add_theme_font_size_override("font_size", 22)
+	_badge_label.add_theme_font_size_override("font_size", 16)
 	_badge_label.add_theme_color_override("font_color", Color.WHITE)
 	_badge_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.85))
 	_badge_label.add_theme_constant_override("shadow_offset_x", 0)
-	_badge_label.add_theme_constant_override("shadow_offset_y", 2)
+	_badge_label.add_theme_constant_override("shadow_offset_y", 1)
 	_badge_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_badge_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_badge_label.position = Vector2(-37.5, -21.0)
-	_badge_label.size = Vector2(75.0, 42.0)
+	_badge_label.position = Vector2(-20.0, -12.0)
+	_badge_label.size = Vector2(40.0, 24.0)
 	_badge_node.add_child(_badge_label)
 
 	add_child(_badge_node)
