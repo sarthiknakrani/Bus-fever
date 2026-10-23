@@ -353,7 +353,12 @@ func show_earn_coins_popup() -> void:
 	close_btn.add_theme_color_override("font_color", Color("475569"))
 	var close_style := ClayStyle.create_clay_button_style(Color("ffffff"), Color("cbd5e1"), 17, 3, 6, 2, 0.20)
 	close_btn.add_theme_stylebox_override("normal", close_style)
+	var close_hover := close_style.duplicate()
+	close_hover.bg_color = Color("f8fafc")
+	close_btn.add_theme_stylebox_override("hover", close_hover)
 	close_btn.add_theme_stylebox_override("pressed", close_style)
+	close_btn.add_theme_stylebox_override("hover_pressed", close_style)
+	close_btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 	
 	var c_gloss := Panel.new()
 	c_gloss.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -415,27 +420,52 @@ func show_earn_coins_popup() -> void:
 	# Claymorphic Action Button
 	var act_btn := Button.new()
 	act_btn.text = _custom_action_title
-	act_btn.custom_minimum_size = Vector2(210, 50)
-	act_btn.size = Vector2(210, 50)
-	act_btn.pivot_offset = Vector2(105, 25)
+	act_btn.custom_minimum_size = Vector2(216, 52)
+	act_btn.size = Vector2(216, 52)
+	act_btn.pivot_offset = Vector2(108, 26)
 	act_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	act_btn.focus_mode = Control.FOCUS_NONE
-	act_btn.add_theme_font_size_override("font_size", 18)
+	act_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	act_btn.add_theme_font_size_override("font_size", 19)
 	act_btn.add_theme_color_override("font_color", Color.WHITE)
 
-	var btn_style := ClayStyle.create_clay_button_style(Color("22c55e"), Color("15803d"), 22, 5, 14, 4, 0.30)
+	var is_play_action: bool = _custom_action_title.to_upper().find("PLAY") != -1
+	var face_color: Color = Color("fb923c") if is_play_action else Color("22c55e")
+	var lip_color: Color = Color("c2410c") if is_play_action else Color("15803d")
+	var hover_color: Color = Color("fdba74") if is_play_action else Color("4ade80")
+	var pressed_color: Color = Color("ea580c") if is_play_action else Color("16a34a")
+	var outline_color: Color = Color("7c2d12") if is_play_action else Color("14532d")
+
+	act_btn.add_theme_color_override("font_outline_color", outline_color)
+	act_btn.add_theme_constant_override("outline_size", 4)
+
+	var btn_style := ClayStyle.create_clay_button_style(face_color, lip_color, 24, 5, 14, 4, 0.30)
 	act_btn.add_theme_stylebox_override("normal", btn_style)
 
+	var btn_hover_style := btn_style.duplicate()
+	btn_hover_style.bg_color = hover_color
+	act_btn.add_theme_stylebox_override("hover", btn_hover_style)
+
 	var btn_pressed_style := btn_style.duplicate()
-	btn_pressed_style.bg_color = Color("16a34a")
+	btn_pressed_style.bg_color = pressed_color
 	btn_pressed_style.border_width_bottom = 2
+	btn_pressed_style.shadow_size = 4
+	btn_pressed_style.shadow_offset = Vector2(0, 2)
 	act_btn.add_theme_stylebox_override("pressed", btn_pressed_style)
+	act_btn.add_theme_stylebox_override("hover_pressed", btn_pressed_style)
+
+	var empty_style := StyleBoxEmpty.new()
+	act_btn.add_theme_stylebox_override("focus", empty_style)
+
+	var btn_disabled_style := btn_style.duplicate()
+	btn_disabled_style.bg_color = face_color.lerp(Color("64748b"), 0.5)
+	act_btn.add_theme_stylebox_override("disabled", btn_disabled_style)
 
 	var act_gloss := Panel.new()
 	act_gloss.set_anchors_preset(Control.PRESET_FULL_RECT)
 	act_gloss.anchor_bottom = 0.5
 	act_gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	act_gloss.add_theme_stylebox_override("panel", ClayStyle.create_clay_highlight_style(22, 0.30))
+	act_gloss.add_theme_stylebox_override("panel", ClayStyle.create_clay_highlight_style(24, 0.32))
 	act_btn.add_child(act_gloss)
 
 	ClayStyle.apply_clay_squish(act_btn, 0.0, 0.94)
