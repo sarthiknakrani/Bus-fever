@@ -126,7 +126,7 @@ func _process(delta: float) -> void:
 			if _is_animated and _char_sprite != null:
 				_char_sprite.frame = IDLE_FRAME
 			if _char_sprite != null:
-				_char_sprite.position.y = 0.0
+				_char_sprite.position = Vector2.ZERO
 				_char_sprite.rotation = 0.0
 				_char_sprite.scale = Vector2(facing_sign, 1.0)
 			if _shadow != null:
@@ -142,9 +142,9 @@ func _process(delta: float) -> void:
 				_char_sprite.frame = run_frame
 			
 			if _char_sprite != null:
-				# Completely stable running without up/down bobbing or tilting
+				# Stable omnidirectional 3D circle running without up/down bobbing or tilting
 				_char_sprite.rotation = 0.0
-				_char_sprite.position.y = 0.0
+				_char_sprite.position = Vector2.ZERO
 				_char_sprite.scale = Vector2(facing_sign, 1.0)
 			
 			if _shadow != null:
@@ -173,8 +173,8 @@ func animate_jump(delay: float) -> void:
 	var tw2 := create_tween()
 	if delay > 0.0:
 		tw2.tween_interval(delay)
-	tw2.tween_property(_char_sprite, "scale", Vector2(facing_sign * 0.85, 1.2), 0.08)
-	tw2.tween_property(_char_sprite, "scale", Vector2(facing_sign, 1.0), 0.08)
+	tw2.tween_property(_char_sprite, "scale", Vector2(0.85, 1.2), 0.08)
+	tw2.tween_property(_char_sprite, "scale", Vector2.ONE, 0.08)
 	
 	if _shadow != null:
 		var tw_s := create_tween()

@@ -227,10 +227,6 @@ func _get_curve_point_and_normal(c: Curve2D, offset: float, is_loop: bool = fals
 func _calc_lane_pos(center_pos: Vector2, normal: Vector2, lane: int) -> Vector2:
 	var curve_fac: float = clampf((absf(center_pos.x) - 75.0) / 30.0, 0.0, 1.0)
 	var dynamic_spacing: float = lerpf(LANE_SPACING, LANE_SPACING_CURVE, curve_fac)
-	# Natural gentle convergence near gateway neck (x in [-80, 80] and y > 80.0)
-	if absf(center_pos.x) < 80.0 and center_pos.y > 80.0:
-		var neck_factor: float = clampf(1.0 - (absf(center_pos.x) / 80.0), 0.0, 1.0)
-		dynamic_spacing = lerpf(dynamic_spacing, 15.5, neck_factor * 0.25)
 	var lane_offset: float = (float(lane) - 1.5) * dynamic_spacing
 	return center_pos + normal * lane_offset
 
@@ -634,7 +630,7 @@ func _build_scene_hierarchy() -> void:
 
 	passenger_visuals = Node2D.new()
 	passenger_visuals.name = "PassengerVisuals"
-	passenger_visuals.y_sort_enabled = true
+	passenger_visuals.y_sort_enabled = false # Disabled to eliminate Y-sort popping and perceived size changes during looping
 	passenger_track_root.add_child(passenger_visuals)
 
 	boarding_effects = Node2D.new()
