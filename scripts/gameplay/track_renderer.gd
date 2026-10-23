@@ -481,8 +481,8 @@ func _draw_3d_curb(pts: PackedVector2Array) -> void:
 	draw_polyline(pts, Color(1.0, 1.0, 1.0, 0.95), 1.5, true)
 
 func _draw_lane_guidelines(straight_x: float, r_center: float, c_l: Vector2, c_r: Vector2) -> void:
-	# Offsets for 3 lane divider boundaries between the 4 lanes (-17.5, 0, +17.5)
-	var lane_divs = [-17.5, 0.0, 17.5]
+	# Offsets for 3 lane divider boundaries between the 4 lanes (-22.0, 0, +22.0)
+	var lane_divs = [-22.0, 0.0, 22.0]
 	for l_off in lane_divs:
 		var r_div: float = r_center + l_off
 		var pts = PackedVector2Array()

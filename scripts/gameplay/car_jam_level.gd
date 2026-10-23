@@ -149,12 +149,12 @@ func set_passenger_state_local(pid: int, new_state: String) -> void:
 	if p != null:
 		p["state"] = new_state
 
-const LANE_SPACING := 17.5
-const LANE_SPACING_CURVE := 16.0
+const LANE_SPACING := 22.0
+const LANE_SPACING_CURVE := 18.0
 const ROW_SPACING := 29.0
 const MIN_ROW_GAP := 28.5
 const NUM_LANES := 4
-const PASSENGER_SPACING := 17.5
+const PASSENGER_SPACING := 22.0
 const MAX_INITIAL_LOOP_PASSENGERS := 144
 const MAX_LOOP_ROWS: int = int(MAX_INITIAL_LOOP_PASSENGERS / NUM_LANES) # 36 rows
 const TOTAL_LOOP_SLOTS: int = 36
@@ -3731,7 +3731,7 @@ func _animate_individual_boarding(p: Dictionary, vehicle_id: int, slot_id: int, 
 		# 3. Ground contact shadow stays on road surface and contracts at jump apex
 		if shadow_sprite != null:
 			var s_factor: float = 1.0 - jump_arc * 0.35
-			shadow_sprite.position = Vector2(0.0, 8.0 + jump_height)
+			shadow_sprite.position = Vector2(0.0, 10.0 + jump_height)
 			shadow_sprite.scale = Vector2(pv.BASE_SCALE * 1.5 * s_factor, pv.BASE_SCALE * 0.75 * s_factor)
 			shadow_sprite.modulate.a = 0.45 * (1.0 - jump_arc * 0.25)
 		

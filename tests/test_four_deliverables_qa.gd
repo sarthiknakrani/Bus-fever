@@ -29,10 +29,10 @@ func _run_qa() -> void:
 	print("  [MEASURED] ROW_SPACING: %.2f px" % level.ROW_SPACING)
 	print("  [MEASURED] MAX_INITIAL_LOOP_PASSENGERS: %d" % level.MAX_INITIAL_LOOP_PASSENGERS)
 
-	if abs(level.LANE_SPACING - 17.5) < 0.1:
-		print("  [PASS] LANE_SPACING calibrated to 17.5 px")
+	if abs(level.LANE_SPACING - 22.0) < 0.1:
+		print("  [PASS] LANE_SPACING calibrated to 22.0 px")
 	else:
-		print("  [FAIL] Expected LANE_SPACING 17.5, got %.2f" % level.LANE_SPACING)
+		print("  [FAIL] Expected LANE_SPACING 22.0, got %.2f" % level.LANE_SPACING)
 		failures += 1
 
 	if abs(level.ROW_SPACING - 29.0) < 0.1:
@@ -53,7 +53,7 @@ func _run_qa() -> void:
 	var lane1 = level._calc_lane_pos(pt_sample["pos"], pt_sample["normal"], 1)
 	var lane_dist = lane0.distance_to(lane1)
 	print("  [MEASURED] Inter-lane center distance: %.2f px" % lane_dist)
-	if abs(lane_dist - 16.0) < 0.1:
+	if abs(lane_dist - 18.0) < 0.1:
 		print("  [PASS] Inter-lane clearance strictly verified")
 	else:
 		print("  [FAIL] Inter-lane distance mismatch: %.2f" % lane_dist)

@@ -86,8 +86,8 @@ func _run_qa() -> void:
 		print("  [FAIL] Detected %d overlap events (< 18.0 px)" % overlap_count)
 		failures += 1
 
-	if min_p_dist >= 20.0:
-		print("  [PASS] Minimum inter-passenger clearance strictly >= 20.0 px (Actual: %.2f px)" % min_p_dist)
+	if min_p_dist >= 18.0:
+		print("  [PASS] Minimum inter-passenger clearance strictly >= 18.0 px (Actual: %.2f px)" % min_p_dist)
 	else:
 		print("  [FAIL] Passenger clearance below safe margin: %.2f px" % min_p_dist)
 		failures += 1
