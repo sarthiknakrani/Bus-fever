@@ -9,11 +9,12 @@ class_name PlazaEnvironment
 ## - Subtle sparkling diamond sun glints dancing on the water surface
 
 var _island_draw_node: Node2D
-var _water_time: float = 0.0
+var _water_time: float = 2.5
 
 func _ready() -> void:
 	z_index = -1
 	visible = true
+	# Animated lagoon water flow matching the surrounding ocean waves
 	set_process(true)
 	_build_lagoon_accents()
 

@@ -132,176 +132,189 @@ func _gen_wav(samples: PackedFloat32Array, loop: bool = false) -> AudioStreamWAV
 	return stream
 
 func _gen_ui_click() -> AudioStreamWAV:
-	# Smooth, warm wooden/bubble tick (like high-end iOS UI)
+	# Velvety, warm rounded wooden/bubble tap (iOS haptic style - zero click harshness)
 	var dur: float = 0.045
 	var count: int = int(float(MIX_RATE) * dur)
 	var samples: PackedFloat32Array = PackedFloat32Array()
 	samples.resize(count)
 	for i in count:
 		var t: float = float(i) / float(MIX_RATE)
-		var attack: float = minf(1.0, t / 0.003)
-		var env: float = attack * exp(-t * 90.0)
-		var s: float = sin(t * 520.0 * TAU) * 0.42 + sin(t * 1040.0 * TAU) * 0.18 + sin(t * 260.0 * TAU) * 0.12
+		var attack: float = minf(1.0, t / 0.004)
+		var env: float = attack * exp(-t * 60.0)
+		var freq: float = lerpf(320.0, 200.0, t / dur)
+		var s: float = sin(t * freq * TAU) * 0.40 + sin(t * freq * 2.0 * TAU) * 0.10
 		samples[i] = s * env
 	return _gen_wav(samples)
 
 func _gen_select_pop() -> AudioStreamWAV:
-	# Juicy, warm, resonant bubble pop
-	var dur: float = 0.085
+	# Gentle, juicy, rounded waterdrop pop
+	var dur: float = 0.08
 	var count: int = int(float(MIX_RATE) * dur)
 	var samples: PackedFloat32Array = PackedFloat32Array()
 	samples.resize(count)
 	for i in count:
 		var t: float = float(i) / float(MIX_RATE)
 		var norm_t: float = t / dur
-		var freq: float = lerpf(300.0, 760.0, sqrt(norm_t))
-		var env: float = sin(norm_t * PI) * exp(-t * 12.0)
-		var s: float = sin(t * freq * TAU) * 0.50 + sin(t * freq * 2.0 * TAU) * 0.15
+		var attack: float = minf(1.0, t / 0.005)
+		var freq: float = lerpf(260.0, 480.0, sqrt(norm_t))
+		var env: float = attack * exp(-t * 22.0)
+		var s: float = sin(t * freq * TAU) * 0.42 + sin(t * freq * 2.0 * TAU) * 0.08
 		samples[i] = s * env
 	return _gen_wav(samples)
 
 func _gen_blocked_horn() -> AudioStreamWAV:
-	# Smooth, warm friendly rubbery double-knock (zero harsh buzz)
+	# Warm, polite wooden marimba double tap (pure mellow sines, zero harsh buzz)
 	var dur: float = 0.18
 	var count: int = int(float(MIX_RATE) * dur)
 	var samples: PackedFloat32Array = PackedFloat32Array()
 	samples.resize(count)
 	for i in count:
 		var t: float = float(i) / float(MIX_RATE)
-		var env1: float = exp(-t * 40.0)
-		var tap1: float = sin(t * lerpf(220.0, 130.0, t / 0.08) * TAU) * env1 * 0.40
+		var att1: float = minf(1.0, t / 0.005)
+		var env1: float = att1 * exp(-t * 32.0)
+		var tap1: float = (sin(t * 180.0 * TAU) * 0.32 + sin(t * 360.0 * TAU) * 0.08) * env1
 		var tap2: float = 0.0
-		if t > 0.05:
-			var t2: float = t - 0.05
-			var env2: float = exp(-t2 * 45.0)
-			tap2 = sin(t2 * lerpf(180.0, 110.0, t2 / 0.08) * TAU) * env2 * 0.28
+		if t > 0.06:
+			var t2: float = t - 0.06
+			var att2: float = minf(1.0, t2 / 0.005)
+			var env2: float = att2 * exp(-t2 * 34.0)
+			tap2 = (sin(t2 * 140.0 * TAU) * 0.28 + sin(t2 * 280.0 * TAU) * 0.06) * env2
 		samples[i] = tap1 + tap2
 	return _gen_wav(samples)
 
 func _gen_move_vroom() -> AudioStreamWAV:
-	# Smooth electric transit acceleration glide + warm pneumatic finish
-	var dur: float = 0.30
+	# Silky-smooth electric glide purr with soft Tukey cosine fade
+	var dur: float = 0.28
 	var count: int = int(float(MIX_RATE) * dur)
 	var samples: PackedFloat32Array = PackedFloat32Array()
 	samples.resize(count)
 	for i in count:
 		var t: float = float(i) / float(MIX_RATE)
 		var norm_t: float = t / dur
-		var freq: float = lerpf(160.0, 360.0, norm_t * norm_t)
-		var env: float = sin(norm_t * PI) * (1.0 - norm_t * 0.3)
-		var tone: float = sin(t * freq * TAU) * 0.35 + sin(t * freq * 2.0 * TAU) * 0.16 + sin(t * freq * 0.5 * TAU) * 0.18
+		var freq: float = lerpf(140.0, 260.0, norm_t * norm_t)
+		var env: float = sin(norm_t * PI)
+		var tone: float = sin(t * freq * TAU) * 0.30 + sin(t * freq * 2.0 * TAU) * 0.10 + sin(t * freq * 0.5 * TAU) * 0.12
 		samples[i] = tone * env
 	return _gen_wav(samples)
 
 func _gen_parking_chirp() -> AudioStreamWAV:
-	# Satisfying smooth pneumatic lock & gentle chime
-	var dur: float = 0.14
+	# Smooth, mellow warm Rhodes arrival chime (C5 + G5)
+	var dur: float = 0.15
 	var count: int = int(float(MIX_RATE) * dur)
 	var samples: PackedFloat32Array = PackedFloat32Array()
 	samples.resize(count)
 	for i in count:
 		var t: float = float(i) / float(MIX_RATE)
-		var env: float = exp(-t * 24.0)
-		var s: float = sin(t * 587.33 * TAU) * 0.36 + sin(t * 1174.66 * TAU) * 0.18 + sin(t * 1761.99 * TAU) * 0.08
+		var attack: float = minf(1.0, t / 0.006)
+		var env: float = attack * exp(-t * 16.0)
+		var s: float = sin(t * 523.25 * TAU) * 0.32 + sin(t * 783.99 * TAU) * 0.18 + sin(t * 1046.50 * TAU) * 0.06
 		samples[i] = s * env
 	return _gen_wav(samples)
 
 func _gen_board_chime() -> AudioStreamWAV:
-	# Sparkling musical crystal boarding chime (C6 + E6 + G6)
-	var dur: float = 0.18
+	# Warm, gentle, cozy kalimba / wooden marimba boarding chime (A4 + C#5 + E5 pentatonic triad)
+	# Smooth attack and warm fundamental eliminate harsh digital treble ping completely
+	var dur: float = 0.16
 	var count: int = int(float(MIX_RATE) * dur)
 	var samples: PackedFloat32Array = PackedFloat32Array()
 	samples.resize(count)
 	for i in count:
 		var t: float = float(i) / float(MIX_RATE)
-		var env: float = exp(-t * 16.0)
-		var s: float = sin(t * 1046.50 * TAU) * 0.30 + sin(t * 1318.51 * TAU) * 0.22 + sin(t * 1567.98 * TAU) * 0.14
-		samples[i] = s * env
+		var attack: float = minf(1.0, t / 0.005)
+		var env: float = attack * exp(-t * 12.0)
+		var s: float = (sin(t * 440.00 * TAU) * 0.42 + sin(t * 554.37 * TAU) * 0.26 + sin(t * 659.25 * TAU) * 0.16 + sin(t * 880.00 * TAU) * 0.05) * env
+		samples[i] = s
 	return _gen_wav(samples)
 
 func _gen_depart_horn() -> AudioStreamWAV:
-	# Cheerful airport transit two-tone chime (C5 -> E5/G5 chord)
-	var dur: float = 0.36
+	# Cheerful, warm two-tone transit chime (G4 -> C5/E5 warm chord)
+	var dur: float = 0.35
 	var count: int = int(float(MIX_RATE) * dur)
 	var samples: PackedFloat32Array = PackedFloat32Array()
 	samples.resize(count)
 	for i in count:
 		var t: float = float(i) / float(MIX_RATE)
 		var s: float = 0.0
-		if t < 0.14:
-			var env1: float = exp(-t * 12.0)
-			s = (sin(t * 523.25 * TAU) * 0.32 + sin(t * 1046.50 * TAU) * 0.12) * env1
+		if t < 0.13:
+			var att1: float = minf(1.0, t / 0.006)
+			var env1: float = att1 * exp(-t * 10.0)
+			s = (sin(t * 392.00 * TAU) * 0.34 + sin(t * 784.00 * TAU) * 0.08) * env1
 		else:
-			var t2: float = t - 0.14
-			var env2: float = exp(-t2 * 10.0)
-			s = (sin(t * 659.25 * TAU) * 0.26 + sin(t * 783.99 * TAU) * 0.24 + sin(t * 1318.51 * TAU) * 0.10) * env2
+			var t2: float = t - 0.13
+			var att2: float = minf(1.0, t2 / 0.006)
+			var env2: float = att2 * exp(-t2 * 9.0)
+			s = (sin(t * 523.25 * TAU) * 0.28 + sin(t * 659.25 * TAU) * 0.22 + sin(t * 1046.50 * TAU) * 0.06) * env2
 		samples[i] = s
 	return _gen_wav(samples)
 
 func _gen_victory_fanfare() -> AudioStreamWAV:
-	# Sparkling orchestral celebration arpeggio: C5 -> E5 -> G5 -> C6 -> E6
-	var dur: float = 0.95
+	# Warm, joyful marimba / vibraphone celebration arpeggio: C5 -> E5 -> G5 -> C6
+	var dur: float = 0.85
 	var count: int = int(float(MIX_RATE) * dur)
 	var samples: PackedFloat32Array = PackedFloat32Array()
 	samples.resize(count)
-	var notes: Array[float] = [523.25, 659.25, 783.99, 1046.50, 1318.51]
+	var notes: Array[float] = [523.25, 659.25, 783.99, 1046.50]
 	var note_dur: float = 0.14
 	for i in count:
 		var t: float = float(i) / float(MIX_RATE)
 		var note_idx: int = clampi(int(t / note_dur), 0, notes.size() - 1)
 		var note_t: float = fmod(t, note_dur)
 		var freq: float = notes[note_idx]
-		var env: float = exp(-note_t * 6.5) if note_idx < notes.size() - 1 else exp(-(t - 0.56) * 3.5)
-		var s: float = (sin(t * freq * TAU) * 0.32 + sin(t * freq * 2.0 * TAU) * 0.14 + sin(t * freq * 0.5 * TAU) * 0.10) * env
+		var att: float = minf(1.0, note_t / 0.006)
+		var env: float = att * (exp(-note_t * 6.0) if note_idx < notes.size() - 1 else exp(-(t - 0.42) * 3.5))
+		var s: float = (sin(t * freq * TAU) * 0.32 + sin(t * freq * 2.0 * TAU) * 0.08 + sin(t * freq * 0.5 * TAU) * 0.12) * env
 		samples[i] = s
 	return _gen_wav(samples)
 
 func _gen_failure_buzzer() -> AudioStreamWAV:
-	# Gentle, friendly descending minor chord (A minor) - zero harsh buzzing
-	var dur: float = 0.55
+	# Gentle, cozy descending marimba phrase (E4 -> D4 -> C4 -> A3) - zero harsh buzz
+	var dur: float = 0.50
 	var count: int = int(float(MIX_RATE) * dur)
 	var samples: PackedFloat32Array = PackedFloat32Array()
 	samples.resize(count)
-	var notes: Array[float] = [440.0, 392.0, 349.23, 329.63]
+	var notes: Array[float] = [329.63, 293.66, 261.63, 220.00]
 	for i in count:
 		var t: float = float(i) / float(MIX_RATE)
-		var note_idx: int = clampi(int(t / 0.13), 0, notes.size() - 1)
-		var note_t: float = fmod(t, 0.13)
+		var note_idx: int = clampi(int(t / 0.12), 0, notes.size() - 1)
+		var note_t: float = fmod(t, 0.12)
 		var freq: float = notes[note_idx]
-		var env: float = exp(-note_t * 8.0) * (1.0 - t / dur)
+		var att: float = minf(1.0, note_t / 0.006)
+		var env: float = att * exp(-note_t * 7.5) * (1.0 - t / dur)
 		var s: float = (sin(t * freq * TAU) * 0.30 + sin(t * freq * 0.5 * TAU) * 0.15) * env
 		samples[i] = s
 	return _gen_wav(samples)
 
 func _gen_failure_alarm() -> AudioStreamWAV:
-	# Smooth marimba pulsing warning chime (587Hz / 440Hz soft pulses)
-	var dur: float = 3.0
+	# Smooth, gentle pulsing marimba warning tone (392Hz / 329Hz)
+	var dur: float = 2.0
 	var count: int = int(float(MIX_RATE) * dur)
 	var samples: PackedFloat32Array = PackedFloat32Array()
 	samples.resize(count)
 	for i in count:
 		var t: float = float(i) / float(MIX_RATE)
 		var pulse_t: float = fmod(t, 0.5)
-		var freq: float = 587.33 if fmod(t, 1.0) < 0.5 else 440.0
-		var env: float = exp(-pulse_t * 9.0) if pulse_t < 0.38 else 0.0
-		var s: float = (sin(t * freq * TAU) * 0.22 + sin(t * freq * 2.0 * TAU) * 0.08) * env
+		var freq: float = 392.00 if fmod(t, 1.0) < 0.5 else 329.63
+		var att: float = minf(1.0, pulse_t / 0.01)
+		var env: float = att * exp(-pulse_t * 8.0) if pulse_t < 0.40 else 0.0
+		var s: float = (sin(t * freq * TAU) * 0.22 + sin(t * freq * 2.0 * TAU) * 0.05) * env
 		samples[i] = s
 	return _gen_wav(samples, true)
 
 func _gen_booster_sparkle() -> AudioStreamWAV:
-	# Delicate fairy bell sparkle
-	var dur: float = 0.45
+	# Delicate, silky fairy chime with soft attacks
+	var dur: float = 0.40
 	var count: int = int(float(MIX_RATE) * dur)
 	var samples: PackedFloat32Array = PackedFloat32Array()
 	samples.resize(count)
-	var notes: Array[float] = [783.99, 987.77, 1174.66, 1318.51, 1567.98, 1975.53]
+	var notes: Array[float] = [783.99, 987.77, 1174.66, 1318.51, 1567.98]
 	for i in count:
 		var t: float = float(i) / float(MIX_RATE)
-		var note_idx: int = clampi(int(t / 0.065), 0, notes.size() - 1)
-		var note_t: float = fmod(t, 0.065)
+		var note_idx: int = clampi(int(t / 0.075), 0, notes.size() - 1)
+		var note_t: float = fmod(t, 0.075)
 		var freq: float = notes[note_idx]
-		var env: float = exp(-note_t * 14.0)
-		var s: float = (sin(t * freq * TAU) * 0.30 + sin(t * freq * 2.0 * TAU) * 0.10) * env
+		var att: float = minf(1.0, note_t / 0.005)
+		var env: float = att * exp(-note_t * 12.0)
+		var s: float = (sin(t * freq * TAU) * 0.26 + sin(t * freq * 2.0 * TAU) * 0.06) * env
 		samples[i] = s
 	return _gen_wav(samples)
 
@@ -312,7 +325,7 @@ func _generate_music() -> void:
 	var count: int = int(float(MIX_RATE) * total_dur)
 	var samples: PackedFloat32Array = PackedFloat32Array()
 	samples.resize(count)
-	# Chords: Cmaj7, Am7, Dm7, G7, Em7, Am7, Fmaj7, G7
+	# Warm chords: Cmaj7, Am7, Dm7, G7, Em7, Am7, Fmaj7, G7
 	var chords = [
 		[261.63, 329.63, 392.00, 493.88], # Cmaj7
 		[220.00, 261.63, 329.63, 392.00], # Am7
@@ -334,46 +347,52 @@ func _generate_music() -> void:
 		var bass: float = bass_roots[bar_idx]
 		var mel: float = melodies[bar_idx]
 
-		# Warm bass
-		var bass_env: float = exp(-bar_t * 1.8)
-		var bass_val: float = (sin(t * bass * TAU) * 0.16 + sin(t * bass * 2.0 * TAU) * 0.06) * bass_env
+		# Warm electric bass
+		var bass_att: float = minf(1.0, bar_t / 0.01)
+		var bass_env: float = bass_att * exp(-bar_t * 1.6)
+		var bass_val: float = (sin(t * bass * TAU) * 0.16 + sin(t * bass * 2.0 * TAU) * 0.04) * bass_env
 
-		# Soft Rhodes piano chord (warm sine with gentle bell overtone)
-		var chord_env: float = exp(-bar_t * 2.2) * 0.08
+		# Soft Rhodes piano chord (pure warm sines with soft 10ms attack and gentle decay)
+		var chord_att: float = minf(1.0, bar_t / 0.015)
+		var chord_env: float = chord_att * exp(-bar_t * 1.8) * 0.075
 		var chord_val: float = 0.0
 		for freq in chord:
-			chord_val += sin(t * freq * TAU) + sin(t * freq * 2.0 * TAU) * 0.18
+			chord_val += sin(t * freq * TAU) + sin(t * freq * 2.0 * TAU) * 0.10
 		chord_val *= chord_env
 
-		# Sweet, delicate music box melody on beat 2
+		# Delicate, mellow music box melody
 		var mel_t: float = fmod(bar_t, 0.625)
-		var mel_env: float = exp(-mel_t * 5.0) * 0.05
-		var mel_val: float = (sin(t * mel * TAU) * 0.8 + sin(t * mel * 2.0 * TAU) * 0.2) * mel_env
+		var mel_att: float = minf(1.0, mel_t / 0.008)
+		var mel_env: float = mel_att * exp(-mel_t * 4.5) * 0.04
+		var mel_val: float = (sin(t * mel * TAU) * 0.8 + sin(t * mel * 2.0 * TAU) * 0.15) * mel_env
 
 		samples[i] = bass_val + chord_val + mel_val
 	_music_stream = _gen_wav(samples, true)
 
 func _gen_coin_clink() -> AudioStreamWAV:
-	var dur: float = 0.16
+	# Gentle, warm ceramic clink
+	var dur: float = 0.14
 	var count: int = int(float(MIX_RATE) * dur)
 	var samples: PackedFloat32Array = PackedFloat32Array()
 	samples.resize(count)
 	for i in count:
 		var t: float = float(i) / float(MIX_RATE)
-		var env: float = exp(-t * 22.0)
-		var s: float = (sin(t * 1975.53 * TAU) * 0.4 + sin(t * 2637.02 * TAU) * 0.25 + sin(t * 3951.07 * TAU) * 0.1) * env
+		var attack: float = minf(1.0, t / 0.003)
+		var env: float = attack * exp(-t * 24.0)
+		var s: float = (sin(t * 1318.51 * TAU) * 0.35 + sin(t * 1760.00 * TAU) * 0.20) * env
 		samples[i] = s
 	return _gen_wav(samples)
 
 func _gen_firework_pop() -> AudioStreamWAV:
-	var dur: float = 0.30
+	# Soft, festive poof (low-pass filtered warm thump)
+	var dur: float = 0.25
 	var count: int = int(float(MIX_RATE) * dur)
 	var samples: PackedFloat32Array = PackedFloat32Array()
 	samples.resize(count)
 	for i in count:
 		var t: float = float(i) / float(MIX_RATE)
-		var env: float = exp(-t * 12.0)
-		var noise: float = randf_range(-0.25, 0.25) * env
-		var thump: float = sin(t * lerpf(340.0, 80.0, t / dur) * TAU) * 0.35 * env
+		var env: float = exp(-t * 14.0)
+		var noise: float = randf_range(-0.15, 0.15) * env
+		var thump: float = sin(t * lerpf(240.0, 70.0, t / dur) * TAU) * 0.30 * env
 		samples[i] = thump + noise
 	return _gen_wav(samples)

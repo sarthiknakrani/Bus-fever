@@ -39,14 +39,16 @@ var vp_size := Vector2.ZERO
 var track_screen_y: float = -1.0
 var scale_factor: float = 1.0
 var divider_screen_y: float = -1.0
-var _water_time: float = 0.0
+var _water_time: float = 2.5
 
 func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 
 func _ready() -> void:
+	# Animated tropical water flow with dynamic wave surges and shimmering caustics
 	set_process(true)
+	queue_redraw()
 
 func _process(delta: float) -> void:
 	_water_time += delta
@@ -353,27 +355,41 @@ func _draw_shallow_caustics(w: float, shore_base_y: float, t: float) -> void:
 			pts.append(Vector2(cx, cy + coff))
 		draw_polyline(pts, caustic_col, 2.5, true)
 
-## Draws an authentic 3D toy lifebuoy with realistic water shadow, red quadrants, and glossy specular
+## Draws an authentic 3D toy lifebuoy with a hollow center showing natural ocean water underneath
 func _draw_3d_lifebuoy(pos: Vector2, rad: float, rot: float, bob: float) -> void:
-	var shadow_offset = Vector2(2.0, 9.0 + bob * 0.4)
-	draw_circle(pos + shadow_offset, rad * 1.06, Color(0.01, 0.10, 0.24, 0.38))
+	var r_inner := rad * 0.46
+	var ring_w := rad - r_inner
+	var mid_r := (rad + r_inner) * 0.5
+	var shadow_offset := Vector2(2.0, 8.0 + bob * 0.4)
 
-	draw_circle(pos, rad, Color.WHITE)
+	# 1. Ring shadow on ocean surface (hollow ring shadow)
+	draw_arc(pos + shadow_offset, mid_r, 0, TAU, 36, Color(0.01, 0.08, 0.22, 0.35), ring_w * 1.15)
 
+	# 2. White doughnut ring body (hollow torus - center is 100% clear water!)
+	draw_arc(pos, mid_r, 0, TAU, 48, Color.WHITE, ring_w)
+
+	# 3. Four red quadrant stripes (drawn strictly between r_inner and rad)
 	for base_ang in [0.0, 90.0, 180.0, 270.0]:
-		var a0 = rot + deg_to_rad(base_ang - 18.0)
-		var a1 = rot + deg_to_rad(base_ang + 18.0)
-		var stripe_pts := PackedVector2Array([pos])
-		for st in 8:
-			var a = lerpf(a0, a1, float(st) / 7.0)
+		var a0 = rot + deg_to_rad(base_ang - 16.0)
+		var a1 = rot + deg_to_rad(base_ang + 16.0)
+		var stripe_pts := PackedVector2Array()
+		var n_step := 6
+		# Outer arc
+		for st in range(n_step + 1):
+			var a = lerpf(a0, a1, float(st) / float(n_step))
 			stripe_pts.append(pos + Vector2(cos(a), sin(a)) * (rad + 0.5))
+		# Inner arc backwards
+		for st in range(n_step, -1, -1):
+			var a = lerpf(a0, a1, float(st) / float(n_step))
+			stripe_pts.append(pos + Vector2(cos(a), sin(a)) * (r_inner - 0.5))
 		draw_colored_polygon(stripe_pts, Color("eb3241"))
 
-	draw_circle(pos, rad * 0.48, COLOR_WATER_SHALLOW)
+	# 4. 3D depth rims: inner shadow into the water hole & outer rim
+	draw_arc(pos, r_inner, 0, TAU, 36, Color(0.01, 0.08, 0.22, 0.32), 2.0)
+	draw_arc(pos, rad, 0, TAU, 36, Color(0.0, 0.0, 0.0, 0.16), 1.5)
 
-	draw_arc(pos, rad * 0.48, 0, TAU, 32, Color(0.0, 0.0, 0.0, 0.22), 2.2)
-	draw_arc(pos, rad - 0.8, 0, TAU, 32, Color(0.0, 0.0, 0.0, 0.14), 1.5)
-	draw_circle(pos + Vector2(-rad * 0.42, -rad * 0.42), rad * 0.24, Color(1.0, 1.0, 1.0, 0.75))
+	# 5. Glossy top-left 3D specular highlight glint along the torus crest
+	draw_arc(pos + Vector2(-1.2, -1.2), mid_r, -PI * 0.85, -PI * 0.15, 24, Color(1.0, 1.0, 1.0, 0.82), 2.2)
 
 ## Draws a crisp sparkling diamond glint star
 func _draw_diamond_glint(pos: Vector2, sz: float, col: Color) -> void:

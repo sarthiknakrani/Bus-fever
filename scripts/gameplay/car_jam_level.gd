@@ -335,7 +335,7 @@ func _process(delta: float) -> void:
 					target_prog = feeder_stop_pos
 				else:
 					target_prog = minf(_feeder_rows[j - 1].progress - ROW_SPACING, queue_slot)
-			
+
 			var dist_ahead: float = maxf(0.0, target_prog - f_row.progress)
 			var base_spd: float = passenger_entrance_speed if _entrance_active else passenger_normal_speed
 			var speed: float = base_spd
@@ -1042,6 +1042,15 @@ func _setup_visuals(lvl: CarJamLevelData) -> void:
 	for v in vehicle_views.values():
 		if is_instance_valid(v): v.queue_free()
 	vehicle_views.clear()
+
+	# Align board orientation: Level 2 buses sit straight (0 deg, scale 1.0) instead of tilted/cross
+	if board_root != null:
+		if lvl.level_id == 2:
+			board_root.rotation = 0.0
+			board_root.scale = Vector2.ONE
+		else:
+			board_root.rotation = deg_to_rad(45)
+			board_root.scale = Vector2(1.0, 0.72)
 	for c in boarding_effects.get_children():
 		c.queue_free()
 	for c in transit_layer.get_children():
@@ -1115,6 +1124,7 @@ func _setup_visuals(lvl: CarJamLevelData) -> void:
 
 	# 4. Passenger Queue
 	_init_passenger_track()
+	_update_layout()
 
 func _calc_footprint_center_offset(footprint: Array[Vector2i]) -> Vector2:
 	if footprint.size() <= 1: return Vector2.ZERO
@@ -3174,9 +3184,10 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 	var board_cells_w = float(controller.level_data.board_size.x) if controller != null and controller.level_data != null else 7.0
 	var board_cells_h = float(controller.level_data.board_size.y) if controller != null and controller.level_data != null else 7.0
 	var board_local_size = max(board_cells_w, board_cells_h) * CELL_SIZE
-	# Rotated 45 deg, scale (1.0, 0.72)
-	var board_pixel_w = board_local_size * sqrt(2.0)
-	var board_pixel_h = board_pixel_w * 0.72
+	# Straight vs 45 deg isometric bounds
+	var is_straight_board: bool = (board_root != null and is_zero_approx(board_root.rotation))
+	var board_pixel_w = board_local_size * (1.0 if is_straight_board else sqrt(2.0))
+	var board_pixel_h = board_local_size * (1.0 if is_straight_board else (sqrt(2.0) * 0.72))
 	
 	# 2. Determine Screen Space Allocation
 	# User request: Lower horizontal divider line to create ample clearance below slots/buses,
@@ -3692,35 +3703,50 @@ func _animate_individual_boarding(p: Dictionary, vehicle_id: int, slot_id: int, 
 	board_curve.add_point(target_pos, Vector2(0.0, -10.0), Vector2.ZERO)
 
 	var travel_dist = board_curve.get_baked_length()
-	var flight_duration := clampf(travel_dist / 480.0, 0.18, 0.24)
+	var flight_duration := clampf(travel_dist / 380.0, 0.28, 0.35)
 	
 	# Paced lane micro-stagger: Lane 0 steps out first, followed by Lane 1, 2, 3
 	var start_delay: float = float(lane_idx) * 0.035
-	var overlap_time = flight_duration * 0.70
-	var fade_time = flight_duration * 0.30
-	
-	# Hop animation starts with flight
-	var tw_jump = pv.create_tween()
-	if start_delay > 0.0:
-		tw_jump.tween_interval(start_delay)
-	tw_jump.tween_callback(func():
-		if is_instance_valid(pv):
-			pv.animate_jump(0.0)
-	)
 	
 	var tw = pv.create_tween().set_parallel(true)
 	
 	var curve_len = board_curve.get_baked_length()
+	var start_pv_scale: Vector2 = pv.scale
+	var char_sprite: Sprite2D = pv.get_node_or_null("VisualNode/CharacterSprite") as Sprite2D
+	var shadow_sprite: Sprite2D = pv.get_node_or_null("Shadow") as Sprite2D
+	
 	var path_func = func(t: float):
-		if is_instance_valid(pv):
-			pv.global_position = board_curve.sample_baked(t * curve_len)
+		if not is_instance_valid(pv):
+			return
+		# 1. Follow ground path
+		var ground_pt: Vector2 = board_curve.sample_baked(t * curve_len)
+		pv.global_position = ground_pt
+		
+		# 2. 3D parabolic leap: lifts passenger up into 2.5D air
+		var jump_arc: float = sin(t * PI)
+		var jump_height: float = jump_arc * 20.0
+		if char_sprite != null:
+			char_sprite.position.y = -jump_height
+		
+		# 3. Ground contact shadow stays on road surface and contracts at jump apex
+		if shadow_sprite != null:
+			var s_factor: float = 1.0 - jump_arc * 0.35
+			shadow_sprite.position = Vector2(0.0, 8.0 + jump_height)
+			shadow_sprite.scale = Vector2(pv.BASE_SCALE * 1.5 * s_factor, pv.BASE_SCALE * 0.75 * s_factor)
+			shadow_sprite.modulate.a = 0.45 * (1.0 - jump_arc * 0.25)
+		
+		# 4. Fluid squash & stretch
+		var squash_x: float = 1.0 - jump_arc * 0.12
+		var stretch_y: float = 1.0 + jump_arc * 0.18
+		if t > 0.75:
+			var entry_t: float = (t - 0.75) / 0.25
+			var entry_scale: float = lerpf(1.0, 0.35, entry_t)
+			pv.scale = start_pv_scale * entry_scale
+			pv.modulate.a = 1.0 - entry_t
+		else:
+			pv.scale = Vector2(start_pv_scale.x * squash_x, start_pv_scale.y * stretch_y)
 	
 	tw.tween_method(path_func, 0.0, 1.0, flight_duration).set_delay(start_delay).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	
-	# Shrink/fade cleanly during the final entry portion without reparenting scale pop
-	var start_pv_scale: Vector2 = pv.scale
-	tw.tween_property(pv, "scale", start_pv_scale * 0.6, fade_time).set_delay(start_delay + overlap_time).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tw.tween_property(pv, "modulate:a", 0.0, fade_time).set_delay(start_delay + overlap_time).set_trans(Tween.TRANS_LINEAR)
 	
 	var token = controller.session_token
 	var tw_done = create_tween()
@@ -3749,6 +3775,12 @@ func _on_individual_boarded(pid: int, vehicle_id: int, color_id: String, token: 
 		p["view"] = null
 	_vehicle_incoming_runners[vehicle_id] = maxi(0, _vehicle_incoming_runners.get(vehicle_id, 0) - 1)
 	_oval_freed_capacity += 1
+	var vv: VehicleView = vehicle_views.get(vehicle_id, null)
+	if is_instance_valid(vv):
+		var orig_s := vv.scale
+		var tw_b := vv.create_tween()
+		tw_b.tween_property(vv, "scale", orig_s * Vector2(1.04, 0.96), 0.04).set_trans(Tween.TRANS_QUAD)
+		tw_b.tween_property(vv, "scale", orig_s, 0.07).set_trans(Tween.TRANS_BOUNCE)
 	controller.check_terminal_states()
 
 func _rollback_uncommitted_passenger(p: Dictionary, pid: int) -> void:
