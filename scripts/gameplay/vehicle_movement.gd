@@ -167,6 +167,9 @@ static func animate_dispatch(
 	var t_dispatch_start: float = Time.get_ticks_msec() / 1000.0
 	print("[QA] Bus %d ARRIVAL START at %.3f (Target: %.2fs)" % [vehicle_id, t_dispatch_start, duration])
 
+	if vehicle_node.has_method("set_exhaust_smoke_active"):
+		vehicle_node.set_exhaust_smoke_active(true, 1.0)
+
 	var curve_callable := Callable(
 		VehicleMovement, "_update_curve"
 	).bind(
@@ -207,6 +210,8 @@ static func animate_dispatch(
 			v_id, t_arrival_end, t_arrival_end - t_start_sec, BUS_ARRIVAL_DURATION * duration_mult
 		])
 		if is_instance_valid(v_node):
+			if v_node.has_method("set_exhaust_smoke_active"):
+				v_node.set_exhaust_smoke_active(false)
 			v_node.z_index = 10
 			v_node.rotation = final_rot_target
 			v_node.position = slot_pos
@@ -253,6 +258,8 @@ static func animate_departure(
 
 	if vehicle_node.has_method("set_parking_mode"):
 		vehicle_node.set_parking_mode(false)
+	if vehicle_node.has_method("set_exhaust_smoke_active"):
+		vehicle_node.set_exhaust_smoke_active(true, 1.0)
 	vehicle_node.z_index = 200 # Ensure it renders above parking slots and grey platform apron
 
 	var t_dep_start: float = Time.get_ticks_msec() / 1000.0
@@ -362,12 +369,47 @@ static func animate_departure(
 			vehicle_id, t_dep_end, t_dep_end - t_dep_start, total_duration
 		])
 		if is_instance_valid(vehicle_node):
+			if vehicle_node.has_method("set_exhaust_smoke_active"):
+				vehicle_node.set_exhaust_smoke_active(false)
 			vehicle_node.visible = false
 			if vehicle_node.get_parent() != null:
 				vehicle_node.get_parent().remove_child(vehicle_node)
 			vehicle_node.queue_free()
 		if is_instance_valid(controller):
 			controller.on_vehicle_departed_from_slot(vehicle_id, slot_id, token)
+	)
+
+static func update_dispatch_transform(
+	t: float,
+	curve: Curve2D,
+	v_node: Node2D,
+	target_scale: Vector2,
+	start_scale: Vector2,
+	drive_forward: bool,
+	front_native: Vector2,
+	force_final_rot: bool = false,
+	final_rot_target: float = 0.0,
+	clear_t: float = 1.0,
+	controller: Node = null,
+	vehicle_id: int = -1,
+	token: int = 0,
+	board_cleared_ref: Array = []
+) -> void:
+	_update_curve(
+		t,
+		curve,
+		v_node,
+		target_scale,
+		start_scale,
+		drive_forward,
+		front_native,
+		force_final_rot,
+		final_rot_target,
+		clear_t,
+		controller,
+		vehicle_id,
+		token,
+		board_cleared_ref
 	)
 
 static func _update_curve(
@@ -384,7 +426,7 @@ static func _update_curve(
 	controller: Node = null,
 	vehicle_id: int = -1,
 	token: int = 0,
-	board_cleared_ref: Array[bool] = []
+	board_cleared_ref: Array = []
 ) -> void:
 	if not is_instance_valid(v_node): return
 

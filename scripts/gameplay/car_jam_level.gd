@@ -202,6 +202,7 @@ var _runner_spawn_timer: float = 0.0
 const RUNNER_SPAWN_INTERVAL: float = 0.035
 var _departure_queue: Array[Dictionary] = []
 var _is_bus_departing: bool = false
+var _active_dispatches: Array[Dictionary] = []
 
 @export var normal_lap_seconds: float = 3.41
 @export var passenger_normal_speed: float = 335.0
@@ -510,6 +511,7 @@ func _process(delta: float) -> void:
 		print("[QA] Sprint lap: ", track_len / passenger_sprint_speed, " s")
 
 	# Frame-rate-independent bounded substepping
+	_tick_bus_transit_simulation(delta)
 	var sim_delta: float = clampf(delta, 0.0, 0.25)
 	if _just_resumed:
 		sim_delta = 1.0 / 60.0
@@ -1181,6 +1183,7 @@ func _setup_visuals(lvl: CarJamLevelData) -> void:
 		c.queue_free()
 	for c in transit_layer.get_children():
 		c.queue_free()
+	_active_dispatches.clear()
 
 	for s in slot_views:
 		if is_instance_valid(s): s.queue_free()
@@ -1806,12 +1809,199 @@ func _on_vehicle_dispatch_started(vehicle_id: int, slot_id: int, corridor: Array
 		bus_movement_duration_multiplier
 	)
 
-	VehicleMovement.animate_dispatch_plan(
-		vv,
-		motion_plan,
-		controller,
-		bus_movement_duration_multiplier
-	)
+	vv.z_index = 100 + slot_id
+	var dispatch_item := {
+		"vehicle_id": vehicle_id,
+		"view": vv,
+		"plan": motion_plan,
+		"slot_id": slot_id,
+		"token": controller.session_token if controller != null else 0,
+		"progress": 0.0,
+		"speed_factor": 1.0,
+		"duration": motion_plan.duration,
+		"board_cleared_ref": [false],
+		"start_scale": vv.scale,
+		"target_scale": final_scale_vec,
+		"target_slot_pos": target_slot_pos,
+		"slot_rot": slot_rot,
+		"final_rot_target": motion_plan.final_rot_target,
+		"front_native": motion_plan.front_native,
+		"clear_t": motion_plan.clear_t,
+		"t_start": Time.get_ticks_msec() / 1000.0,
+		"completed": false
+	}
+	_active_dispatches.append(dispatch_item)
+
+	# Smoothly transition _base_sprite from board anchor offset & board scale to centered parking
+	if vv.get("_base_sprite") != null and vv._base_sprite != null:
+		var spr: Sprite2D = vv._base_sprite
+		var tw_spr := vv.create_tween()
+		tw_spr.set_parallel(true)
+		tw_spr.tween_property(spr, "position", Vector2.ZERO, motion_plan.duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tw_spr.tween_property(spr, "scale", Vector2.ONE, motion_plan.duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+	if vv.has_method("set_exhaust_smoke_active"):
+		vv.set_exhaust_smoke_active(true, 1.0)
+
+func _tick_bus_transit_simulation(delta: float) -> void:
+	if _active_dispatches.is_empty():
+		return
+
+	var to_remove: Array[int] = []
+
+	for i in range(_active_dispatches.size()):
+		var d: Dictionary = _active_dispatches[i]
+		if d.completed:
+			to_remove.append(i)
+			continue
+
+		var vv: VehicleView = d.view
+		if not is_instance_valid(vv):
+			to_remove.append(i)
+			continue
+
+		var dur: float = maxf(0.001, d.duration)
+		# Step fraction based on current speed_factor
+		var step_fraction: float = (delta / dur) * d.speed_factor
+		var candidate_prog: float = minf(1.0, d.progress + step_fraction)
+
+		var can_advance: bool = _can_dispatch_advance(d, candidate_prog)
+
+		if can_advance:
+			d.speed_factor = minf(1.0, d.speed_factor + delta * 4.0)
+			d.progress = candidate_prog
+			if vv.has_method("set_exhaust_smoke_active"):
+				vv.set_exhaust_smoke_active(true, d.speed_factor)
+		else:
+			# Decelerate smoothly and yield safely
+			d.speed_factor = maxf(0.0, d.speed_factor - delta * 6.0)
+			if vv.has_method("set_exhaust_smoke_active"):
+				vv.set_exhaust_smoke_active(true, maxf(0.3, d.speed_factor))
+			if d.speed_factor > 0.05:
+				var micro_step: float = (delta / dur) * d.speed_factor
+				var micro_prog: float = minf(1.0, d.progress + micro_step)
+				if _can_dispatch_advance(d, micro_prog):
+					d.progress = micro_prog
+
+		VehicleMovement.update_dispatch_transform(
+			d.progress,
+			d.plan.curve,
+			vv,
+			d.target_scale,
+			d.start_scale,
+			true,
+			d.front_native,
+			true,
+			d.final_rot_target,
+			d.clear_t,
+			controller,
+			d.vehicle_id,
+			d.token,
+			d.board_cleared_ref
+		)
+
+		if d.progress >= 1.0:
+			d.completed = true
+			to_remove.append(i)
+			_finish_dispatch_arrival(d)
+
+	for idx in range(to_remove.size() - 1, -1, -1):
+		var remove_idx: int = to_remove[idx]
+		if remove_idx < _active_dispatches.size():
+			_active_dispatches.remove_at(remove_idx)
+
+func _can_dispatch_advance(d: Dictionary, candidate_prog: float) -> bool:
+	var curve: Curve2D = d.plan.curve
+	if curve == null:
+		return true
+
+	var total_len: float = d.plan.total_curve_length
+	var offset: float = candidate_prog * total_len
+	var candidate_pos: Vector2 = curve.sample_baked(offset)
+
+	var offset_back: float = maxf(0.0, offset - 2.0)
+	var offset_ahead: float = minf(total_len, offset + 2.0)
+	var p_back: Vector2 = curve.sample_baked(offset_back)
+	var p_ahead: Vector2 = curve.sample_baked(offset_ahead)
+	var cand_rot: float = d.view.rotation
+	if p_back.distance_to(p_ahead) > 0.01:
+		var dir := (p_ahead - p_back).normalized()
+		cand_rot = dir.angle() - d.front_native.angle()
+		if candidate_prog > 0.75:
+			var blend: float = clampf((candidate_prog - 0.75) / 0.25, 0.0, 1.0)
+			cand_rot = lerp_angle(cand_rot, d.final_rot_target, blend)
+
+	var s: Vector2 = d.start_scale.lerp(d.target_scale, candidate_prog)
+	var cand_hl: float = 102.0 * s.y * 0.5
+	var cand_hw: float = 48.0 * s.x * 0.5
+	var cand_obb = BusMotionPlan.BusOBB.create(candidate_pos, cand_rot, d.front_native, cand_hl, cand_hw, 10.0)
+
+	# 1. Collision check against all other active dispatches
+	for other in _active_dispatches:
+		if other.vehicle_id == d.vehicle_id or other.completed:
+			continue
+		var other_v: VehicleView = other.view
+		if not is_instance_valid(other_v):
+			continue
+
+		var is_other_ahead: bool = false
+		if other.progress > d.progress:
+			is_other_ahead = true
+		elif is_equal_approx(other.progress, d.progress):
+			is_other_ahead = (other.t_start < d.t_start)
+
+		if is_other_ahead:
+			var other_obb = BusMotionPlan.BusOBB.from_view_in_world(other_v, world_root, 10.0)
+			if cand_obb.intersects(other_obb):
+				return false
+			var other_pos: Vector2 = world_root.to_local(other_v.global_position) if world_root != null else other_v.position
+			if candidate_pos.distance_to(other_pos) < 115.0:
+				return false
+
+	# 2. Collision check against already parked buses
+	# Parked buses sit at Y <= -230 (deep inside their parking bays).
+	# Moving buses only check parked buses when actually entering the bays (Y <= -220.0).
+	if candidate_pos.y <= -220.0 and candidate_prog < 0.90:
+		for s_id in range(slot_views.size()):
+			if s_id == d.slot_id:
+				continue
+			var slot_v: ParkingSlotView = slot_views[s_id]
+			if slot_v != null and controller != null and controller.parking != null:
+				var slot_obj = controller.parking.get_slot(s_id)
+				if slot_obj != null and slot_obj.state == CarJamParkingManager.SlotState.OCCUPIED:
+					var parked_pos := _get_slot_world_pos(s_id)
+					var slot_rot: float = slot_v.rotation
+					var parked_obb = BusMotionPlan.BusOBB.create(parked_pos, slot_rot, Vector2(0, -1), 43.5, 20.5, 4.0)
+					if cand_obb.intersects(parked_obb):
+						return false
+
+	return true
+
+func _finish_dispatch_arrival(d: Dictionary) -> void:
+	var vv: VehicleView = d.view
+	if not is_instance_valid(vv):
+		return
+
+	if vv.has_method("set_exhaust_smoke_active"):
+		vv.set_exhaust_smoke_active(false)
+
+	vv.z_index = 10
+	vv.rotation = d.final_rot_target
+	vv.position = d.target_slot_pos
+	vv.scale = d.target_scale
+	if vv.get("_base_sprite") != null and vv._base_sprite != null:
+		vv._base_sprite.position = Vector2.ZERO
+		vv._base_sprite.scale = Vector2.ONE
+	if vv.has_method("set_parking_mode"):
+		vv.set_parking_mode(true)
+
+	if not d.board_cleared_ref[0]:
+		d.board_cleared_ref[0] = true
+		if controller != null and controller.has_method("on_vehicle_cleared_board"):
+			controller.on_vehicle_cleared_board(d.vehicle_id, d.token)
+
+	if controller != null:
+		controller.on_vehicle_arrived_at_slot(d.vehicle_id, d.slot_id, d.token)
 
 func _on_vehicle_parked(vehicle_id: int, slot_id: int) -> void:
 	_play_sfx("parking")
@@ -2315,6 +2505,7 @@ func _exit_tree() -> void:
 func _cleanup_level_tweens() -> void:
 	_stop_celebration_effects()
 	_stop_failure_animations()
+	_active_dispatches.clear()
 	if _toast_tween != null and _toast_tween.is_valid():
 		_toast_tween.kill()
 		_toast_tween = null

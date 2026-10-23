@@ -55,6 +55,8 @@ var _mystery_reveal_tween: Tween = null
 var _badge_tween: Tween = null
 var _pop_tween: Tween = null
 var _arrow_cover: ColorRect = null
+var _exhaust_smoke: CPUParticles2D = null
+static var _smoke_texture: Texture2D = null
 
 # Sprite nodes for modular art replacement
 var _shadow_sprite: Sprite2D
@@ -90,6 +92,7 @@ func setup(p_id: int, p_code: String, p_col_id: String, p_dir: int, p_cap: int, 
 func _ready() -> void:
 	_setup_touch_area()
 	_setup_capacity_badge()
+	_setup_exhaust_smoke()
 	process_mode = Node.PROCESS_MODE_INHERIT
 
 func set_occupancy(occ: int) -> void:
@@ -100,6 +103,8 @@ func set_occupancy(occ: int) -> void:
 
 func set_parking_mode(in_parking: bool) -> void:
 	is_in_parking = in_parking
+	if in_parking:
+		set_exhaust_smoke_active(false)
 	if _badge_node != null:
 		_badge_node.visible = in_parking
 		if in_parking:
@@ -107,6 +112,80 @@ func set_parking_mode(in_parking: bool) -> void:
 	if in_parking and _base_sprite != null:
 		_base_sprite.position = Vector2.ZERO
 		_base_sprite.scale = Vector2.ONE
+
+static func _get_smoke_texture() -> Texture2D:
+	if _smoke_texture != null:
+		return _smoke_texture
+	var img := Image.create(32, 32, false, Image.FORMAT_RGBA8)
+	var center := Vector2(15.5, 15.5)
+	var max_r: float = 15.5
+	for y in 32:
+		for x in 32:
+			var d: float = Vector2(x, y).distance_to(center)
+			var a: float = clampf(1.0 - (d / max_r), 0.0, 1.0)
+			a = a * a * (3.0 - 2.0 * a)
+			img.set_pixel(x, y, Color(1.0, 1.0, 1.0, a))
+	_smoke_texture = ImageTexture.create_from_image(img)
+	return _smoke_texture
+
+func _setup_exhaust_smoke() -> void:
+	if _exhaust_smoke != null and is_instance_valid(_exhaust_smoke):
+		_update_exhaust_position()
+		return
+	_exhaust_smoke = CPUParticles2D.new()
+	_exhaust_smoke.name = "ExhaustSmoke"
+	_exhaust_smoke.z_index = -1
+	_exhaust_smoke.local_coords = false
+	_exhaust_smoke.emitting = false
+	_exhaust_smoke.amount = 16
+	_exhaust_smoke.lifetime = 0.50
+	_exhaust_smoke.one_shot = false
+	_exhaust_smoke.explosiveness = 0.02
+	_exhaust_smoke.randomness = 0.35
+	_exhaust_smoke.spread = 20.0
+	_exhaust_smoke.gravity = Vector2(0.0, -12.0)
+	_exhaust_smoke.initial_velocity_min = 20.0
+	_exhaust_smoke.initial_velocity_max = 42.0
+	_exhaust_smoke.scale_amount_min = 3.5
+	_exhaust_smoke.scale_amount_max = 7.0
+
+	var scale_curve := Curve.new()
+	scale_curve.add_point(Vector2(0.0, 0.35))
+	scale_curve.add_point(Vector2(0.5, 0.95))
+	scale_curve.add_point(Vector2(1.0, 1.25))
+	_exhaust_smoke.scale_amount_curve = scale_curve
+
+	var grad := Gradient.new()
+	grad.set_color(0, Color(0.90, 0.92, 0.95, 0.45))
+	grad.set_color(1, Color(0.85, 0.86, 0.90, 0.0))
+	_exhaust_smoke.color_ramp = grad
+
+	_exhaust_smoke.texture = _get_smoke_texture()
+	_update_exhaust_position()
+	add_child(_exhaust_smoke)
+
+func _update_exhaust_position() -> void:
+	if _exhaust_smoke == null:
+		return
+	var front_native := Vector2(0, -1)
+	match vehicle_dir:
+		CarJamVehicleData.Direction.DOWN: front_native = Vector2(0, 1)
+		CarJamVehicleData.Direction.UP: front_native = Vector2(0, -1)
+		CarJamVehicleData.Direction.LEFT: front_native = Vector2(-1, 0)
+		CarJamVehicleData.Direction.RIGHT: front_native = Vector2(1, 0)
+
+	var rear_dir := -front_native
+	var rear_dist: float = (CANONICAL_BODY_LENGTH * 0.45)
+	var lat_dir := rear_dir.orthogonal() * 10.0
+	_exhaust_smoke.position = rear_dir * rear_dist + lat_dir
+	_exhaust_smoke.direction = rear_dir
+
+func set_exhaust_smoke_active(p_active: bool, p_speed_scale: float = 1.0) -> void:
+	if _exhaust_smoke == null:
+		_setup_exhaust_smoke()
+	if _exhaust_smoke != null:
+		_exhaust_smoke.emitting = p_active
+		_exhaust_smoke.speed_scale = clampf(p_speed_scale, 0.3, 1.2)
 
 func _process(_delta: float) -> void:
 	if _badge_node != null and _badge_node.visible:
@@ -170,6 +249,8 @@ func _build_visuals() -> void:
 	# Add base sprite and apply tightened board cell-fitting and leading-edge anchor shift
 	add_child(_base_sprite)
 	_apply_bus_cell_fit()
+	_setup_exhaust_smoke()
+	_update_exhaust_position()
 
 func set_color(new_color_id: String) -> void:
 	vehicle_color_id = new_color_id.to_lower()

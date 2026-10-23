@@ -165,26 +165,41 @@ static func compute_motion_plan(
 	var safe_min_y: float = viewport_safe_bounds.position.y
 	var safe_max_y: float = viewport_safe_bounds.position.y + viewport_safe_bounds.size.y
 
-	# Perimeter highway around puzzle board if exiting downwards or sideways
-	if plan.forward_vector_world.y > 0.2:
-		# Exiting DOWN: route around bottom corner towards target slot side
-		var bottom_y: float = clampf(plan.board_clear_point.y + 40.0, plan.board_clear_point.y, safe_max_y - 20.0)
-		var side_x: float = (safe_min_x + 38.0) if target_slot_pos.x <= 0.0 else (safe_max_x - 38.0)
+	# Symmetrical perimeter highways around puzzle board
+	var hw_left_x: float = safe_min_x + 42.0
+	var hw_right_x: float = safe_max_x - 42.0
+	var road_y: float = plan.approach_corridor_pos.y
+	var bottom_y: float = clampf(plan.board_clear_point.y + 40.0, plan.board_clear_point.y + 20.0, safe_max_y - 25.0)
+
+	var fwd := plan.forward_vector_world
+	if fwd.y < -0.2 and absf(fwd.y) >= absf(fwd.x):
+		# Exiting UP towards parking: curve directly to approach corridor
+		pts.append(plan.approach_corridor_pos)
+	elif fwd.x > 0.2 and absf(fwd.x) >= absf(fwd.y):
+		# Exiting RIGHT: follow right clearance highway up to roadway
+		var right_x: float = clampf(plan.board_clear_point.x, hw_right_x, safe_max_x - 20.0)
+		pts.append(Vector2(right_x, plan.board_clear_point.y))
+		pts.append(Vector2(right_x, road_y))
+		pts.append(plan.approach_corridor_pos)
+	elif fwd.x < -0.2 and absf(fwd.x) >= absf(fwd.y):
+		# Exiting LEFT: follow left clearance highway up to roadway
+		var left_x: float = clampf(plan.board_clear_point.x, safe_min_x + 20.0, hw_left_x)
+		pts.append(Vector2(left_x, plan.board_clear_point.y))
+		pts.append(Vector2(left_x, road_y))
+		pts.append(plan.approach_corridor_pos)
+	elif fwd.y > 0.2:
+		# Exiting DOWN: route around bottom corner towards the side of its exit
+		var side_x: float = hw_left_x if plan.board_clear_point.x <= 0.0 else hw_right_x
 		pts.append(Vector2(plan.board_clear_point.x, bottom_y))
 		pts.append(Vector2(side_x, bottom_y))
-		pts.append(Vector2(side_x, plan.approach_corridor_pos.y))
-	elif plan.forward_vector_world.x < -0.2:
-		# Exiting LEFT: follow left highway up to corridor
-		var side_x: float = clampf(minf(plan.board_clear_point.x - 20.0, -180.0), safe_min_x + 38.0, -80.0)
+		pts.append(Vector2(side_x, road_y))
+		pts.append(plan.approach_corridor_pos)
+	else:
+		var side_x: float = hw_left_x if plan.board_clear_point.x <= 0.0 else hw_right_x
 		pts.append(Vector2(side_x, plan.board_clear_point.y))
-		pts.append(Vector2(side_x, plan.approach_corridor_pos.y))
-	elif plan.forward_vector_world.x > 0.2:
-		# Exiting RIGHT: follow right highway up to corridor
-		var side_x: float = clampf(maxf(plan.board_clear_point.x + 20.0, 180.0), 80.0, safe_max_x - 38.0)
-		pts.append(Vector2(side_x, plan.board_clear_point.y))
-		pts.append(Vector2(side_x, plan.approach_corridor_pos.y))
+		pts.append(Vector2(side_x, road_y))
+		pts.append(plan.approach_corridor_pos)
 
-	pts.append(plan.approach_corridor_pos)
 	pts.append(target_slot_pos)
 	plan.transit_waypoints = pts
 
@@ -225,3 +240,72 @@ static func compute_motion_plan(
 		plan.clear_t = 0.3
 
 	return plan
+
+## Oriented Bounding Box for exact 2D continuous collision checking (SAT theorem).
+class BusOBB extends RefCounted:
+	var center: Vector2 = Vector2.ZERO
+	var axis_fwd: Vector2 = Vector2(0, -1)
+	var axis_lat: Vector2 = Vector2(1, 0)
+	var half_length: float = 43.5
+	var half_width: float = 20.5
+
+	static func create(pos: Vector2, rot: float, front_native: Vector2, hl: float, hw: float, margin: float = 0.0) -> BusOBB:
+		var obb := BusOBB.new()
+		obb.center = pos
+		obb.half_length = hl + margin
+		obb.half_width = hw + margin
+		obb.axis_fwd = front_native.rotated(rot).normalized()
+		obb.axis_lat = Vector2(-obb.axis_fwd.y, obb.axis_fwd.x)
+		return obb
+
+	static func from_view_in_world(v: Node2D, world_node: Node2D, margin: float = 0.0) -> BusOBB:
+		var obb := BusOBB.new()
+		obb.center = world_node.to_local(v.global_position) if world_node != null else v.position
+		var rot: float = v.global_rotation - (world_node.global_rotation if world_node != null else 0.0)
+		var v_dir: int = v.get("vehicle_dir") if v.get("vehicle_dir") != null else CarJamVehicleData.Direction.UP
+		var front_native := Vector2(0, -1)
+		match v_dir:
+			CarJamVehicleData.Direction.DOWN: front_native = Vector2(0, 1)
+			CarJamVehicleData.Direction.UP: front_native = Vector2(0, -1)
+			CarJamVehicleData.Direction.LEFT: front_native = Vector2(-1, 0)
+			CarJamVehicleData.Direction.RIGHT: front_native = Vector2(1, 0)
+		
+		var s: Vector2 = v.scale
+		obb.half_length = (102.0 * s.y * 0.5) + margin
+		obb.half_width = (48.0 * s.x * 0.5) + margin
+		obb.axis_fwd = front_native.rotated(rot).normalized()
+		obb.axis_lat = Vector2(-obb.axis_fwd.y, obb.axis_fwd.x)
+		return obb
+
+	static func from_node(v: Node2D, margin: float = 0.0) -> BusOBB:
+		var obb := BusOBB.new()
+		obb.center = v.position
+		var rot: float = v.rotation
+		var v_dir: int = v.get("vehicle_dir") if v.get("vehicle_dir") != null else CarJamVehicleData.Direction.UP
+		var front_native := Vector2(0, -1)
+		match v_dir:
+			CarJamVehicleData.Direction.DOWN: front_native = Vector2(0, 1)
+			CarJamVehicleData.Direction.UP: front_native = Vector2(0, -1)
+			CarJamVehicleData.Direction.LEFT: front_native = Vector2(-1, 0)
+			CarJamVehicleData.Direction.RIGHT: front_native = Vector2(1, 0)
+		
+		var s: Vector2 = v.scale
+		obb.half_length = (102.0 * s.y * 0.5) + margin
+		obb.half_width = (48.0 * s.x * 0.5) + margin
+		obb.axis_fwd = front_native.rotated(rot).normalized()
+		obb.axis_lat = Vector2(-obb.axis_fwd.y, obb.axis_fwd.x)
+		return obb
+
+	func intersects(other: BusOBB) -> bool:
+		var d := other.center - center
+		var axes := [axis_fwd, axis_lat, other.axis_fwd, other.axis_lat]
+		for a in axes:
+			var r_a := half_length * absf(axis_fwd.dot(a)) + half_width * absf(axis_lat.dot(a))
+			var r_b := other.half_length * absf(other.axis_fwd.dot(a)) + other.half_width * absf(other.axis_lat.dot(a))
+			if absf(d.dot(a)) > (r_a + r_b):
+				return false
+		return true
+
+	func distance_to_center(other: BusOBB) -> float:
+		return center.distance_to(other.center)
+
