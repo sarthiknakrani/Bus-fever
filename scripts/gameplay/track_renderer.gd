@@ -18,7 +18,7 @@ var outer_meet_ang: float = 0.09
 
 # Snug geometry constants: tight fit to 4-across passengers (76.5px total passenger span)
 const ROAD_HALF_WIDTH: float = 43.0
-const GATEWAY_HALF_WIDTH: float = 45.0
+const GATEWAY_HALF_WIDTH: float = 67.5 # 1.5X width (was 45.0) for spacious crosswalk path
 
 const COLOR_ROAD := Color("767786") # Authoritative road grey matching PlatformView
 const COLOR_ROAD_SHADOW := Color("5d5e6c") # Ambient occlusion inner shadow

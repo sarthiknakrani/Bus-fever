@@ -14,7 +14,7 @@ var p_parking_y: float = -9999.0
 var p_parking_h: float = 94.0
 var p_straight_x: float = 105.0
 
-const GATEWAY_HALF_WIDTH: float = 55.0
+const GATEWAY_HALF_WIDTH: float = 67.5 # 1.5X width matching track_renderer gateway
 
 # Authoritative source-of-truth track grey matching passenger track & connector
 const COLOR_TRACK_GREY := Color("727382")

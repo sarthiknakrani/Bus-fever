@@ -227,9 +227,9 @@ func _get_curve_point_and_normal(c: Curve2D, offset: float, is_loop: bool = fals
 func _calc_lane_pos(center_pos: Vector2, normal: Vector2, lane: int) -> Vector2:
 	var curve_fac: float = clampf((absf(center_pos.x) - 75.0) / 30.0, 0.0, 1.0)
 	var dynamic_spacing: float = lerpf(LANE_SPACING, LANE_SPACING_CURVE, curve_fac)
-	# Natural gentle convergence near gateway neck (x in [-60, 60] and y > 80.0)
-	if absf(center_pos.x) < 60.0 and center_pos.y > 80.0:
-		var neck_factor: float = clampf(1.0 - (absf(center_pos.x) / 60.0), 0.0, 1.0)
+	# Natural gentle convergence near gateway neck (x in [-80, 80] and y > 80.0)
+	if absf(center_pos.x) < 80.0 and center_pos.y > 80.0:
+		var neck_factor: float = clampf(1.0 - (absf(center_pos.x) / 80.0), 0.0, 1.0)
 		dynamic_spacing = lerpf(dynamic_spacing, 15.5, neck_factor * 0.25)
 	var lane_offset: float = (float(lane) - 1.5) * dynamic_spacing
 	return center_pos + normal * lane_offset
@@ -3665,18 +3665,18 @@ func _animate_individual_boarding(p: Dictionary, vehicle_id: int, slot_id: int, 
 		if track_rend != null and track_rend.plat_top_local > 150.0:
 			plat_y_local = track_rend.plat_top_local
 
-	# W1: Gateway neck mouth (y = 165, x safely inside [-36, 36])
-	var w1_x: float = clampf(lerpf(p0_local.x, tgt_local.x * 0.25, 0.4) + lane_offset, -36.0, 36.0)
+	# W1: Gateway neck mouth (y = 165, x safely inside [-54, 54] scaled 1.5X for wide crosswalk)
+	var w1_x: float = clampf(lerpf(p0_local.x, tgt_local.x * 0.25, 0.4) + lane_offset, -54.0, 54.0)
 	var w1_local := Vector2(w1_x, 165.0)
 	var w1_global: Vector2 = passenger_track_root.to_global(w1_local)
 
-	# W2: Gateway throat center (y = plat_y_local = 197, x safely inside [-36, 36])
-	var w2_x: float = clampf(lerpf(w1_x, tgt_local.x * 0.35, 0.3), -36.0, 36.0)
+	# W2: Gateway throat center (y = plat_y_local = 197, x safely inside [-54, 54] scaled 1.5X for wide crosswalk)
+	var w2_x: float = clampf(lerpf(w1_x, tgt_local.x * 0.35, 0.3), -54.0, 54.0)
 	var w2_local := Vector2(w2_x, plat_y_local)
 	var w2_global: Vector2 = passenger_track_root.to_global(w2_local)
 
-	# W3: Gateway throat exit into platform apron (y = plat_y_local + 18, safely inside [-42, 42])
-	var w3_x: float = clampf(lerpf(w2_x, tgt_local.x * 0.5, 0.4), -42.0, 42.0)
+	# W3: Gateway throat exit into platform apron (y = plat_y_local + 18, safely inside [-63, 63] scaled 1.5X)
+	var w3_x: float = clampf(lerpf(w2_x, tgt_local.x * 0.5, 0.4), -63.0, 63.0)
 	var w3_local := Vector2(w3_x, plat_y_local + 18.0)
 	var w3_global: Vector2 = passenger_track_root.to_global(w3_local)
 
