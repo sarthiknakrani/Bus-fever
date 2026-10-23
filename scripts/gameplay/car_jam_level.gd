@@ -2414,7 +2414,7 @@ func _build_hud() -> void:
 	safe_area_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud.add_child(safe_area_root)
 
-	# TopBar: Level 1, Restart, Pause
+	# TopBar: Level 1, Restart, Pause (compact buttons & claymorphic text)
 	top_bar = Control.new()
 	top_bar.name = "TopBar"
 	top_bar.anchor_left = 0.0
@@ -2424,7 +2424,7 @@ func _build_hud() -> void:
 	top_bar.offset_left = 20.0
 	top_bar.offset_right = -20.0
 	top_bar.offset_top = 24.0
-	top_bar.offset_bottom = 68.0
+	top_bar.offset_bottom = 62.0
 	safe_area_root.add_child(top_bar)
 
 	var btn_restart := TextureButton.new()
@@ -2432,8 +2432,8 @@ func _build_hud() -> void:
 	btn_restart.texture_pressed = load("res://assets/ui/gameplay_buttons/restart_pressed.svg")
 	btn_restart.ignore_texture_size = true
 	btn_restart.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
-	btn_restart.custom_minimum_size = Vector2(50, 50)
-	btn_restart.pivot_offset = Vector2(25, 25)
+	btn_restart.custom_minimum_size = Vector2(36, 36)
+	btn_restart.pivot_offset = Vector2(18, 18)
 	ClayStyle.apply_clay_squish(btn_restart, 3.0, 0.91)
 	btn_restart.pressed.connect(_on_restart_pressed)
 	top_bar.add_child(btn_restart)
@@ -2441,14 +2441,14 @@ func _build_hud() -> void:
 	level_title_label = Label.new()
 	var top_gc = get_tree().root.get_node_or_null("GameController") if is_inside_tree() and get_tree() and get_tree().root else null
 	level_title_label.text = "Level " + str(top_gc.current_level_number if top_gc else 1)
-	level_title_label.add_theme_font_size_override("font_size", 22)
-	level_title_label.add_theme_color_override("font_color", Color("1e3a8a")) # rich navy text
-	var title_pill := ClayStyle.create_clay_pill(Color("ffffff"), Color("cbd5e1"), 4, 12, 4, 0.18)
-	title_pill.content_margin_left = 20
-	title_pill.content_margin_right = 20
-	title_pill.content_margin_top = 4
-	title_pill.content_margin_bottom = 6
-	level_title_label.add_theme_stylebox_override("normal", title_pill)
+	level_title_label.add_theme_font_size_override("font_size", 17)
+	level_title_label.add_theme_color_override("font_color", Color("1e293b")) # rich slate navy
+	level_title_label.add_theme_color_override("font_outline_color", Color.WHITE)
+	level_title_label.add_theme_constant_override("outline_size", 4)
+	level_title_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.18))
+	level_title_label.add_theme_constant_override("shadow_offset_x", 0)
+	level_title_label.add_theme_constant_override("shadow_offset_y", 2)
+	# Pure text without background card in claymorphism embossed style
 	level_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	level_title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	level_title_label.anchor_left = 0.24
@@ -2462,10 +2462,10 @@ func _build_hud() -> void:
 	btn_pause.texture_pressed = load("res://assets/ui/gameplay_buttons/pause_pressed.svg")
 	btn_pause.ignore_texture_size = true
 	btn_pause.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
-	btn_pause.custom_minimum_size = Vector2(50, 50)
-	btn_pause.pivot_offset = Vector2(25, 25)
+	btn_pause.custom_minimum_size = Vector2(36, 36)
+	btn_pause.pivot_offset = Vector2(18, 18)
 	btn_pause.anchor_left = 1.0
-	btn_pause.offset_left = -50.0
+	btn_pause.offset_left = -36.0
 	ClayStyle.apply_clay_squish(btn_pause, 3.0, 0.91)
 	btn_pause.pressed.connect(_on_pause_pressed)
 	top_bar.add_child(btn_pause)
@@ -3244,8 +3244,9 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 	var avail_lower_h = btm_safe_y - divider_y
 	var board_y = divider_y + (avail_lower_h / 2.0)
 
-	# Passenger track prominent in upper section
+	# Passenger track streamlined to compact 3D proportions
 	if passenger_track_root != null:
+		passenger_track_root.scale = Vector2(0.88, 0.88)
 		passenger_track_root.position = Vector2(0, track_y)
 
 	# Parking strip positioned lower with clear visual separation
@@ -3269,7 +3270,7 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 		var visible_w = vp_size.x / scale_factor
 		var full_w = visible_w + 200.0
 		
-		var track_bottom_y = track_y + 188.0
+		var track_bottom_y = track_y + 196.0 * 0.88
 		platform_bg.setup_full(plat_top, local_bottom, full_w, partition_y, separator_y, deck_w, visible_w, track_bottom_y, parking_y, parking_h)
 
 	# Responsive Feeder Track Extension:

@@ -111,7 +111,7 @@ func _draw() -> void:
 	var top_connect_y: float = p_track_bottom_y if p_track_bottom_y > -9000.0 else p_top
 	var top_y: float = top_connect_y
 
-	var gate_hw: float = GATEWAY_HALF_WIDTH # 95.0
+	var gate_hw: float = GATEWAY_HALF_WIDTH * 0.88 # Scaled matching compact passenger track
 	var top_shoulder_x: float = hw * 0.76
 	var shoulder_bottom_y: float = (p_parking_y + (p_parking_h * 0.35)) if p_parking_y > -9000.0 else (top_y + (plat_btm - top_y) * 0.5)
 	shoulder_bottom_y = clampf(shoulder_bottom_y, top_y + 15.0, plat_btm - 10.0)

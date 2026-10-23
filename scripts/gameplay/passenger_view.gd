@@ -53,7 +53,7 @@ func setup(p_col_id: String, p_id: int = 0, p_lane: int = 0) -> void:
 		_shadow.texture = t_shadow
 	_shadow.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	_shadow.position = Vector2(0, 0)
-	_shadow.scale = Vector2(BASE_SCALE, BASE_SCALE * 0.5)
+	_shadow.scale = Vector2(BASE_SCALE * 1.5, BASE_SCALE * 0.75)
 	_shadow.modulate = Color(0, 0, 0, 0.45)
 	_shadow.z_index = -1
 	add_child(_shadow)
@@ -130,7 +130,7 @@ func _process(delta: float) -> void:
 				_char_sprite.rotation = 0.0
 				_char_sprite.scale = Vector2(facing_sign, 1.0)
 			if _shadow != null:
-				_shadow.scale = Vector2(BASE_SCALE, BASE_SCALE * 0.5)
+				_shadow.scale = Vector2(BASE_SCALE * 1.5, BASE_SCALE * 0.75)
 				_shadow.modulate.a = 0.45
 		else:
 			# Real Running Cycle synchronized directly with movement distance
@@ -148,7 +148,7 @@ func _process(delta: float) -> void:
 				_char_sprite.scale = Vector2(facing_sign, 1.0)
 			
 			if _shadow != null:
-				_shadow.scale = Vector2(BASE_SCALE, BASE_SCALE * 0.5)
+				_shadow.scale = Vector2(BASE_SCALE * 1.5, BASE_SCALE * 0.75)
 				_shadow.modulate.a = 0.45
 
 func animate_jump(delay: float) -> void:
