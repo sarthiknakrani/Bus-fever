@@ -8,6 +8,7 @@ class_name PlazaEnvironment
 var _island_draw_node: Node2D
 
 func _ready() -> void:
+	z_index = -3
 	visible = true
 	_build_garden_accents()
 

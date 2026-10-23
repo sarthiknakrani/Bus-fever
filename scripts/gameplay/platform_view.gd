@@ -185,29 +185,58 @@ func _draw() -> void:
 	left_curb.append(Vector2(-fill_hw, shoulder_bottom_y))
 
 	# Drop shadows onto surrounding lawn
-	var shadow_dy := Vector2(0.0, 5.0)
+	var shadow_dy := Vector2(0.0, 7.0)
 	var s_right := PackedVector2Array()
 	for pt in right_curb: s_right.append(pt + shadow_dy)
 	var s_left := PackedVector2Array()
 	for pt in left_curb: s_left.append(pt + shadow_dy)
-	draw_polyline(s_right, color_shadow, 9.0, true)
-	draw_polyline(s_left, color_shadow, 9.0, true)
+	draw_polyline(s_right, color_shadow, 14.0, true)
+	draw_polyline(s_left, color_shadow, 14.0, true)
 
-	# 3D Raised curb wall faces (extruded downwards by 3.5px)
-	var wall_dy := Vector2(0.0, 3.5)
-	var w_right := PackedVector2Array()
-	for pt in right_curb: w_right.append(pt + wall_dy)
-	var w_left := PackedVector2Array()
-	for pt in left_curb: w_left.append(pt + wall_dy)
-	draw_polyline(w_right, COLOR_CURB_FACE, 7.5, true)
-	draw_polyline(w_left, COLOR_CURB_FACE, 7.5, true)
+	# Solid 3D Raised concrete wall faces (vertical deck extrusion H = 8.0px)
+	const PLAT_WALL_H: float = 8.0
+	const PLAT_WALL_LEFT := Color("343746")
+	const PLAT_WALL_RIGHT := Color("292b36")
+	const PLAT_WALL_SHADOW := Color(0.01, 0.05, 0.01, 0.40)
 
-	# PROMINENT THICK 3D WHITE & BEVEL CURBS (4.2px white rim, 6.5px bevel)
-	draw_polyline(right_curb, curb_bevel, 6.5, true)
-	draw_polyline(right_curb, curb_highlight, 4.2, true)
+	_draw_platform_wall_quads(left_curb, PLAT_WALL_H, PLAT_WALL_LEFT)
+	_draw_platform_wall_quads(right_curb, PLAT_WALL_H, PLAT_WALL_RIGHT)
+	_draw_platform_wall_shadow(left_curb, PLAT_WALL_H, PLAT_WALL_SHADOW, 4.0)
+	_draw_platform_wall_shadow(right_curb, PLAT_WALL_H, PLAT_WALL_SHADOW, 4.0)
 
-	draw_polyline(left_curb, curb_bevel, 6.5, true)
-	draw_polyline(left_curb, curb_highlight, 4.2, true)
+	# PROMINENT THICK 3D WHITE & BEVELED METALLIC CURBS (matching track)
+	_draw_3d_platform_curb(right_curb)
+	_draw_3d_platform_curb(left_curb)
+
+func _draw_platform_wall_quads(pts: PackedVector2Array, wall_h: float, col: Color) -> void:
+	if pts.size() < 2:
+		return
+	for i in range(pts.size() - 1):
+		var p1 = pts[i]
+		var p2 = pts[i + 1]
+		var quad := PackedVector2Array([
+			p1,
+			p2,
+			p2 + Vector2(0.0, wall_h),
+			p1 + Vector2(0.0, wall_h)
+		])
+		draw_colored_polygon(quad, col)
+
+func _draw_platform_wall_shadow(pts: PackedVector2Array, wall_h: float, col: Color, width: float) -> void:
+	if pts.size() < 2:
+		return
+	for i in range(pts.size() - 1):
+		var p1 = pts[i]
+		var p2 = pts[i + 1]
+		draw_line(p1 + Vector2(0.0, wall_h), p2 + Vector2(0.0, wall_h), col, width)
+
+func _draw_3d_platform_curb(pts: PackedVector2Array) -> void:
+	if pts.size() < 2:
+		return
+	draw_polyline(pts, Color("454858"), 8.0, true)
+	draw_polyline(pts, Color("9ea4bc"), 5.5, true)
+	draw_polyline(pts, Color.WHITE, 3.6, true)
+	draw_polyline(pts, Color(1.0, 1.0, 1.0, 0.95), 1.5, true)
 
 func draw_parking_strip(_top_y: float, _bottom_y: float, _w: float) -> void:
 	pass

@@ -116,7 +116,7 @@ func _draw() -> void:
 	var r_inner: float = r_center - ROAD_HALF_WIDTH # 62.0
 	var w: float = ROAD_HALF_WIDTH
 	var x_gate: float = GATEWAY_HALF_WIDTH
-	var plat_y: float = r_outer + 20.0 # 188.0 in track-local coordinates
+	var plat_y: float = 196.0 # Connects seamlessly to platform apron at W2 waypoint
 	
 	var straight_x_inner: float = straight_x
 	var r_inner_scaled: float = r_inner
@@ -239,11 +239,11 @@ func _draw() -> void:
 	outer_road.append(Vector2(x_gate, plat_y + 1.0))
 
 	# -----------------------------------------------------------------
-	# 5. DRAWING PIPELINE (RICH 3D DEPTH, DUAL-LAYER DROP SHADOWS, BEVELED CURBS)
+	# 5. DRAWING PIPELINE (TRUE 3D DEPTH, VERTICAL RETAINING WALLS, ROAD CAMBER, 3D CURBS)
 	# -----------------------------------------------------------------
 	# Step A: Dual-layer 2.5D Drop shadows onto surrounding garden lawn
-	var shadow_offset_deep := Vector2(0, 12.0)
-	var shadow_offset_near := Vector2(0, 6.0)
+	var shadow_offset_deep := Vector2(0, 14.0)
+	var shadow_offset_near := Vector2(0, 7.0)
 	var s_left_deep = PackedVector2Array()
 	var s_left_near = PackedVector2Array()
 	for pt in curb_left:
@@ -256,17 +256,42 @@ func _draw() -> void:
 		s_right_near.append(pt + shadow_offset_near)
 
 	# Deep volumetric ambient shadow + crisp contact shadow onto lawn
-	draw_polyline(s_left_deep, Color(0.01, 0.05, 0.01, 0.35), 22.0, true)
-	draw_polyline(s_right_deep, Color(0.01, 0.05, 0.01, 0.35), 22.0, true)
-	draw_polyline(s_left_near, Color(0.01, 0.04, 0.01, 0.55), 11.0, true)
-	draw_polyline(s_right_near, Color(0.01, 0.04, 0.01, 0.55), 11.0, true)
+	draw_polyline(s_left_deep, Color(0.01, 0.05, 0.01, 0.35), 24.0, true)
+	draw_polyline(s_right_deep, Color(0.01, 0.05, 0.01, 0.35), 24.0, true)
+	draw_polyline(s_left_near, Color(0.01, 0.04, 0.01, 0.55), 12.0, true)
+	draw_polyline(s_right_near, Color(0.01, 0.04, 0.01, 0.55), 12.0, true)
 
-	# Step B: 100% Solid, seamless grey road surface (zero gaps / zero green seams)
+	# Step B: Solid 3D Vertical Concrete Retaining Walls (Deck Extrusion H = 12.0px)
+	# These physical vertical quads connect the top road deck to the ground on south-facing edges
+	const WALL_H: float = 12.0
+	const COLOR_WALL_LEFT := Color("343746") # South-west facing concrete wall (receives glancing light)
+	const COLOR_WALL_RIGHT := Color("292b36") # South-east facing concrete wall (in directional shade)
+	const COLOR_WALL_INNER := Color("1c1e26") # Inner courtyard retaining wall (deep pit shadow)
+	const COLOR_WALL_SHADOW := Color(0.01, 0.05, 0.01, 0.45)
+
+	# Left outer wall: visible where y >= -10.0 with smooth height taper towards apex
+	_draw_wall_quad_strip_tapered(curb_left, WALL_H, COLOR_WALL_LEFT, true, -10.0, 25.0)
+
+	# Right outer wall: visible from outer meet pt down to gateway throat
+	_draw_wall_quad_strip_tapered(curb_right, WALL_H, COLOR_WALL_RIGHT, true, -5.0, 25.0)
+
+	# Crisp ground contact shadow at the base of the outer vertical walls
+	_draw_wall_base_shadow_tapered(curb_left, WALL_H, COLOR_WALL_SHADOW, 5.0, true, -10.0, 25.0)
+	_draw_wall_base_shadow_tapered(curb_right, WALL_H, COLOR_WALL_SHADOW, 5.0, true, -5.0, 25.0)
+
+	# Step C: 100% Solid, seamless grey road surface (zero gaps / zero green seams)
 	# Draw solid outer road surface covering track & feeder seamlessly
 	draw_colored_polygon(outer_road, COLOR_ROAD)
 
-	# Terraced Sunken Central Garden (Deep 3D perspective):
-	# 1. Outer sunken ground shadow ledge
+	# Step D: 3D Road Camber & Lighting (Crowned asphalt center ribbon + gutter ambient occlusion)
+	_draw_road_camber(straight_x, r_center, c_left, c_right, n_arc)
+	# Ambient occlusion gutter shadows where road meets inner and outer curbs
+	draw_polyline(curb_left, Color(0.08, 0.09, 0.12, 0.38), 6.0, true)
+	draw_polyline(curb_right, Color(0.08, 0.09, 0.12, 0.38), 6.0, true)
+	draw_polyline(curb_inner, Color(0.08, 0.09, 0.12, 0.38), 6.0, true)
+
+	# Step E: Terraced Sunken Central Garden Courtyard (Deep 3D perspective inside inner hole)
+	# 1. Base sunken courtyard fill
 	const COLOR_SUNKEN_BASE := Color("488828")
 	draw_colored_polygon(curb_inner, COLOR_SUNKEN_BASE)
 
@@ -287,53 +312,127 @@ func _draw() -> void:
 	const COLOR_CENTRAL_LAWN := Color("62b03f")
 	draw_colored_polygon(curb_inner_inset, COLOR_CENTRAL_LAWN)
 
-	# 3. Deep inner retaining drop shadow cast into the sunken garden
-	var s_inner = PackedVector2Array()
-	for pt in curb_inner:
-		s_inner.append(pt + Vector2(0, 5.0))
-	draw_polyline(s_inner, Color(0.01, 0.05, 0.01, 0.45), 11.0, true)
+	# 3. Inner Vertical Retaining Wall (Drops 10.0px downward into the sunken garden on northern rim y <= 15.0)
+	const INNER_WALL_H: float = 10.0
+	_draw_wall_quad_strip_tapered(curb_inner, INNER_WALL_H, COLOR_WALL_INNER, false, -15.0, 20.0)
+	# Inner drop shadow cast by the northern deck onto the sunken courtyard lawn
+	_draw_wall_base_shadow_tapered(curb_inner, INNER_WALL_H, Color(0.01, 0.05, 0.01, 0.52), 6.0, false, -15.0, 20.0)
 
-	# Step C: Ambient occlusion road banking (curved 3D asphalt camber)
-	draw_polyline(curb_left, Color(0.12, 0.13, 0.16, 0.40), 9.0, true)
-	draw_polyline(curb_right, Color(0.12, 0.13, 0.16, 0.40), 9.0, true)
-	draw_polyline(curb_inner, Color(0.12, 0.13, 0.16, 0.40), 8.0, true)
-
-	# Step D: Faint 4-lane guide markings (subtle dashed guidelines)
+	# Step F: Faint 4-lane guide markings (subtle dashed guidelines)
 	_draw_lane_guidelines(straight_x, r_center, c_left, c_right)
 
-	# Step E: Raised 3D Curb Walls (Vertical Extrusion dy = 8.5px)
-	var wall_dy := Vector2(0, 8.5)
-	var w_left = PackedVector2Array()
-	for pt in curb_left: w_left.append(pt + wall_dy)
-	var w_right = PackedVector2Array()
-	for pt in curb_right: w_right.append(pt + wall_dy)
+	# Step G: 3D Zebra Crosswalk at Gateway Throat (Connecting loop to parking apron across 1.5X width)
+	_draw_gateway_crosswalk(x_gate, r_outer, plat_y)
 
-	const COLOR_WALL_CONCRETE := Color("30323e")
-	draw_polyline(w_left, COLOR_WALL_CONCRETE, 10.5, true)
-	draw_polyline(w_right, COLOR_WALL_CONCRETE, 10.5, true)
+	# Step H: PROMINENT THICK 3D WHITE & BEVELED METALLIC/CONCRETE CURBS
+	# Multi-tier beveled curb: dark crease base, stone bevel chamfer, pure white crown, specular glint
+	_draw_3d_curb(curb_left)
+	_draw_3d_curb(curb_right)
+	_draw_3d_curb(curb_inner)
 
-	# Inner retaining curb wall (visible to 2.5D camera)
-	var w_inner = PackedVector2Array()
-	for pt in curb_inner:
-		if pt.y >= -15.0:
-			w_inner.append(pt + wall_dy)
-	if w_inner.size() >= 2:
-		draw_polyline(w_inner, COLOR_WALL_CONCRETE, 10.5, true)
-
-	# Step F: PROMINENT THICK 3D WHITE & BEVEL CURBS (5.0px white rim, 7.5px bevel)
-	const COLOR_BEVEL_LIGHT := Color("a8b0c8")
-	draw_polyline(curb_left, COLOR_BEVEL_LIGHT, 7.5, true)
-	draw_polyline(curb_left, Color.WHITE, 5.0, true)
-
-	draw_polyline(curb_right, COLOR_BEVEL_LIGHT, 7.5, true)
-	draw_polyline(curb_right, Color.WHITE, 5.0, true)
-
-	draw_polyline(curb_inner, COLOR_BEVEL_LIGHT, 7.5, true)
-	draw_polyline(curb_inner, Color.WHITE, 5.0, true)
-
-	# Step G: 3D Gateway Endcap Bollards at (-x_gate, plat_y) and (x_gate, plat_y)
+	# Step I: 3D Gateway Endcap Bollards at (-x_gate, plat_y) and (x_gate, plat_y)
 	_draw_gateway_bollard(Vector2(-x_gate, plat_y))
 	_draw_gateway_bollard(Vector2(x_gate, plat_y))
+
+func _draw_wall_quad_strip_tapered(pts: PackedVector2Array, max_h: float, col: Color, south_facing: bool, y_min: float, y_ramp: float) -> void:
+	if pts.size() < 2:
+		return
+	for i in range(pts.size() - 1):
+		var p1 = pts[i]
+		var p2 = pts[i + 1]
+		var h1 = _calc_taper_h(p1.y, max_h, south_facing, y_min, y_ramp)
+		var h2 = _calc_taper_h(p2.y, max_h, south_facing, y_min, y_ramp)
+		if h1 <= 0.01 and h2 <= 0.01:
+			continue
+		var quad := PackedVector2Array([
+			p1,
+			p2,
+			p2 + Vector2(0.0, h2),
+			p1 + Vector2(0.0, h1)
+		])
+		draw_colored_polygon(quad, col)
+
+func _draw_wall_base_shadow_tapered(pts: PackedVector2Array, max_h: float, col: Color, width: float, south_facing: bool, y_min: float, y_ramp: float) -> void:
+	if pts.size() < 2:
+		return
+	for i in range(pts.size() - 1):
+		var p1 = pts[i]
+		var p2 = pts[i + 1]
+		var h1 = _calc_taper_h(p1.y, max_h, south_facing, y_min, y_ramp)
+		var h2 = _calc_taper_h(p2.y, max_h, south_facing, y_min, y_ramp)
+		if h1 <= 0.5 and h2 <= 0.5:
+			continue
+		draw_line(p1 + Vector2(0.0, h1), p2 + Vector2(0.0, h2), col, width)
+
+func _calc_taper_h(y: float, max_h: float, south_facing: bool, y_min: float, y_ramp: float) -> float:
+	if south_facing:
+		# Visible on southern side (y >= y_min)
+		if y <= y_min:
+			return 0.0
+		var ramp_end = y_min + y_ramp
+		if y >= ramp_end:
+			return max_h
+		return max_h * ((y - y_min) / y_ramp)
+	else:
+		# Inner hole wall: visible on northern side (y <= y_min + y_ramp)
+		if y <= y_min:
+			return max_h
+		var ramp_end = y_min + y_ramp
+		if y >= ramp_end:
+			return 0.0
+		return max_h * (1.0 - ((y - y_min) / y_ramp))
+
+func _draw_road_camber(straight_x: float, r_center: float, c_l: Vector2, c_r: Vector2, n_arc: int) -> void:
+	var c_pts := PackedVector2Array()
+	c_pts.append(Vector2(straight_x, -r_center))
+	c_pts.append(Vector2(-straight_x, -r_center))
+	for i in range(1, n_arc):
+		var ang = -PI / 2.0 - (float(i) / float(n_arc)) * PI
+		c_pts.append(c_l + Vector2(cos(ang), sin(ang)) * r_center)
+	c_pts.append(Vector2(-straight_x, r_center))
+	c_pts.append(Vector2(straight_x, r_center))
+	for i in range(1, n_arc):
+		var ang = PI / 2.0 - (float(i) / float(n_arc)) * PI
+		c_pts.append(c_r + Vector2(cos(ang), sin(ang)) * r_center)
+	c_pts.append(Vector2(straight_x, -r_center))
+
+	# Road camber crown highlight (broad soft glow + narrow sheen)
+	draw_polyline(c_pts, Color(1.0, 1.0, 1.0, 0.09), 32.0, true)
+	draw_polyline(c_pts, Color(1.0, 1.0, 1.0, 0.07), 16.0, true)
+	draw_polyline(c_pts, Color(1.0, 1.0, 1.0, 0.05), 6.0, true)
+
+func _draw_gateway_crosswalk(x_gate: float, r_outer: float, plat_y: float) -> void:
+	# 7 white 3D zebra crosswalk bars spanning across 1.5X gateway width (135px)
+	var num_bars := 7
+	var bar_w := 9.0
+	var bar_top_y := r_outer - 4.0
+	var bar_bot_y := plat_y - 2.0
+	var bar_h := bar_bot_y - bar_top_y
+	var span := (x_gate - 14.0) * 2.0
+	var step := span / float(num_bars - 1)
+	var start_x := -x_gate + 14.0
+
+	for i in range(num_bars):
+		var bx = start_x + float(i) * step
+		var bar_rect := Rect2(bx - bar_w / 2.0, bar_top_y, bar_w, bar_h)
+		# 3D drop shadow
+		draw_rect(Rect2(bx - bar_w / 2.0, bar_top_y + 2.5, bar_w, bar_h), Color(0.10, 0.11, 0.14, 0.35))
+		# Main white paint bar
+		draw_rect(bar_rect, Color(0.96, 0.97, 1.0, 0.90))
+		# Top edge sunlit glint
+		draw_rect(Rect2(bx - bar_w / 2.0 + 1.0, bar_top_y, bar_w - 2.0, 3.0), Color(1.0, 1.0, 1.0, 0.95))
+
+func _draw_3d_curb(pts: PackedVector2Array) -> void:
+	if pts.size() < 2:
+		return
+	# Layer 1: Dark outer crease / bottom lip
+	draw_polyline(pts, Color("454858"), 8.0, true)
+	# Layer 2: Stone bevel chamfer
+	draw_polyline(pts, Color("9ea4bc"), 5.5, true)
+	# Layer 3: Pristine white metallic top crown
+	draw_polyline(pts, Color.WHITE, 3.6, true)
+	# Layer 4: Specular highlight glint
+	draw_polyline(pts, Color(1.0, 1.0, 1.0, 0.95), 1.5, true)
 
 func _draw_lane_guidelines(straight_x: float, r_center: float, c_l: Vector2, c_r: Vector2) -> void:
 	# Offsets for 3 lane divider boundaries between the 4 lanes (-17.5, 0, +17.5)
