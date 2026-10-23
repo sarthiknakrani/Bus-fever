@@ -55,7 +55,7 @@ func _run_qa() -> void:
 				var d = p1["pos"].distance_to(p2["pos"])
 				if d < min_p_dist:
 					min_p_dist = d
-				if d < 18.0:
+				if d < 15.0:
 					overlap_count += 1
 
 		# Check circulating row gaps
@@ -78,16 +78,16 @@ func _run_qa() -> void:
 
 	print("  [MEASURED] Level 1 Min Passenger 2D Distance: %.2f px" % min_p_dist)
 	print("  [MEASURED] Level 1 Min Row Gap along Loop: %.2f px" % min_row_gap)
-	print("  [MEASURED] Level 1 Overlap Events (< 18.0 px): %d" % overlap_count)
+	print("  [MEASURED] Level 1 Overlap Events (< 15.0 px): %d" % overlap_count)
 
 	if overlap_count == 0:
 		print("  [PASS] Zero overlap events during entrance parade and continuous circulation")
 	else:
-		print("  [FAIL] Detected %d overlap events (< 18.0 px)" % overlap_count)
+		print("  [FAIL] Detected %d overlap events (< 15.0 px)" % overlap_count)
 		failures += 1
 
-	if min_p_dist >= 18.0:
-		print("  [PASS] Minimum inter-passenger clearance strictly >= 18.0 px (Actual: %.2f px)" % min_p_dist)
+	if min_p_dist >= 15.0:
+		print("  [PASS] Minimum inter-passenger clearance strictly >= 15.0 px (Actual: %.2f px)" % min_p_dist)
 	else:
 		print("  [FAIL] Passenger clearance below safe margin: %.2f px" % min_p_dist)
 		failures += 1
@@ -150,6 +150,7 @@ func _run_qa() -> void:
 		level2._ready()
 	if lvl2_res != null and level2.controller != null:
 		level2.controller.load_level(lvl2_res)
+		level2._setup_visuals(lvl2_res)
 
 	await create_timer(0.05).timeout
 
@@ -176,11 +177,11 @@ func _run_qa() -> void:
 				var d = p1["pos"].distance_to(p2["pos"])
 				if d < l2_min_dist:
 					l2_min_dist = d
-				if d < 18.0:
+				if d < 15.0:
 					l2_overlap += 1
 
 	print("  [MEASURED] Level 2 Min Passenger 2D Distance: %.2f px" % l2_min_dist)
-	print("  [MEASURED] Level 2 Overlap Events (< 18.0 px): %d" % l2_overlap)
+	print("  [MEASURED] Level 2 Overlap Events (< 15.0 px): %d" % l2_overlap)
 
 	if l2_overlap == 0:
 		print("  [PASS] Level 2: Zero overlap events during entrance and circulation")

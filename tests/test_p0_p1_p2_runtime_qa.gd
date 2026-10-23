@@ -96,9 +96,10 @@ func _run_suite() -> void:
 	var left_apex_off = curve.get_closest_offset(Vector2(-270, 0))
 	var right_apex_off = curve.get_closest_offset(Vector2(270, 0))
 
-	# Compute exact inner-most lane separation for two adjacent rows on the curve
+	# Compute exact inner-most lane separation for two adjacent circulating rows on the curve
+	var loop_row_sp: float = track_len / float(l1.TOTAL_LOOP_SLOTS)
 	var pt_left = l1._get_curve_point_and_normal(curve, left_apex_off, true)
-	var pt_left_prev = l1._get_curve_point_and_normal(curve, left_apex_off - l1.ROW_SPACING, true)
+	var pt_left_prev = l1._get_curve_point_and_normal(curve, left_apex_off - loop_row_sp, true)
 	
 	var inner_pos1 = l1._calc_lane_pos(pt_left["pos"], pt_left["normal"], 3)
 	var inner_pos0 = l1._calc_lane_pos(pt_left_prev["pos"], pt_left_prev["normal"], 3)

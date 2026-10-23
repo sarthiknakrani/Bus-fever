@@ -9,7 +9,7 @@ func _init() -> void:
 	
 	var CANONICAL_L = 102.0
 	var CANONICAL_W_V = 48.0
-	var CANONICAL_W_H = 46.0
+	var CANONICAL_W_H = 48.0 # Unified 3D bus design: horizontal buses match vertical 3D bus width exactly
 	var SLOT_W = 53.0
 	var SLOT_H = 94.0
 
@@ -26,11 +26,10 @@ func _init() -> void:
 	var max_aspect_dev = 0.0
 	var max_length_dev = 0.0
 	
-	# Original un-distorted aspect ratios from git history (f603b81 / 1bfd63d):
-	# Vertical: 145 / 68 = 2.13235
-	# Horizontal: 144 / 65 = 2.21538
+	# Approved 3D bus aspect ratio unified across all orientations:
+	# Vertical and Horizontal: 145 / 68 = 2.13235 (102 / 48 = 2.125)
 	var ORIG_ASPECT_V = 145.0 / 68.0
-	var ORIG_ASPECT_H = 144.0 / 65.0
+	var ORIG_ASPECT_H = 145.0 / 68.0
 	
 	for c in colors:
 		for d in dirs:

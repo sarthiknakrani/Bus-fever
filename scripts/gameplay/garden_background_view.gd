@@ -178,15 +178,17 @@ func _draw() -> void:
 			_draw_diamond_glint(gp, 6.0 * pulse * sc, Color(1.0, 1.0, 1.0, pulse * 0.85))
 
 	# 8. CHARMING 3D TOY NAUTICAL LIFEBUOYS BOBBING IN WATER
-	var buoy_y_bob = sin(t * 2.2) * 4.0
-	var buoy_pos = Vector2(maxf(50.0, track_left_x * 0.40), clampf(tr_y + 10.0 * sc + buoy_y_bob, 120.0, shore_base_y - 45.0))
-	var buoy_rot = sin(t * 2.2) * 0.08
-	_draw_3d_lifebuoy(buoy_pos, 26.0 * sc, buoy_rot, buoy_y_bob)
+	var buoy_y_bob = sin(t * 1.4) * 1.2
+	var buoy_x_bob = cos(t * 1.0) * 0.8
+	var buoy_pos = Vector2(maxf(50.0, track_left_x * 0.40) + buoy_x_bob, clampf(tr_y + 10.0 * sc + buoy_y_bob, 120.0, shore_base_y - 45.0))
+	var buoy_rot = sin(t * 1.2) * 0.04
+	_draw_3d_lifebuoy(buoy_pos, 26.0 * sc, buoy_rot, t)
 
-	var buoy2_y_bob = sin(t * 2.5 + 1.2) * 2.5
-	var buoy2_pos = Vector2(maxf(75.0, track_left_x * 0.68), clampf(tr_y - 95.0 * sc + buoy2_y_bob, 65.0, shore_base_y - 120.0))
-	var buoy2_rot = sin(t * 2.5 + 1.2) * 0.06
-	_draw_3d_lifebuoy(buoy2_pos, 16.0 * sc, buoy2_rot, buoy2_y_bob)
+	var buoy2_y_bob = sin(t * 1.5 + 1.4) * 0.9
+	var buoy2_x_bob = cos(t * 1.1 + 0.8) * 0.6
+	var buoy2_pos = Vector2(maxf(75.0, track_left_x * 0.68) + buoy2_x_bob, clampf(tr_y - 95.0 * sc + buoy2_y_bob, 65.0, shore_base_y - 120.0))
+	var buoy2_rot = sin(t * 1.3 + 1.0) * 0.03
+	_draw_3d_lifebuoy(buoy2_pos, 16.0 * sc, buoy2_rot, t + 1.2)
 
 	# 9. SOLID CLEAN LAVENDER PLAYFIELD BELOW 44% DIVIDER
 	if h > div_y:
@@ -355,20 +357,33 @@ func _draw_shallow_caustics(w: float, shore_base_y: float, t: float) -> void:
 			pts.append(Vector2(cx, cy + coff))
 		draw_polyline(pts, caustic_col, 2.5, true)
 
-## Draws an authentic 3D toy lifebuoy with a hollow center showing natural ocean water underneath
-func _draw_3d_lifebuoy(pos: Vector2, rad: float, rot: float, bob: float) -> void:
+## Draws an authentic 3D toy lifebuoy naturally floating on the ocean water with subtle contact shading and ripples
+func _draw_3d_lifebuoy(pos: Vector2, rad: float, rot: float, t: float) -> void:
 	var r_inner := rad * 0.46
 	var ring_w := rad - r_inner
 	var mid_r := (rad + r_inner) * 0.5
-	var shadow_offset := Vector2(2.0, 8.0 + bob * 0.4)
 
-	# 1. Ring shadow on ocean surface (hollow ring shadow)
-	draw_arc(pos + shadow_offset, mid_r, 0, TAU, 36, Color(0.01, 0.08, 0.22, 0.35), ring_w * 1.15)
+	# 1. Gentle concentric surface ripples originating at water contact point
+	var rip1_phase: float = fmod(t * 0.65, 1.0)
+	var rip1_r: float = rad * (1.10 + rip1_phase * 0.32)
+	var rip1_alpha: float = (1.0 - rip1_phase) * 0.28
+	draw_arc(pos, rip1_r, 0, TAU, 36, Color(1.0, 1.0, 1.0, rip1_alpha), 1.4)
 
-	# 2. White doughnut ring body (hollow torus - center is 100% clear water!)
+	var rip2_phase: float = fmod(t * 0.65 + 0.5, 1.0)
+	var rip2_r: float = rad * (1.10 + rip2_phase * 0.32)
+	var rip2_alpha: float = (1.0 - rip2_phase) * 0.20
+	draw_arc(pos, rip2_r, 0, TAU, 36, Color(1.0, 1.0, 1.0, rip2_alpha), 1.2)
+
+	# 2. Subtle, close water-contact shading directly under the buoyant ring (no detached hover shadow)
+	var contact_offset := Vector2(0.5, 1.2)
+	draw_arc(pos + contact_offset, mid_r, 0, TAU, 48, Color(0.01, 0.06, 0.18, 0.28), ring_w * 1.08)
+	# Ambient water contact crease around waterline
+	draw_arc(pos + Vector2(0.0, 1.0), rad, 0.1 * PI, 0.9 * PI, 36, Color(0.01, 0.05, 0.15, 0.25), 2.2)
+
+	# 3. White doughnut ring body (hollow torus - center is 100% clear water!)
 	draw_arc(pos, mid_r, 0, TAU, 48, Color.WHITE, ring_w)
 
-	# 3. Four red quadrant stripes (drawn strictly between r_inner and rad)
+	# 4. Four red quadrant stripes (drawn strictly between r_inner and rad)
 	for base_ang in [0.0, 90.0, 180.0, 270.0]:
 		var a0 = rot + deg_to_rad(base_ang - 16.0)
 		var a1 = rot + deg_to_rad(base_ang + 16.0)
@@ -384,12 +399,17 @@ func _draw_3d_lifebuoy(pos: Vector2, rad: float, rot: float, bob: float) -> void
 			stripe_pts.append(pos + Vector2(cos(a), sin(a)) * (r_inner - 0.5))
 		draw_colored_polygon(stripe_pts, Color("eb3241"))
 
-	# 4. 3D depth rims: inner shadow into the water hole & outer rim
+	# 5. 3D depth rims: inner shadow into the water hole & outer rim
 	draw_arc(pos, r_inner, 0, TAU, 36, Color(0.01, 0.08, 0.22, 0.32), 2.0)
 	draw_arc(pos, rad, 0, TAU, 36, Color(0.0, 0.0, 0.0, 0.16), 1.5)
 
-	# 5. Glossy top-left 3D specular highlight glint along the torus crest
+	# 6. Glossy top-left 3D specular highlight glint along the torus crest
 	draw_arc(pos + Vector2(-1.2, -1.2), mid_r, -PI * 0.85, -PI * 0.15, 24, Color(1.0, 1.0, 1.0, 0.82), 2.2)
+
+	# 7. Subtle waterline occlusion wash across lower partially-submerged curve
+	draw_arc(pos, mid_r, 0.18 * PI, 0.82 * PI, 24, Color(0.04, 0.32, 0.55, 0.22), ring_w * 0.95)
+	# Waterline contact meniscus
+	draw_arc(pos, rad, 0.25 * PI, 0.75 * PI, 24, Color(0.88, 0.96, 1.0, 0.30), 1.4)
 
 ## Draws a crisp sparkling diamond glint star
 func _draw_diamond_glint(pos: Vector2, sz: float, col: Color) -> void:

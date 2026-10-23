@@ -150,7 +150,7 @@ func set_passenger_state_local(pid: int, new_state: String) -> void:
 		p["state"] = new_state
 
 const LANE_SPACING := 22.0
-const LANE_SPACING_CURVE := 18.0
+const LANE_SPACING_CURVE := 22.0
 const ROW_SPACING := 29.0
 const MIN_ROW_GAP := 28.5
 const NUM_LANES := 4
@@ -225,23 +225,22 @@ func get_effective_normal_speed() -> float:
 
 func _get_curve_point_and_normal(c: Curve2D, offset: float, is_loop: bool = false) -> Dictionary:
 	var curve_len := c.get_baked_length()
-	var clamped_offset: float = fmod(offset, curve_len) if is_loop else clampf(offset, 0.0, curve_len)
-	if clamped_offset < 0.0: clamped_offset += curve_len
+	var clamped_offset: float = fposmod(offset, curve_len) if is_loop else clampf(offset, 0.0, curve_len)
 	var p0 := c.sample_baked(clamped_offset)
-	var next_offset: float = fmod(clamped_offset + 1.0, curve_len) if is_loop else minf(clamped_offset + 1.0, curve_len)
-	var p1 := c.sample_baked(next_offset)
-	if p1.distance_squared_to(p0) < 0.0001:
-		var prev_offset = maxf(clamped_offset - 1.0, 0.0)
-		p1 = p0
-		p0 = c.sample_baked(prev_offset)
-	var tangent := (p1 - p0).normalized()
+	var off_fwd: float = fposmod(clamped_offset + 0.5, curve_len) if is_loop else minf(clamped_offset + 0.5, curve_len)
+	var off_bwd: float = fposmod(clamped_offset - 0.5, curve_len) if is_loop else maxf(clamped_offset - 0.5, 0.0)
+	var p_fwd := c.sample_baked(off_fwd)
+	var p_bwd := c.sample_baked(off_bwd)
+	var tangent: Vector2
+	if p_fwd.distance_squared_to(p_bwd) > 0.00001:
+		tangent = (p_fwd - p_bwd).normalized()
+	else:
+		tangent = Vector2.RIGHT
 	var normal := Vector2(-tangent.y, tangent.x)
 	return {"pos": p0, "tangent": tangent, "normal": normal}
 
 func _calc_lane_pos(center_pos: Vector2, normal: Vector2, lane: int) -> Vector2:
-	var curve_fac: float = clampf((absf(center_pos.x) - 75.0) / 30.0, 0.0, 1.0)
-	var dynamic_spacing: float = lerpf(LANE_SPACING, LANE_SPACING_CURVE, curve_fac)
-	var lane_offset: float = (float(lane) - 1.5) * dynamic_spacing
+	var lane_offset: float = (float(lane) - 1.5) * LANE_SPACING
 	return center_pos + normal * lane_offset
 
 func _find_leftmost_matching_slot(color_id: String) -> int:
@@ -308,7 +307,7 @@ func _tick_passenger_simulation(step_dt: float) -> void:
 				_feeder_rows.append(next_row)
 
 		# B. Dynamic Continuous Feeder Admission Scheduler
-		var feeder_stop_pos: float = f_len - 120.0
+		var feeder_stop_pos: float = f_len - 145.0
 
 		# 1. Determine how many feeder rows are authorized by freed loop capacity
 		var running_cap: int = _oval_freed_capacity
@@ -525,7 +524,7 @@ func _process(delta: float) -> void:
 	# Visual update for feeder passengers (once per render frame)
 	if feeder_track != null and is_instance_valid(feeder_track) and feeder_track.curve != null:
 		var f_len: float = feeder_track.curve.get_baked_length()
-		var feeder_stop_pos: float = f_len - 120.0
+		var feeder_stop_pos: float = f_len - 145.0
 		var running_cap: int = _oval_freed_capacity
 		var authorized_count: int = 0
 		if _entrance_active:
@@ -1559,7 +1558,7 @@ func _init_passenger_track() -> void:
 
 		# Remaining rows form a separate dense waiting queue on feeder ramp
 		var f_len = feeder_track.curve.get_baked_length()
-		var feeder_stop_pos: float = f_len - 120.0 # Queue stop line rests 120px before junction (snug fit right at junction entrance with zero overlap)
+		var feeder_stop_pos: float = f_len - 145.0 # Queue stop line rests 120px before junction (snug fit right at junction entrance with zero overlap)
 		for r in range(initial_rows_count, all_rows.size()):
 			var row = all_rows[r]
 			var feeder_idx = r - initial_rows_count

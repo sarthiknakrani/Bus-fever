@@ -20,7 +20,7 @@ var _last_pos: Vector2 = Vector2.ZERO
 var _facing_right: bool = true
 var _smoothed_speed: float = 0.0
 
-const BASE_SCALE := 0.31
+const BASE_SCALE := 0.26
 const IDLE_FRAME := 6
 const RUN_FRAMES := 6
 const TOTAL_FRAMES := 8

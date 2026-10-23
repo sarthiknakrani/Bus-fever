@@ -53,7 +53,7 @@ func _run_qa() -> void:
 	var lane1 = level._calc_lane_pos(pt_sample["pos"], pt_sample["normal"], 1)
 	var lane_dist = lane0.distance_to(lane1)
 	print("  [MEASURED] Inter-lane center distance: %.2f px" % lane_dist)
-	if abs(lane_dist - 18.0) < 0.1:
+	if abs(lane_dist - level.LANE_SPACING) < 0.1:
 		print("  [PASS] Inter-lane clearance strictly verified")
 	else:
 		print("  [FAIL] Inter-lane distance mismatch: %.2f" % lane_dist)
