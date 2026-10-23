@@ -630,7 +630,7 @@ func _build_scene_hierarchy() -> void:
 
 	passenger_visuals = Node2D.new()
 	passenger_visuals.name = "PassengerVisuals"
-	passenger_visuals.y_sort_enabled = false # Disabled to eliminate Y-sort popping and perceived size changes during looping
+	passenger_visuals.y_sort_enabled = true
 	passenger_track_root.add_child(passenger_visuals)
 
 	boarding_effects = Node2D.new()
