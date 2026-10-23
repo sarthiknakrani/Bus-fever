@@ -289,11 +289,60 @@ func _draw() -> void:
 	_draw_wall_base_shadow_tapered(curb_left, WALL_H, COLOR_WALL_SHADOW, 5.0, true, -10.0, 25.0)
 	_draw_wall_base_shadow_tapered(curb_right, WALL_H, COLOR_WALL_SHADOW, 5.0, true, -5.0, 25.0)
 
-	# Step C: 100% Solid, seamless grey road surface with inner lagoon hole
-	# Subtract curb_inner hole from outer_road so the 3D lagoon water shows through
-	var road_polys = Geometry2D.clip_polygons(outer_road, curb_inner)
-	for p in road_polys:
-		draw_colored_polygon(p, COLOR_ROAD)
+	# Step C: 100% Solid, seamless grey road surface with true empty inner lagoon hole
+	# Split into left and right seamless simple ribbons meeting at x=0 so the center hole is TRULY EMPTY!
+	# This lets the real, continuous 3D Caribbean ocean background show right through seamlessly.
+	var road_left := PackedVector2Array()
+	road_left.append(Vector2(0.0, -r_outer))
+	road_left.append(Vector2(-straight_x, -r_outer))
+	for i in range(1, n_arc):
+		var ang = -PI / 2.0 - (float(i) / float(n_arc)) * PI
+		road_left.append(c_left + Vector2(cos(ang), sin(ang)) * r_outer)
+	road_left.append(Vector2(-straight_x, r_outer))
+	road_left.append(Vector2(-x_gate, r_outer))
+	road_left.append(Vector2(-x_gate, plat_y + 1.0))
+	road_left.append(Vector2(0.0, plat_y + 1.0))
+	road_left.append(Vector2(0.0, r_inner))
+	road_left.append(Vector2(-straight_x, r_inner))
+	for i in range(1, n_arc):
+		var ang = PI / 2.0 + (float(i) / float(n_arc)) * PI
+		road_left.append(c_left + Vector2(cos(ang), sin(ang)) * r_inner)
+	road_left.append(Vector2(-straight_x, -r_inner))
+	road_left.append(Vector2(0.0, -r_inner))
+
+	var road_right := PackedVector2Array()
+	road_right.append(Vector2(0.0, -r_outer))
+	road_right.append(Vector2(straight_x, -r_outer))
+	for i in range(1, steps_to_inner):
+		var ang = -PI / 2.0 + (float(i) / float(steps_to_inner)) * (inner_meet_ang - (-PI / 2.0))
+		road_right.append(c_right + Vector2(cos(ang), sin(ang)) * r_outer)
+	if inner_meet_idx >= 0:
+		road_right.append(inner_meet_pt)
+		for i in range(inner_meet_idx - 1, -1, -1):
+			road_right.append(f_inner[i])
+	if not f_outer.is_empty():
+		road_right.append(f_outer[0])
+	if outer_meet_idx >= 0:
+		for i in range(1, outer_meet_idx):
+			road_right.append(f_outer[i])
+		road_right.append(outer_meet_pt)
+	for i in range(1, steps_from_outer):
+		var ang = outer_meet_ang + (float(i) / float(steps_from_outer)) * (PI / 2.0 - outer_meet_ang)
+		road_right.append(c_right + Vector2(cos(ang), sin(ang)) * r_outer)
+	road_right.append(Vector2(straight_x, r_outer))
+	road_right.append(Vector2(x_gate, r_outer))
+	road_right.append(Vector2(x_gate, plat_y + 1.0))
+	road_right.append(Vector2(0.0, plat_y + 1.0))
+	road_right.append(Vector2(0.0, r_inner))
+	road_right.append(Vector2(straight_x, r_inner))
+	for i in range(1, n_arc):
+		var ang = PI / 2.0 - (float(i) / float(n_arc)) * PI
+		road_right.append(c_right + Vector2(cos(ang), sin(ang)) * r_inner)
+	road_right.append(Vector2(straight_x, -r_inner))
+	road_right.append(Vector2(0.0, -r_inner))
+
+	draw_colored_polygon(road_left, COLOR_ROAD)
+	draw_colored_polygon(road_right, COLOR_ROAD)
 
 	# Step D: 3D Road Camber & Lighting (Crowned asphalt center ribbon + gutter ambient occlusion)
 	_draw_road_camber(straight_x, r_center, c_left, c_right, n_arc)
@@ -488,201 +537,222 @@ func _draw_custom_ellipse(center: Vector2, radii: Vector2, color: Color) -> void
 	draw_colored_polygon(pts, color)
 
 ## ─────────────────────────────────────────────────────────────────────────────
-## Step H — Shoreline Embankment, Rocks & Animated Water Lapping at gateway flanks
-## Creates a tropical shoreline ("kinara") where the elevated oval track meets
-## the water, with 3D shaded boulders, sandy beach rim, animated lapping foam,
-## expanding ripples, rolling shore waves, and sun glints.
+## Step H — 3D Coastal Shoreline ("Kinaro"), Chiseled Boulders & Real Ocean Water
+## Authentic 2.5D casual game shoreline:
+## - Crystal-clear ocean water flowing seamlessly between pier & platform
+## - Solid 3D stone pier corner foundations at the gateway throat
+## - Artistically chiseled 3D coastal boulders with faceted triangulation & moss
+## - Submerged rock foundations visible through translucent tropical water
+## - Dynamic animated lapping foam collars, expanding ripples & sun sparkles
 ## ─────────────────────────────────────────────────────────────────────────────
 func _draw_shoreline_rocks_and_water(x_gate: float, r_outer: float, plat_y: float) -> void:
-	# 1. Sandy Shoreline Beach Bed ("kinare jesa rim") along the track base
-	_draw_shoreline_sand_bed(x_gate, r_outer, plat_y)
+	# 1. 3D Pier Embankment / Quay Corner Foundation at the gateway flanks
+	_draw_quay_embankment(x_gate, r_outer, plat_y)
 
-	# 2. Rock formations nestled in the water gap (y between 165 and 190)
-	# Format: [pos, radius, phase_seed, is_pebble]
-	var left_rocks: Array = [
-		[Vector2(-78.0, 179.0),  10.5, 0.0, false],
-		[Vector2(-97.0, 174.0),   8.5, 1.2, false],
-		[Vector2(-116.0, 180.0), 11.0, 2.1, false],
-		[Vector2(-136.0, 173.0),  8.0, 0.7, false],
-		[Vector2(-154.0, 168.0),  6.5, 1.9, false],
-		# Small shoreline pebbles
-		[Vector2(-87.0, 187.0),   4.0, 0.4, true],
-		[Vector2(-106.0, 186.0),  3.5, 1.6, true],
-		[Vector2(-125.0, 185.0),  4.5, 2.8, true],
-		[Vector2(-144.0, 178.0),  3.2, 0.9, true],
+	# 2. Curated 3D Coastal Rock Formations resting in the open water cove
+	# Format: [pos, radius, phase_seed, has_moss, is_skerry]
+	var rock_clusters: Array = [
+		# Left Coastal Formation (Spans naturally across the water cove)
+		[Vector2(-x_gate - 14.0, r_outer + 18.0), 10.5, 0.0, false, false], # Corner anchor stone
+		[Vector2(-x_gate - 48.0, r_outer + 15.0), 16.5, 1.2, true,  false], # Majestic Hero Boulder
+		[Vector2(-x_gate - 88.0, r_outer + 10.0), 13.5, 2.5, false, false], # Outer coastal bluff
+		[Vector2(-x_gate - 32.0, r_outer + 25.0),  8.0, 3.8, false, true],  # Low reef skerry
+
+		# Right Coastal Formation (Balanced companion reef on feeder side)
+		[Vector2(x_gate + 14.0,  r_outer + 18.0), 10.5, 0.6, false, false], # Corner anchor stone
+		[Vector2(x_gate + 48.0,  r_outer + 15.0), 16.5, 1.8, true,  false], # Majestic Hero Boulder
+		[Vector2(x_gate + 88.0,  r_outer + 10.0), 13.5, 3.1, false, false], # Outer coastal bluff
+		[Vector2(x_gate + 32.0,  r_outer + 25.0),  8.0, 0.4, false, true],  # Low reef skerry
 	]
 
-	var right_rocks: Array = [
-		[Vector2(78.0, 179.0),   10.5, 0.5, false],
-		[Vector2(97.0, 174.0),    8.5, 1.7, false],
-		[Vector2(116.0, 180.0),  11.0, 2.6, false],
-		[Vector2(136.0, 173.0),   8.0, 1.1, false],
-		[Vector2(154.0, 168.0),   6.5, 2.3, false],
-		# Small shoreline pebbles
-		[Vector2(87.0, 187.0),    4.0, 0.8, true],
-		[Vector2(106.0, 186.0),   3.5, 2.0, true],
-		[Vector2(125.0, 185.0),   4.5, 0.3, true],
-		[Vector2(144.0, 178.0),   3.2, 1.4, true],
-	]
+	# 3. Expanding water ripples from rock bases
+	_draw_animated_rock_ripples(rock_clusters)
 
-	# 3. Animated water ripples expanding from rock clusters
-	_draw_animated_rock_ripples(left_rocks)
-	_draw_animated_rock_ripples(right_rocks)
+	# 4. Draw artistically chiseled 3D coastal boulders (using robust pure triangles)
+	for rdef in rock_clusters:
+		_draw_chiseled_3d_rock(rdef[0], rdef[1], rdef[2], rdef[3], rdef[4])
 
-	# 4. Draw 3D stylized boulders & pebbles
-	for cluster in [left_rocks, right_rocks]:
-		for rdef in cluster:
-			var rpos: Vector2 = rdef[0]
-			var rsize: float  = rdef[1]
-			var rphase: float = rdef[2]
-			var is_peb: bool  = rdef[3]
-			if is_peb:
-				_draw_pebble_3d(rpos, rsize)
-			else:
-				_draw_rock_3d(rpos, rsize, rphase)
+	# 5. Dynamic animated water foam collars lapping around each rock
+	for rdef in rock_clusters:
+		_draw_rock_water_foam(rdef[0], rdef[1], rdef[2], rdef[4])
 
-	# 5. Animated foam lapping around each boulder base
-	for cluster in [left_rocks, right_rocks]:
-		for rdef in cluster:
-			if not rdef[3]: # only for main boulders
-				_draw_rock_foam(rdef[0], rdef[1], rdef[2])
+	# 6. Channel wave breakers: gentle animated foam wave crests washing through channel
+	_draw_channel_wave_crests(x_gate, r_outer, plat_y)
 
-	# 6. Animated rolling shore wave arcs sweeping along the water channel
-	_draw_shore_waves(x_gate, r_outer, plat_y)
-
-	# 7. Animated diamond sun glints sparkling in the shoreline water
+	# 7. Sparkling diamond sun glints on the shoreline water
 	_draw_shoreline_glints(x_gate, r_outer, plat_y)
 
-## Draws a soft organic sandy beach shore following the curve of the track pier.
-func _draw_shoreline_sand_bed(x_gate: float, r_outer: float, plat_y: float) -> void:
-	var col_dry_sand := Color(0.88, 0.80, 0.66, 0.40)
-	var col_wet_sand := Color(0.64, 0.54, 0.42, 0.50)
-
+## Draws the solid 3D stone pier embankment corner foundations at gateway flanks.
+func _draw_quay_embankment(x_gate: float, r_outer: float, plat_y: float) -> void:
 	for side in [-1, 1]:
 		var s := float(side)
-		# Smooth curved sand bank using overlapping soft discs
-		var sand_nodes := [
-			[Vector2(s * (x_gate + 12.0), r_outer + 8.0), 16.0],
-			[Vector2(s * (x_gate + 28.0), r_outer + 12.0), 18.0],
-			[Vector2(s * (x_gate + 48.0), r_outer + 14.0), 19.0],
-			[Vector2(s * (x_gate + 70.0), r_outer + 12.0), 18.0],
-			[Vector2(s * (x_gate + 92.0), r_outer + 10.0), 16.0],
-			[Vector2(s * (x_gate + 115.0), r_outer + 6.0), 14.0],
-		]
-		for sn in sand_nodes:
-			_draw_custom_ellipse(sn[0], Vector2(sn[1], sn[1] * 0.55), col_dry_sand)
-			_draw_custom_ellipse(sn[0] + Vector2(0, 3.0), Vector2(sn[1] * 0.75, sn[1] * 0.40), col_wet_sand)
+		# 1. Vertical Pier Quoin / Embankment Foundation Wall at crosswalk throat edge
+		var pier_wall := PackedVector2Array([
+			Vector2(s * x_gate, r_outer),
+			Vector2(s * (x_gate + 10.0), r_outer),
+			Vector2(s * (x_gate + 10.0), plat_y),
+			Vector2(s * x_gate, plat_y)
+		])
+		draw_colored_polygon(pier_wall, Color("343a48"))
 
-		# Soft lapping shore contact curve
-		var shore_pts := PackedVector2Array()
-		var n_shore := 16
-		for i in range(n_shore + 1):
-			var frac := float(i) / float(n_shore)
-			var sx := s * (x_gate + 4.0 + frac * 125.0)
-			var sy := r_outer + 5.0 + sin(frac * PI * 0.85) * 14.0 - frac * 6.0
-			shore_pts.append(Vector2(sx, sy))
-		draw_polyline(shore_pts, Color(0.92, 0.98, 1.0, 0.35), 2.0, true)
+		# 2. Pier stone coping highlight edge
+		draw_line(Vector2(s * (x_gate + 10.0), r_outer), Vector2(s * (x_gate + 10.0), plat_y), Color("909cb0"), 2.0)
 
-## Draws a stylised 3D cartoon boulder with deep water shadow, chiseled body, facets, moss, highlight, specular.
-func _draw_rock_3d(center: Vector2, size: float, phase: float, has_moss: bool = false) -> void:
-	# Deep water contact shadow (ellipse, offset down-right)
-	var shadow_off := Vector2(size * 0.18, size * 0.28)
-	_draw_custom_ellipse(center + shadow_off, Vector2(size * 0.95, size * 0.50), Color(0.01, 0.05, 0.16, 0.50))
-	# Dark basalt foundation / wet tide rim
-	_draw_custom_ellipse(center + Vector2(0.0, size * 0.15), Vector2(size * 1.02, size * 0.75), Color("20242c"))
-	# Main rock body (chiseled dark slate)
-	_draw_custom_ellipse(center, Vector2(size, size * 0.78), Color("3a4250"))
-	# Mid-tone upper face (angled toward tropical sun)
-	_draw_custom_ellipse(center + Vector2(-size * 0.10, -size * 0.14), Vector2(size * 0.82, size * 0.60), Color("556173"))
-	# Lighter top facet dome
-	_draw_custom_ellipse(center + Vector2(-size * 0.20, -size * 0.26), Vector2(size * 0.52, size * 0.38), Color("7a8b9f"))
+		# 3. Translucent shallow turquoise water fringe along the pier base
+		var wash_pts := PackedVector2Array([
+			Vector2(s * (x_gate + 8.0), r_outer + 8.0),
+			Vector2(s * (x_gate + 110.0), r_outer + 8.0),
+			Vector2(s * (x_gate + 110.0), r_outer + 18.0),
+			Vector2(s * (x_gate + 8.0), plat_y - 2.0)
+		])
+		draw_colored_polygon(wash_pts, Color(0.18, 0.85, 0.95, 0.18))
 
-	# Optional lush tropical moss cap on top
+## Draws a prominent, artistically faceted 3D coastal boulder in 2.5D perspective using robust triangles.
+func _draw_chiseled_3d_rock(center: Vector2, rad: float, phase: float, has_moss: bool, is_skerry: bool) -> void:
+	# 1. Soft deep-water contact shadow
+	var shadow_pts := PackedVector2Array()
+	for i in 14:
+		var a = float(i) / 13.0 * TAU
+		shadow_pts.append(center + Vector2(cos(a) * rad * 1.15 + rad * 0.18, sin(a) * rad * 0.52 + rad * 0.32))
+	draw_colored_polygon(shadow_pts, Color(0.01, 0.05, 0.16, 0.45))
+
+	# 2. Submerged rock foundation visible through clear tropical ocean
+	var sub_pts := PackedVector2Array()
+	for i in 12:
+		var a = float(i) / 11.0 * PI
+		sub_pts.append(center + Vector2(cos(a) * rad * 1.05, sin(a) * rad * 0.62 + rad * 0.18))
+	draw_colored_polygon(sub_pts, Color(0.10, 0.58, 0.74, 0.75))
+
+	# 3. Chiseled 3D Rock Facets:
+	var v_apex    := center + Vector2(-rad * 0.22, -rad * 0.38) # Sunlit high crest
+	var v_top     := center + Vector2(rad * 0.12,  -rad * 0.48) # Top peak
+	var v_r_top   := center + Vector2(rad * 0.68,  -rad * 0.25) # Upper-right corner
+	var v_r_mid   := center + Vector2(rad * 0.92,   rad * 0.08) # Right flank
+	var v_r_bot   := center + Vector2(rad * 0.65,   rad * 0.48) # Lower-right base
+	var v_bot_mid := center + Vector2(rad * 0.05,   rad * 0.58) # Bottom waterline center
+	var v_l_bot   := center + Vector2(-rad * 0.68,  rad * 0.42) # Lower-left base
+	var v_l_mid   := center + Vector2(-rad * 0.88,  rad * 0.05) # Left flank
+	var v_l_top   := center + Vector2(-rad * 0.65, -rad * 0.22) # Upper-left shoulder
+
+	if is_skerry:
+		# Low wet skerry: robust triangles with clear wet stone sheen
+		draw_colored_polygon(PackedVector2Array([center, v_l_bot, v_bot_mid]), Color("3a485a"))
+		draw_colored_polygon(PackedVector2Array([center, v_bot_mid, v_r_mid]), Color("323e4e"))
+		draw_colored_polygon(PackedVector2Array([center, v_r_mid, v_top]), Color("4a5c70"))
+		draw_colored_polygon(PackedVector2Array([center, v_top, v_l_top]), Color("7e96b0"))
+		draw_colored_polygon(PackedVector2Array([center, v_l_top, v_l_bot]), Color("5c7086"))
+		draw_line(v_l_top, v_top, Color(1.0, 1.0, 1.0, 0.85), 1.6)
+		return
+
+	# Facet Group 1: Right Shadow Face (Facing away from tropical sun)
+	draw_colored_polygon(PackedVector2Array([center, v_top, v_r_top]), Color("384656"))
+	draw_colored_polygon(PackedVector2Array([center, v_r_top, v_r_mid]), Color("303c4c"))
+	draw_colored_polygon(PackedVector2Array([center, v_r_mid, v_r_bot]), Color("283240"))
+	draw_colored_polygon(PackedVector2Array([center, v_r_bot, v_bot_mid]), Color("2e3846"))
+
+	# Facet Group 2: Left Mid Face (Glancing sunlit facet)
+	draw_colored_polygon(PackedVector2Array([center, v_bot_mid, v_l_bot]), Color("52647a"))
+	draw_colored_polygon(PackedVector2Array([center, v_l_bot, v_l_mid]), Color("60748c"))
+	draw_colored_polygon(PackedVector2Array([v_apex, v_l_mid, v_l_top]), Color("788fa8"))
+
+	# Facet Group 3: Sunlit Upper Plane
+	draw_colored_polygon(PackedVector2Array([v_apex, v_l_top, v_top]), Color("9cb4cc"))
+	draw_colored_polygon(PackedVector2Array([v_apex, v_top, center]), Color("8aa2ba"))
+	draw_colored_polygon(PackedVector2Array([v_apex, center, v_l_mid]), Color("7288a0"))
+
+	# Facet Group 4: Warm Sunny Crown Ridge
+	var crown_p1 := v_apex + Vector2(-rad * 0.18, -rad * 0.12)
+	var crown_p2 := v_apex + Vector2(rad * 0.14, -rad * 0.08)
+	var crown_p3 := v_apex + Vector2(rad * 0.02, rad * 0.14)
+	draw_colored_polygon(PackedVector2Array([v_apex, crown_p1, crown_p3]), Color("d4e4f4"))
+	draw_colored_polygon(PackedVector2Array([v_apex, crown_p3, crown_p2]), Color("b8d0e6"))
+
+	# Optional lush tropical moss cap (pure triangles)
 	if has_moss:
-		_draw_custom_ellipse(center + Vector2(-size * 0.15, -size * 0.32), Vector2(size * 0.38, size * 0.22), Color(0.32, 0.54, 0.28, 0.75))
-		_draw_custom_ellipse(center + Vector2(-size * 0.20, -size * 0.36), Vector2(size * 0.24, size * 0.14), Color(0.48, 0.72, 0.38, 0.80))
+		var m1 := v_apex + Vector2(-rad * 0.22, -rad * 0.15)
+		var m2 := v_apex + Vector2(rad * 0.16, -rad * 0.10)
+		var m3 := v_apex + Vector2(0.0, rad * 0.10)
+		draw_colored_polygon(PackedVector2Array([v_apex, m1, m3]), Color(0.38, 0.72, 0.32, 0.90))
+		draw_colored_polygon(PackedVector2Array([v_apex, m3, m2]), Color(0.52, 0.88, 0.42, 0.90))
+		draw_line(m1, m2, Color(0.75, 0.98, 0.60, 0.95), 1.8)
 
-	# Sunlit highlight patch
-	_draw_custom_ellipse(center + Vector2(-size * 0.30, -size * 0.35), Vector2(size * 0.28, size * 0.20), Color("b0c0d4"))
-	# Sharp specular glint
-	_draw_custom_ellipse(center + Vector2(-size * 0.38, -size * 0.40), Vector2(size * 0.12, size * 0.08), Color(1.0, 1.0, 1.0, 0.90))
+	# Specular sunlight ridge line
+	draw_line(v_l_top, v_apex, Color(1.0, 1.0, 1.0, 0.95), 2.0)
+	draw_line(v_apex, v_top, Color(1.0, 1.0, 1.0, 0.85), 1.6)
 
-## Draws a tiny smooth shoreline pebble.
-func _draw_pebble_3d(center: Vector2, size: float) -> void:
-	# Shadow
-	_draw_custom_ellipse(center + Vector2(size * 0.2, size * 0.25), Vector2(size * 0.9, size * 0.5), Color(0.01, 0.05, 0.14, 0.35))
-	# Body
-	_draw_custom_ellipse(center, Vector2(size, size * 0.75), Color("4a5464"))
-	# Top highlight
-	_draw_custom_ellipse(center + Vector2(-size * 0.2, -size * 0.2), Vector2(size * 0.5, size * 0.35), Color("8ea0b5"))
-	# Specular
-	_draw_custom_ellipse(center + Vector2(-size * 0.3, -size * 0.3), Vector2(size * 0.15, size * 0.1), Color(1.0, 1.0, 1.0, 0.75))
+## Draws realistic animated water foam collars hugging each boulder.
+func _draw_rock_water_foam(center: Vector2, rad: float, phase: float, is_skerry: bool) -> void:
+	var foam_pulse := sin(_water_time * 2.2 + phase) * 0.35 + 0.50
+	var foam_col := Color(0.92, 0.98, 1.0, foam_pulse * (0.75 if is_skerry else 0.60))
+	var foam_r := rad * (1.30 if is_skerry else 1.22)
+
+	# Crescent foam arc hugging the water surface line
+	var arc_pts := PackedVector2Array()
+	var n_arc_pts := 16
+	for i in range(n_arc_pts):
+		var ang: float = float(i) / float(n_arc_pts - 1) * PI
+		arc_pts.append(center + Vector2(cos(ang) * foam_r, sin(ang) * foam_r * 0.60 + rad * 0.15))
+	if arc_pts.size() >= 2:
+		draw_polyline(arc_pts, foam_col, 2.2, true)
+
+	# Faint secondary outer foam ring
+	var outer_alpha := foam_pulse * 0.30
+	var outer_pts := PackedVector2Array()
+	var outer_r := rad * 1.45
+	for i in range(12):
+		var ang: float = (float(i) / 11.0) * PI
+		outer_pts.append(center + Vector2(cos(ang) * outer_r, sin(ang) * outer_r * 0.55 + rad * 0.20))
+	if outer_pts.size() >= 2:
+		draw_polyline(outer_pts, Color(0.80, 0.94, 1.0, outer_alpha), 1.4, true)
 
 ## Draws concentric animated water ripples expanding from rock bases.
 func _draw_animated_rock_ripples(rocks: Array) -> void:
 	for rdef in rocks:
-		if rdef[3]: continue # skip small pebbles
 		var rpos: Vector2 = rdef[0]
 		var rsize: float  = rdef[1]
 		var rphase: float = rdef[2]
 		for ri in 2:
-			var t := fmod(_water_time * 0.85 + rphase + float(ri) * 0.5, 1.0)
-			var rip_r := rsize * (1.1 + t * 0.9)
-			var rip_alpha := (1.0 - t) * 0.35
-			_draw_ellipse_outline(rpos + Vector2(0.0, rsize * 0.2), Vector2(rip_r, rip_r * 0.55), Color(0.78, 0.94, 1.0, rip_alpha), 1.2)
+			var t := fmod(_water_time * 0.80 + rphase + float(ri) * 0.50, 1.0)
+			var rip_r := rsize * (1.15 + t * 0.95)
+			var rip_alpha := (1.0 - t) * 0.32
+			_draw_ellipse_outline(rpos + Vector2(0.0, rsize * 0.20), Vector2(rip_r, rip_r * 0.55), Color(0.75, 0.94, 1.0, rip_alpha), 1.2)
 
-## Draws pulsing foam rings hugging a boulder.
-func _draw_rock_foam(center: Vector2, size: float, phase: float) -> void:
-	var alpha_pulse := sin(_water_time * 2.4 + phase) * 0.35 + 0.50
-	var foam_col := Color(0.92, 0.98, 1.0, alpha_pulse * 0.65)
-	var foam_r := size * 1.25
-	# Lower crescent hugging water line
-	var arc_pts := PackedVector2Array()
-	for i in 15:
-		var ang: float = float(i) / 14.0 * PI
-		arc_pts.append(center + Vector2(cos(ang) * foam_r, sin(ang) * foam_r * 0.65 + size * 0.12))
-	if arc_pts.size() >= 2:
-		draw_polyline(arc_pts, foam_col, 2.0, true)
-
-## Draws gentle shore-wash wave arcs washing in toward the gateway flanks.
-func _draw_shore_waves(x_gate: float, r_outer: float, plat_y: float) -> void:
+## Draws gentle animated foam wave crests washing through the water channel.
+func _draw_channel_wave_crests(x_gate: float, r_outer: float, plat_y: float) -> void:
 	for side in [-1, 1]:
 		var s := float(side)
-		for wi in 3:
-			var t_cycle: float = fmod(_water_time * 0.75 + float(wi) * 0.42, 1.5) / 1.5
-			var wave_alpha: float = sin(t_cycle * PI) * 0.52
-			var wave_dist: float = t_cycle * 22.0
-			var wave_y: float = plat_y - 6.0 - wave_dist * 0.5
-			var start_x: float = s * (x_gate + 12.0 + wave_dist * 0.3)
-			var wave_len: float = 38.0 - float(wi) * 6.0
+		for wi in 2:
+			var t_cycle: float = fmod(_water_time * 0.65 + float(wi) * 0.50, 1.8) / 1.8
+			var wave_alpha: float = sin(t_cycle * PI) * 0.45
+			var wave_y: float = r_outer + 12.0 + t_cycle * 18.0
+			var start_x: float = s * (x_gate + 8.0)
+			var wave_len: float = 75.0 - float(wi) * 10.0
 
 			var pts := PackedVector2Array()
-			for k in 12:
-				var frac: float = float(k) / 11.0
+			for k in 14:
+				var frac: float = float(k) / 13.0
 				var wx: float = start_x + s * frac * wave_len
-				var wy: float = wave_y + sin(frac * PI) * 3.5
+				var wy: float = wave_y + sin(frac * PI * 1.5 + _water_time * 1.8) * 2.8
 				pts.append(Vector2(wx, wy))
 			if pts.size() >= 2:
-				draw_polyline(pts, Color(0.85, 0.96, 1.0, wave_alpha), 1.6, true)
+				draw_polyline(pts, Color(0.85, 0.96, 1.0, wave_alpha), 1.8, true)
 
 ## Draws sparkling sun glints in the shoreline water near the rocks.
 func _draw_shoreline_glints(x_gate: float, r_outer: float, plat_y: float) -> void:
 	var glints := [
-		[Vector2(-72.0, 191.0), 0.0],
-		[Vector2(-90.0, 183.0), 1.5],
-		[Vector2(-112.0, 188.0), 3.0],
-		[Vector2(-130.0, 179.0), 4.2],
-		[Vector2(72.0, 191.0), 0.8],
-		[Vector2(90.0, 183.0), 2.2],
-		[Vector2(112.0, 188.0), 3.7],
-		[Vector2(130.0, 179.0), 5.0],
+		[Vector2(-x_gate - 20.0, r_outer + 32.0), 0.0],
+		[Vector2(-x_gate - 52.0, r_outer + 30.0), 1.6],
+		[Vector2(-x_gate - 95.0, r_outer + 24.0), 2.8],
+		[Vector2(x_gate + 20.0,  r_outer + 32.0), 0.8],
+		[Vector2(x_gate + 52.0,  r_outer + 30.0), 2.2],
+		[Vector2(x_gate + 95.0,  r_outer + 24.0), 3.4],
 	]
 	for g in glints:
 		var gpos: Vector2 = g[0]
 		var gphase: float = g[1]
-		var glint_alpha: float = maxf(0.0, sin(_water_time * 3.6 + gphase))
-		if glint_alpha > 0.3:
-			var sz: float = 2.4 * glint_alpha
+		var glint_alpha: float = maxf(0.0, sin(_water_time * 3.4 + gphase))
+		if glint_alpha > 0.25:
+			var sz: float = 2.6 * glint_alpha
 			var col := Color(1.0, 1.0, 1.0, glint_alpha * 0.85)
 			draw_line(gpos - Vector2(sz, 0), gpos + Vector2(sz, 0), col, 1.2)
 			draw_line(gpos - Vector2(0, sz), gpos + Vector2(0, sz), col, 1.2)
