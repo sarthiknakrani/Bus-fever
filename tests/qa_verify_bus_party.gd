@@ -63,6 +63,17 @@ func _run_verification() -> void:
 	_assert(ResourceLoader.exists("res://assets/home/foliage_left.png"), "foliage_left.png exists")
 	_assert(ResourceLoader.exists("res://assets/home/foliage_right.png"), "foliage_right.png exists")
 
+	# Check app icon assets
+	_assert(ResourceLoader.exists("res://icon.png"), "Project icon.png exists")
+	var root_icon: Texture2D = ResourceLoader.load("res://icon.png")
+	_assert(root_icon != null, "icon.png loads as Texture2D")
+	var cfg_icon: String = ProjectSettings.get_setting("application/config/icon")
+	_assert(cfg_icon == "res://icon.png", "project.godot application/config/icon is res://icon.png")
+	_assert(FileAccess.file_exists("res://assets/app_icons/mac/icon.icns"), "macOS icon.icns exists")
+	_assert(FileAccess.file_exists("res://assets/app_icons/android/adaptive_foreground_432x432.png"), "Android adaptive icon exists")
+	_assert(FileAccess.file_exists("res://assets/app_icons/ios/AppIcon.appiconset/Contents.json"), "iOS AppIcon.appiconset exists")
+	_assert(FileAccess.file_exists("res://assets/app_icons/stores/appstore_1024.png"), "App Store 1024 icon exists")
+
 	# 2. SubViewport setup for 720x1280
 	var vp := SubViewport.new()
 	vp.size = Vector2i(720, 1280)

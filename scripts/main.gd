@@ -59,6 +59,10 @@ var _idle_time: float = 0.0
 
 
 func _ready() -> void:
+	if DisplayServer.has_method("set_icon"):
+		var icon_tex = load("res://icon.png")
+		if icon_tex != null and icon_tex is Texture2D:
+			DisplayServer.set_icon(icon_tex.get_image())
 	_build_ui()
 	var vp := get_viewport()
 	if vp != null:
@@ -625,9 +629,9 @@ func _show_settings_overlay() -> void:
 
 	var wrapper := Control.new()
 	wrapper.name = "ModalWrapper"
-	wrapper.custom_minimum_size = Vector2(300, 270)
-	wrapper.size = Vector2(300, 270)
-	wrapper.pivot_offset = Vector2(150, 135)
+	wrapper.custom_minimum_size = Vector2(300, 290)
+	wrapper.size = Vector2(300, 290)
+	wrapper.pivot_offset = Vector2(150, 145)
 	wrapper.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	center.add_child(wrapper)
 
@@ -720,6 +724,35 @@ func _show_settings_overlay() -> void:
 	toggles.add_child(_create_custom_toggle("Vibration", "res://assets/ui/clay_textless/icon_vibration_cream.png", haptics_on, func(on):
 		var s = _get_settings_manager()
 		if s and s.has_method("set_haptics"): s.set_haptics(on)))
+
+	# App Icon & Version footer in Settings
+	var footer := HBoxContainer.new()
+	footer.name = "VersionFooter"
+	footer.alignment = BoxContainer.ALIGNMENT_CENTER
+	footer.add_theme_constant_override("separation", 6)
+	footer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var app_icon := TextureRect.new()
+	app_icon.name = "AppIconSmall"
+	app_icon.texture = load("res://icon.png")
+	app_icon.custom_minimum_size = Vector2(22, 22)
+	app_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	app_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	app_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	footer.add_child(app_icon)
+
+	var ver_label := Label.new()
+	ver_label.name = "VersionLabel"
+	ver_label.text = "Bus Party v1.0"
+	ver_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var vls := LabelSettings.new()
+	vls.font = load("res://assets/fonts/Fredoka-Bold.ttf")
+	vls.font_size = 13
+	vls.font_color = Color(0.42, 0.28, 0.18, 0.7)
+	ver_label.label_settings = vls
+	footer.add_child(ver_label)
+
+	vbox.add_child(footer)
 
 	var close_btn := _create_close_button(close_overlay)
 	close_btn.name = "CloseButton"
