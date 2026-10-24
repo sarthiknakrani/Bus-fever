@@ -62,7 +62,7 @@ func _build_ui() -> void:
 	_hud_ctrl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root_ctrl.add_child(_hud_ctrl)
 
-	# B. Premium 3D Game Title Logo ("BUS FEVER PARTY!" - static)
+	# B. Premium 3D Game Title Logo ("BUS PARTY" - static)
 	_logo_wrapper = Control.new()
 	_logo_wrapper.name = "TitleLogoWrapper"
 	_logo_wrapper.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -70,7 +70,7 @@ func _build_ui() -> void:
 
 	_logo_rect = TextureRect.new()
 	_logo_rect.name = "LogoTexture"
-	_logo_rect.texture = load("res://assets/ui/logo/bus_fever_party_logo.png")
+	_logo_rect.texture = load("res://assets/ui/logo/bus_party_logo.png")
 	_logo_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_logo_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_logo_rect.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS

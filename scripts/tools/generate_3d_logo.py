@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 """
-BUS FEVER PARTY! — High-End 3D Casual Mobile Game Logo Generator
+BUS PARTY — High-End 3D Casual Mobile Game Logo Generator
 Generates a studio-quality 3D-extruded, candy-glossed, multicolor game logo
 with per-letter vibrant hues, unified badge silhouette, and rich lighting.
 """
 
-import math
+import math, os
 from PIL import Image, ImageFont, ImageDraw, ImageFilter, ImageChops
 
 FONT_PATH = "assets/fonts/arial_rounded_bold.ttf"
-OUTPUT_PNG = "assets/ui/logo/bus_fever_party_logo.png"
+OUTPUT_PNG = "assets/ui/logo/bus_party_logo.png"
+LEGACY_OUTPUT_PNG = "assets/ui/logo/bus_fever_party_logo.png"
 
 CANVAS_W = 1400
-CANVAS_H = 1100
+CANVAS_H = 900
 CENTER_X = CANVAS_W // 2
 
 # Harmonious, super-vibrant casual palette
@@ -49,61 +50,7 @@ LETTER_PALETTES = {
         "ext_mid": (125, 0, 15),
         "ext_base": (70, 0, 10),
     },
-    # Line 2: F E V E R
-    "F": {
-        "name": "Bright Cyan",
-        "highlight": (225, 252, 255),
-        "face_top": (0, 235, 255),
-        "face_bottom": (0, 175, 235),
-        "bevel_shade": (0, 135, 195),
-        "ext_top": (0, 105, 165),
-        "ext_mid": (0, 75, 130),
-        "ext_base": (0, 35, 75),
-    },
-    "E1": {
-        "char": "E",
-        "name": "Royal Blue",
-        "highlight": (225, 240, 255),
-        "face_top": (60, 145, 255),
-        "face_bottom": (25, 90, 245),
-        "bevel_shade": (15, 60, 205),
-        "ext_top": (10, 40, 165),
-        "ext_mid": (5, 25, 125),
-        "ext_base": (0, 12, 70),
-    },
-    "V": {
-        "name": "Rich Purple",
-        "highlight": (248, 230, 255),
-        "face_top": (200, 95, 255),
-        "face_bottom": (150, 35, 235),
-        "bevel_shade": (120, 15, 195),
-        "ext_top": (90, 10, 160),
-        "ext_mid": (65, 5, 120),
-        "ext_base": (35, 0, 75),
-    },
-    "E2": {
-        "char": "E",
-        "name": "Bubblegum Pink",
-        "highlight": (255, 230, 242),
-        "face_top": (255, 75, 155),
-        "face_bottom": (240, 25, 115),
-        "bevel_shade": (200, 10, 85),
-        "ext_top": (160, 5, 65),
-        "ext_mid": (120, 0, 45),
-        "ext_base": (65, 0, 25),
-    },
-    "R1": {
-        "char": "R",
-        "name": "Lime Green",
-        "highlight": (240, 255, 220),
-        "face_top": (135, 245, 25),
-        "face_bottom": (90, 215, 10),
-        "bevel_shade": (65, 175, 5),
-        "ext_top": (45, 135, 5),
-        "ext_mid": (30, 100, 5),
-        "ext_base": (12, 55, 0),
-    },
-    # Line 3: P A R T Y !
+    # Line 2: P A R T Y
     "P": {
         "name": "Sunny Yellow",
         "highlight": (255, 255, 220),
@@ -124,8 +71,7 @@ LETTER_PALETTES = {
         "ext_mid": (105, 0, 20),
         "ext_base": (55, 0, 10),
     },
-    "R2": {
-        "char": "R",
+    "R": {
         "name": "Emerald Mint",
         "highlight": (225, 255, 240),
         "face_top": (20, 235, 145),
@@ -155,16 +101,6 @@ LETTER_PALETTES = {
         "ext_mid": (0, 55, 115),
         "ext_base": (0, 25, 65),
     },
-    "!": {
-        "name": "Metallic Gold",
-        "highlight": (255, 255, 225),
-        "face_top": (255, 230, 45),
-        "face_bottom": (255, 175, 0),
-        "bevel_shade": (230, 135, 0),
-        "ext_top": (195, 95, 0),
-        "ext_mid": (155, 60, 0),
-        "ext_base": (90, 25, 0),
-    },
 }
 
 def lerp_color(c1, c2, t):
@@ -185,7 +121,7 @@ def render_gradient_vertical(w, h, c_top, c_bottom):
             pixels[x, y] = (c[0], c[1], c[2], 255)
     return grad
 
-def create_letter_image(char_key, font_size=190, stroke_w=7, depth=26):
+def create_letter_image(char_key, font_size=200, stroke_w=8, depth=26):
     """
     Renders an individual letter with:
     - 3D extrusion with directional light & occlusion base
@@ -302,43 +238,33 @@ def draw_diamond_sparkle(img, cx, cy, radius=22, color=(255, 255, 255, 255)):
     img.alpha_composite(star_layer)
 
 def generate_logo():
-    print("=== GENERATING 3D CASUAL GAME TITLE LOGO (TIGHT KERNING & THIN BORDER) ===")
+    print("=== GENERATING 3D CASUAL GAME TITLE LOGO: BUS PARTY ===")
 
     # Layout configuration
-    # Letters sit close together, slightly overlapping within each word
+    # 2 lines: Line 1 = BUS (3 letters), Line 2 = PARTY (5 letters)
+    # Forms an exquisitely balanced, candy-glossed casual badge
     lines_def = [
         # Line 1: BUS
         {
             "keys": ["B", "U", "S"],
-            "font_size": 240,
+            "font_size": 250,
             "stroke_w": 9,
             "depth": 28,
-            "y_pos": 120,
+            "y_pos": 140,
             "spacing": -16, # snug overlap
             "angles": [-2.0, 0.0, 2.0],
             "y_offsets": [3, -3, 3]
         },
-        # Line 2: FEVER
+        # Line 2: PARTY
         {
-            "keys": ["F", "E1", "V", "E2", "R1"],
-            "font_size": 186,
+            "keys": ["P", "A", "R", "T", "Y"],
+            "font_size": 215,
             "stroke_w": 8,
             "depth": 26,
-            "y_pos": 345,
+            "y_pos": 375,
             "spacing": -14, # snug overlap
-            "angles": [-1.5, -0.5, 0.0, 0.5, 1.5],
-            "y_offsets": [0, -3, 3, -3, 0]
-        },
-        # Line 3: PARTY!
-        {
-            "keys": ["P", "A", "R2", "T", "Y", "!"],
-            "font_size": 190,
-            "stroke_w": 8,
-            "depth": 26,
-            "y_pos": 555,
-            "spacing": -12, # snug overlap
-            "angles": [-2.5, -1.2, 0.0, 1.2, 2.5, 5.0],
-            "y_offsets": [2, -2, 0, -2, 2, -4]
+            "angles": [-2.5, -1.2, 0.0, 1.2, 2.5],
+            "y_offsets": [2, -2, 0, -2, 2]
         }
     ]
 
@@ -439,13 +365,13 @@ def generate_logo():
         # Composite the letter
         final_canvas.alpha_composite(l["img"], (l["pos_x"], l["pos_y"]))
 
-    # 5. Diamond Star Sparkles
+    # 5. Diamond Star Sparkles (Placed across BUS PARTY letters)
     sparkles = [
         (rendered_letters[0]["pos_x"] + 50, rendered_letters[0]["pos_y"] + 45, 22, (255, 255, 225, 255)),  # B
         (rendered_letters[2]["pos_x"] + 120, rendered_letters[2]["pos_y"] + 70, 20, (255, 235, 235, 255)), # S
-        (rendered_letters[7]["pos_x"] + 105, rendered_letters[7]["pos_y"] + 55, 18, (235, 255, 220, 255)), # R (FEVER)
-        (rendered_letters[8]["pos_x"] + 45, rendered_letters[8]["pos_y"] + 45, 22, (255, 255, 210, 255)),  # P
-        (rendered_letters[13]["pos_x"] + 35, rendered_letters[13]["pos_y"] + 30, 24, (255, 250, 180, 255)), # !
+        (rendered_letters[3]["pos_x"] + 45, rendered_letters[3]["pos_y"] + 45, 22, (255, 255, 210, 255)),  # P
+        (rendered_letters[5]["pos_x"] + 50, rendered_letters[5]["pos_y"] + 40, 18, (225, 255, 240, 255)),  # R
+        (rendered_letters[7]["pos_x"] + 100, rendered_letters[7]["pos_y"] + 45, 24, (225, 250, 255, 255)), # Y
     ]
     for sp in sparkles:
         draw_diamond_sparkle(final_canvas, sp[0], sp[1], sp[2], sp[3])
@@ -460,8 +386,13 @@ def generate_logo():
         min(CANVAS_H, bbox[3] + pad)
     )
     cropped = final_canvas.crop(crop_box)
+    os.makedirs(os.path.dirname(OUTPUT_PNG), exist_ok=True)
     cropped.save(OUTPUT_PNG, "PNG", optimize=True)
     print(f"SUCCESS! Rendered 3D logo saved to {OUTPUT_PNG} ({cropped.width}x{cropped.height} px)")
+    
+    # Also save to legacy path for backward compatibility
+    cropped.save(LEGACY_OUTPUT_PNG, "PNG", optimize=True)
+    print(f"Saved copy to legacy path {LEGACY_OUTPUT_PNG}")
 
 if __name__ == "__main__":
     generate_logo()

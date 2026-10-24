@@ -14,7 +14,7 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 
 [application]
 
-config/name="Bus Fever Party Clone"
+config/name="Bus Party"
 config/description="Traffic-blocking bus puzzle. Tap vehicles to send them to bays, board matching passengers, and clear the queue."
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
