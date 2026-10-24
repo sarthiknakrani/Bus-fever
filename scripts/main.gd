@@ -90,26 +90,26 @@ func _build_ui() -> void:
 
 	_logo_wrapper.add_child(_logo_rect)
 
-	# C. Top-right Settings button (Glossy Blue SVG - static)
+	# C. Top-right Settings button (Genuine Claymorphic 3D Gear Icon)
 	_settings_btn = TextureButton.new()
 	_settings_btn.name = "settings_btn"
-	_settings_btn.texture_normal = load("res://assets/ui/buttons/settings_gear_normal.svg")
-	_settings_btn.texture_pressed = load("res://assets/ui/buttons/settings_gear_pressed.svg")
+	_settings_btn.texture_normal = load("res://assets/ui/clay/icon_settings.png")
 	_settings_btn.ignore_texture_size = true
 	_settings_btn.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
+	_settings_btn.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	_settings_btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	_settings_btn.focus_mode = Control.FOCUS_NONE
 	_settings_btn.pressed.connect(_on_settings_pressed)
 	ClayStyle.apply_clay_squish(_settings_btn, 3.0, 0.91)
 	_hud_ctrl.add_child(_settings_btn)
 
-	# D. Bottom-center Play button (Glossy 3D Candy Orange Button - static)
+	# D. Bottom-center Play button (Genuine Claymorphic 3D Candy Button)
 	_play_btn = TextureButton.new()
 	_play_btn.name = "PlayButton"
-	_play_btn.texture_normal = load("res://assets/ui/buttons/play_orange_normal.png")
-	_play_btn.texture_pressed = load("res://assets/ui/buttons/play_orange_pressed.png")
+	_play_btn.texture_normal = load("res://assets/ui/clay/button_play.png")
 	_play_btn.ignore_texture_size = true
 	_play_btn.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
+	_play_btn.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	_play_btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	_play_btn.focus_mode = Control.FOCUS_NONE
 	_play_btn.pressed.connect(_on_play_pressed)
@@ -248,21 +248,15 @@ func _show_settings_overlay() -> void:
 	vbox.add_theme_constant_override("separation", 14)
 	margin.add_child(vbox)
 
-	var title := Label.new()
-	title.name = "SettingsTitle"
-	title.text = "Settings"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 22)
-	title.add_theme_color_override("font_color", Color("4a2810")) # High contrast warm brown
-	title.add_theme_color_override("font_outline_color", Color("fffdf7"))
-	title.add_theme_constant_override("outline_size", 2)
-	vbox.add_child(title)
-
-	var line := ColorRect.new()
-	line.name = "DividerLine"
-	line.custom_minimum_size = Vector2(0, 2)
-	line.color = Color("d4c3ad")
-	vbox.add_child(line)
+	var header_rect := TextureRect.new()
+	header_rect.name = "SettingsHeader"
+	header_rect.texture = load("res://assets/ui/clay/header_settings.png")
+	header_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	header_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	header_rect.custom_minimum_size = Vector2(180, 42)
+	header_rect.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	header_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(header_rect)
 
 	var toggles := VBoxContainer.new()
 	toggles.name = "TogglesVBox"
@@ -290,7 +284,7 @@ func _show_settings_overlay() -> void:
 		var s = _get_settings_manager()
 		if s and s.has_method("set_haptics"): s.set_haptics(on)))
 
-	# --- Professional Vector Close Button (44x44 minimum touch target) ---
+	# --- Claymorphic Close Button ---
 	var close_btn := _create_close_button(close_overlay)
 	close_btn.name = "CloseButton"
 	close_btn.anchor_left = 1.0
@@ -324,7 +318,8 @@ func _create_custom_toggle(text: String, icon_path: String, is_on: bool, on_togg
 	row_wrapper.add_child(row)
 
 	var icon := TextureRect.new()
-	icon.texture = load(icon_path)
+	if ResourceLoader.exists(icon_path):
+		icon.texture = load(icon_path)
 	icon.custom_minimum_size = Vector2(24, 24)
 	icon.size = Vector2(24, 24)
 	icon.ignore_texture_size = true
@@ -346,143 +341,42 @@ func _create_custom_toggle(text: String, icon_path: String, is_on: bool, on_togg
 	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(lbl)
 
-	# Procedural Clay toggle pill
-	const PILL_W := 54.0
-	const PILL_H := 32.0
-	const KNOB := 22.0
-	const PAD := 5.0
-
-	var pill := Panel.new()
-	pill.custom_minimum_size = Vector2(PILL_W, PILL_H)
-	pill.size = Vector2(PILL_W, PILL_H)
-	pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var pill_style := ClayStyle.create_clay_pill(
-		Color("22c55e") if is_on else Color("cbd5e1"),
-		Color("15803d") if is_on else Color("94a3b8"),
-		3, 8, 2, 0.16
-	)
-	pill.add_theme_stylebox_override("panel", pill_style)
-	
-	var t_gloss := Panel.new()
-	t_gloss.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	t_gloss.anchor_bottom = 0.48
-	t_gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var tg_style := ClayStyle.create_clay_highlight_style(int(PILL_H / 2), 0.32)
-	t_gloss.add_theme_stylebox_override("panel", tg_style)
-	pill.add_child(t_gloss)
-
-	var inside := Control.new()
-	inside.set_anchors_preset(Control.PRESET_FULL_RECT)
-	inside.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	pill.add_child(inside)
-
-	var knob := Panel.new()
-	knob.custom_minimum_size = Vector2(KNOB, KNOB)
-	knob.size = Vector2(KNOB, KNOB)
-	knob.pivot_offset = Vector2(KNOB * 0.5, KNOB * 0.5)
-	knob.position = Vector2(
-		(PILL_W - KNOB - PAD) if is_on else PAD,
-		(PILL_H - KNOB) / 2.0
-	)
-	var knob_style := ClayStyle.create_clay_button_style(Color("ffffff"), Color("cbd5e1"), int(KNOB / 2), 3, 5, 2, 0.22)
-	knob.add_theme_stylebox_override("panel", knob_style)
-	knob.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	inside.add_child(knob)
-
-	var knob_gloss := Panel.new()
-	knob_gloss.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	knob_gloss.anchor_bottom = 0.48
-	knob_gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	knob_gloss.add_theme_stylebox_override("panel", ClayStyle.create_clay_highlight_style(int(KNOB / 2), 0.35))
-	knob.add_child(knob_gloss)
-
-	var pill_center := CenterContainer.new()
-	pill_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	pill_center.add_child(pill)
-	row.add_child(pill_center)
-
-	# Full-row interactive hit button for reliable, effortless mobile touch
-	var hit := Button.new()
-	hit.name = "HitButton"
-	hit.set_anchors_preset(Control.PRESET_FULL_RECT)
-	hit.flat = true
-	hit.focus_mode = Control.FOCUS_NONE
-	hit.modulate = Color(1, 1, 1, 0.0)
-	hit.mouse_filter = Control.MOUSE_FILTER_STOP
-	row_wrapper.add_child(hit)
+	# Genuine Claymorphic ON/OFF toggle texture button
+	var toggle_btn := TextureButton.new()
+	toggle_btn.ignore_texture_size = true
+	toggle_btn.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
+	toggle_btn.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	toggle_btn.custom_minimum_size = Vector2(56, 36)
+	toggle_btn.size = Vector2(56, 36)
+	toggle_btn.pivot_offset = Vector2(28, 18)
+	toggle_btn.texture_normal = load("res://assets/ui/clay/toggle_on.png" if is_on else "res://assets/ui/clay/toggle_off.png")
+	toggle_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	toggle_btn.focus_mode = Control.FOCUS_NONE
+	ClayStyle.apply_clay_squish(toggle_btn, 2.0, 0.92)
 
 	var state := {"on": is_on}
-	var toggle_fn = func():
+	toggle_btn.pressed.connect(func():
 		_play_sfx("ui_click")
 		state["on"] = not state["on"]
-		var on: bool = state["on"]
-
-		var target_bg := Color("22c55e") if on else Color("cbd5e1")
-		var target_lip := Color("15803d") if on else Color("94a3b8")
-		var target_x: float = (PILL_W - KNOB - PAD) if on else PAD
-
-		var tw := pill.create_tween()
-		tw.set_parallel(true)
-		tw.tween_method(func(c: Color):
-			pill_style.bg_color = c
-			pill.queue_redraw()
-		, pill_style.bg_color, target_bg, 0.16)
-		tw.tween_method(func(c: Color):
-			pill_style.border_color = c
-			pill.queue_redraw()
-		, pill_style.border_color, target_lip, 0.16)
-		tw.tween_property(knob, "position:x", target_x, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-		# Squash knob during movement
-		tw.tween_property(knob, "scale", Vector2(1.15, 0.90), 0.08).set_trans(Tween.TRANS_QUAD)
-		tw.chain().tween_property(knob, "scale", Vector2.ONE, 0.10).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-
-		on_toggle.call(on)
-
-	hit.pressed.connect(toggle_fn)
+		toggle_btn.texture_normal = load("res://assets/ui/clay/toggle_on.png" if state["on"] else "res://assets/ui/clay/toggle_off.png")
+		on_toggle.call(state["on"])
+	)
+	row.add_child(toggle_btn)
 
 	return row_wrapper
 
 
-func _create_close_button(on_close: Callable) -> Button:
-	var btn := Button.new()
-	btn.custom_minimum_size = Vector2(44, 44)
-	btn.size = Vector2(44, 44)
+func _create_close_button(on_close: Callable) -> Control:
+	var btn := TextureButton.new()
+	btn.texture_normal = load("res://assets/ui/clay/icon_close_red.png")
+	btn.ignore_texture_size = true
+	btn.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
+	btn.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	btn.custom_minimum_size = Vector2(40, 40)
+	btn.size = Vector2(40, 40)
+	btn.pivot_offset = Vector2(20, 20)
 	btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	btn.focus_mode = Control.FOCUS_NONE
-	
-	var c_style := ClayStyle.create_clay_button_style(Color("ef4444"), Color("b91c1c"), 22, 4, 10, 4, 0.25)
-	btn.add_theme_stylebox_override("normal", c_style)
-	
-	var c_hover := c_style.duplicate()
-	c_hover.bg_color = Color("f87171")
-	btn.add_theme_stylebox_override("hover", c_hover)
-	
-	var c_pressed := c_style.duplicate()
-	c_pressed.bg_color = Color("dc2626")
-	c_pressed.border_width_bottom = 2
-	c_pressed.shadow_size = 4
-	c_pressed.shadow_offset = Vector2(0, 2)
-	btn.add_theme_stylebox_override("pressed", c_pressed)
-	
-	var cg := Panel.new()
-	cg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	cg.anchor_bottom = 0.5
-	cg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var cgs := ClayStyle.create_clay_highlight_style(22, 0.35)
-	cg.add_theme_stylebox_override("panel", cgs)
-	btn.add_child(cg)
-	
-	var icon := TextureRect.new()
-	icon.texture = load("res://assets/ui/icons/close.svg")
-	icon.ignore_texture_size = true
-	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	icon.custom_minimum_size = Vector2(18, 18)
-	icon.size = Vector2(18, 18)
-	icon.position = Vector2(13, 11)
-	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	btn.add_child(icon)
-	
-	btn.pivot_offset = Vector2(22, 22)
 	ClayStyle.apply_clay_squish(btn, 0.0, 0.90)
 	btn.pressed.connect(on_close)
 	return btn
@@ -517,28 +411,29 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 		if safe_rect.position.y > 0:
 			safe_top = maxf(28.0, safe_rect.position.y + 6.0)
 
-	var s_size: float = 64.0
+	var s_w: float = 58.0
+	var s_h: float = s_w * (142.0 / 137.0)
 
-	# Responsive Coin Counter sizing: scaled proportionally to viewport width
-	var c_h: float = clampf(vp_size.x * 0.082, 28.0, 36.0)
-	var c_w: float = c_h * 4.0
+	# Responsive Coin Counter sizing: scaled proportionally to viewport width (482x131 aspect)
+	var c_h: float = clampf(vp_size.x * 0.088, 30.0, 38.0)
+	var c_w: float = c_h * (482.0 / 131.0)
 	if _coin_counter != null and is_instance_valid(_coin_counter):
 		_coin_counter.custom_minimum_size = Vector2(c_w, c_h)
 		_coin_counter.size = Vector2(c_w, c_h)
 		# Vertically center-aligned with the settings button
-		var c_y: float = safe_top + (s_size - c_h) * 0.5
+		var c_y: float = safe_top + (s_h - c_h) * 0.5
 		_coin_counter.position = Vector2(20.0, c_y)
 
 	# Top-right Settings button (explicit positioning matching visual button)
 	if _settings_btn != null and is_instance_valid(_settings_btn):
-		_settings_btn.size = Vector2(s_size, s_size)
-		_settings_btn.position = Vector2(vp_size.x - s_size - 24.0, safe_top)
-		_settings_btn.pivot_offset = Vector2(s_size * 0.5, s_size * 0.5)
+		_settings_btn.size = Vector2(s_w, s_h)
+		_settings_btn.position = Vector2(vp_size.x - s_w - 24.0, safe_top)
+		_settings_btn.pivot_offset = Vector2(s_w * 0.5, s_h * 0.5)
 		_settings_btn.rotation = 0.0
 
-	# Compact 3D Orange Play Button: 48% width, capped at 280px, elevated higher up (81% height)
-	var btn_w: float = minf(vp_size.x * 0.48, 280.0)
-	var btn_h: float = btn_w * (590.0 / 1160.0) # aspect ~0.5086
+	# Compact 3D Orange Play Button (428x181 genuine claymorphic artwork)
+	var btn_w: float = minf(vp_size.x * 0.52, 280.0)
+	var btn_h: float = btn_w * (181.0 / 428.0)
 	var btn_y: float = (vp_size.y * 0.81) - (btn_h * 0.5)
 	if _play_btn != null and is_instance_valid(_play_btn):
 		_play_btn.size = Vector2(btn_w, btn_h)

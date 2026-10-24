@@ -181,6 +181,28 @@ static func apply_clay_squish(
 		ctrl.button_up.connect(on_up)
 
 
+## Builds a clay texture button from imported PNG assets with sharp rendering and tactile squish.
+static func create_clay_texture_button(
+		tex_path: String,
+		custom_size: Vector2 = Vector2.ZERO,
+		squish_scale: float = 0.92
+) -> TextureButton:
+	var btn := TextureButton.new()
+	if ResourceLoader.exists(tex_path):
+		btn.texture_normal = load(tex_path)
+	btn.ignore_texture_size = true
+	btn.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
+	btn.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	btn.focus_mode = Control.FOCUS_NONE
+	if custom_size != Vector2.ZERO:
+		btn.custom_minimum_size = custom_size
+		btn.size = custom_size
+		btn.pivot_offset = custom_size * 0.5
+	apply_clay_squish(btn, 2.5, squish_scale)
+	return btn
+
+
 ## Builds a complete claymorphic button widget with tactile squish.
 static func create_clay_button(
 		text: String,

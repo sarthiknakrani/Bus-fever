@@ -7,7 +7,7 @@ class_name CoinCounterHUD
 
 signal plus_pressed()
 
-const COUNTER_TEXTURE_PATH := "res://assets/ui/coins/coin_counter_blank_plus.png"
+const COUNTER_TEXTURE_PATH := "res://assets/ui/clay/hud_coin_counter_blank.png"
 const ClayStyle := preload("res://scripts/ui/style_helpers.gd")
 
 var texture_rect: TextureRect
@@ -333,41 +333,16 @@ func show_earn_coins_popup() -> void:
 	dummy_spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	header_hbox.add_child(dummy_spacer)
 
-	var title_lbl := Label.new()
-	title_lbl.text = "HOW TO EARN COINS"
-	title_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title_lbl.add_theme_font_size_override("font_size", 18)
-	title_lbl.add_theme_color_override("font_color", Color("78350f")) # rich warm amber brown
-	title_lbl.add_theme_color_override("font_outline_color", Color("ffffff"))
-	title_lbl.add_theme_constant_override("outline_size", 4)
-	header_hbox.add_child(title_lbl)
+	var header_rect := TextureRect.new()
+	header_rect.texture = load("res://assets/ui/clay/header_earn_coins.png")
+	header_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	header_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	header_rect.custom_minimum_size = Vector2(190, 34)
+	header_rect.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	header_hbox.add_child(header_rect)
 
-	var close_btn := Button.new()
-	close_btn.text = "✕"
-	close_btn.custom_minimum_size = Vector2(34, 34)
-	close_btn.size = Vector2(34, 34)
-	close_btn.pivot_offset = Vector2(17, 17)
-	close_btn.focus_mode = Control.FOCUS_NONE
-	close_btn.add_theme_font_size_override("font_size", 16)
-	close_btn.add_theme_color_override("font_color", Color("475569"))
-	var close_style := ClayStyle.create_clay_button_style(Color("ffffff"), Color("cbd5e1"), 17, 3, 6, 2, 0.20)
-	close_btn.add_theme_stylebox_override("normal", close_style)
-	var close_hover := close_style.duplicate()
-	close_hover.bg_color = Color("f8fafc")
-	close_btn.add_theme_stylebox_override("hover", close_hover)
-	close_btn.add_theme_stylebox_override("pressed", close_style)
-	close_btn.add_theme_stylebox_override("hover_pressed", close_style)
-	close_btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-	
-	var c_gloss := Panel.new()
-	c_gloss.set_anchors_preset(Control.PRESET_FULL_RECT)
-	c_gloss.anchor_bottom = 0.5
-	c_gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	c_gloss.add_theme_stylebox_override("panel", ClayStyle.create_clay_highlight_style(17, 0.35))
-	close_btn.add_child(c_gloss)
-
-	ClayStyle.apply_clay_squish(close_btn, 0.0, 0.90)
+	var close_btn := ClayStyle.create_clay_texture_button("res://assets/ui/clay/icon_close_red.png", Vector2(34, 34))
 	close_btn.pressed.connect(func():
 		_play_ui_sfx()
 		_close_popup(popup_root)
@@ -379,9 +354,9 @@ func show_earn_coins_popup() -> void:
 	coin_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	var coin_pedestal := PanelContainer.new()
-	coin_pedestal.custom_minimum_size = Vector2(76, 76)
+	coin_pedestal.custom_minimum_size = Vector2(88, 80)
 	coin_pedestal.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var ped_style := ClayStyle.create_clay_panel(Color("fef3c7"), Color("f59e0b"), 38, 4, 12, 3, Color(0.96, 0.62, 0.11, 0.25))
+	var ped_style := ClayStyle.create_clay_panel(Color("fef3c7"), Color("f59e0b"), 28, 4, 12, 3, Color(0.96, 0.62, 0.11, 0.25))
 	coin_pedestal.add_theme_stylebox_override("panel", ped_style)
 	coin_center.add_child(coin_pedestal)
 
@@ -389,7 +364,7 @@ func show_earn_coins_popup() -> void:
 	coin_ped_gloss.set_anchors_preset(Control.PRESET_FULL_RECT)
 	coin_ped_gloss.anchor_bottom = 0.5
 	coin_ped_gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	coin_ped_gloss.add_theme_stylebox_override("panel", ClayStyle.create_clay_highlight_style(38, 0.30))
+	coin_ped_gloss.add_theme_stylebox_override("panel", ClayStyle.create_clay_highlight_style(28, 0.30))
 	coin_pedestal.add_child(coin_ped_gloss)
 
 	var coin_margin := CenterContainer.new()
@@ -397,12 +372,11 @@ func show_earn_coins_popup() -> void:
 	coin_pedestal.add_child(coin_margin)
 
 	var coin_icon := TextureRect.new()
-	coin_icon.custom_minimum_size = Vector2(52, 52)
-	coin_icon.size = Vector2(52, 52)
+	coin_icon.custom_minimum_size = Vector2(72, 64)
+	coin_icon.size = Vector2(72, 64)
 	coin_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	coin_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	if ResourceLoader.exists("res://assets/ui/icons/coin.svg"):
-		coin_icon.texture = load("res://assets/ui/icons/coin.svg")
+	coin_icon.texture = load("res://assets/ui/clay/icon_coin_reward.png")
 	coin_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	coin_margin.add_child(coin_icon)
 
@@ -418,58 +392,19 @@ func show_earn_coins_popup() -> void:
 	vbox.add_child(desc_lbl)
 
 	# Claymorphic Action Button
-	var act_btn := Button.new()
-	act_btn.text = _custom_action_title
-	act_btn.custom_minimum_size = Vector2(216, 52)
-	act_btn.size = Vector2(216, 52)
-	act_btn.pivot_offset = Vector2(108, 26)
+	var act_btn := ClayStyle.create_clay_texture_button("res://assets/ui/clay/button_orange_blank.png", Vector2(210, 56))
 	act_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	act_btn.focus_mode = Control.FOCUS_NONE
-	act_btn.mouse_filter = Control.MOUSE_FILTER_STOP
-	act_btn.add_theme_font_size_override("font_size", 19)
-	act_btn.add_theme_color_override("font_color", Color.WHITE)
-
-	var is_play_action: bool = _custom_action_title.to_upper().find("PLAY") != -1
-	var face_color: Color = Color("fb923c") if is_play_action else Color("22c55e")
-	var lip_color: Color = Color("c2410c") if is_play_action else Color("15803d")
-	var hover_color: Color = Color("fdba74") if is_play_action else Color("4ade80")
-	var pressed_color: Color = Color("ea580c") if is_play_action else Color("16a34a")
-	var outline_color: Color = Color("7c2d12") if is_play_action else Color("14532d")
-
-	act_btn.add_theme_color_override("font_outline_color", outline_color)
-	act_btn.add_theme_constant_override("outline_size", 4)
-
-	var btn_style := ClayStyle.create_clay_button_style(face_color, lip_color, 24, 5, 14, 4, 0.30)
-	act_btn.add_theme_stylebox_override("normal", btn_style)
-
-	var btn_hover_style := btn_style.duplicate()
-	btn_hover_style.bg_color = hover_color
-	act_btn.add_theme_stylebox_override("hover", btn_hover_style)
-
-	var btn_pressed_style := btn_style.duplicate()
-	btn_pressed_style.bg_color = pressed_color
-	btn_pressed_style.border_width_bottom = 2
-	btn_pressed_style.shadow_size = 4
-	btn_pressed_style.shadow_offset = Vector2(0, 2)
-	act_btn.add_theme_stylebox_override("pressed", btn_pressed_style)
-	act_btn.add_theme_stylebox_override("hover_pressed", btn_pressed_style)
-
-	var empty_style := StyleBoxEmpty.new()
-	act_btn.add_theme_stylebox_override("focus", empty_style)
-
-	var btn_disabled_style := btn_style.duplicate()
-	btn_disabled_style.bg_color = face_color.lerp(Color("64748b"), 0.5)
-	act_btn.add_theme_stylebox_override("disabled", btn_disabled_style)
-
-	var act_gloss := Panel.new()
-	act_gloss.set_anchors_preset(Control.PRESET_FULL_RECT)
-	act_gloss.anchor_bottom = 0.5
-	act_gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	act_gloss.add_theme_stylebox_override("panel", ClayStyle.create_clay_highlight_style(24, 0.32))
-	act_btn.add_child(act_gloss)
-
-	ClayStyle.apply_clay_squish(act_btn, 0.0, 0.94)
-
+	var act_lbl := Label.new()
+	act_lbl.text = _custom_action_title
+	act_lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
+	act_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	act_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	act_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	act_lbl.add_theme_font_size_override("font_size", 18)
+	act_lbl.add_theme_color_override("font_color", Color.WHITE)
+	act_lbl.add_theme_color_override("font_outline_color", Color("7c2d12"))
+	act_lbl.add_theme_constant_override("outline_size", 4)
+	act_btn.add_child(act_lbl)
 	act_btn.pressed.connect(func():
 		_play_ui_sfx()
 		var cb := _custom_action_callback
