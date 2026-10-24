@@ -587,14 +587,11 @@ static func animate_vip_flight(
 		if on_land_callback.is_valid():
 			on_land_callback.call()
 
-		# Squash & stretch landing impact
-		var bounce_tw := vehicle_node.create_tween()
-		bounce_tw.tween_property(vehicle_node, "scale", target_scale * Vector2(1.14, 0.86), 0.07).set_trans(Tween.TRANS_QUAD)
-		bounce_tw.tween_property(vehicle_node, "scale", target_scale * Vector2(0.96, 1.04), 0.07).set_trans(Tween.TRANS_QUAD)
-		bounce_tw.tween_property(vehicle_node, "scale", target_scale, 0.06).set_trans(Tween.TRANS_QUAD)
+		# Maintain exact rigid bus body dimensions without squash and stretch
+		vehicle_node.scale = target_scale
+		if vehicle_node.get("_base_sprite") != null and vehicle_node._base_sprite != null:
+			vehicle_node._base_sprite.scale = Vector2.ONE
 
-		bounce_tw.tween_callback(func():
-			if is_instance_valid(controller):
-				controller.on_vehicle_arrived_at_slot(vehicle_id, 0, token)
-		)
+		if is_instance_valid(controller):
+			controller.on_vehicle_arrived_at_slot(vehicle_id, 0, token)
 	)

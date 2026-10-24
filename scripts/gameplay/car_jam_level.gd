@@ -4119,10 +4119,10 @@ func _on_individual_boarded(pid: int, vehicle_id: int, color_id: String, token: 
 	_total_boarded_count += 1
 	var vv: VehicleView = vehicle_views.get(vehicle_id, null)
 	if is_instance_valid(vv):
-		var orig_s := vv.scale
-		var tw_b := vv.create_tween()
-		tw_b.tween_property(vv, "scale", orig_s * Vector2(1.04, 0.96), 0.04).set_trans(Tween.TRANS_QUAD)
-		tw_b.tween_property(vv, "scale", orig_s, 0.07).set_trans(Tween.TRANS_BOUNCE)
+		# Maintain rigid, non-deformed bus body scale at all times
+		vv.scale = Vector2(VehicleView.BUS_VISUAL_SCALE, VehicleView.BUS_VISUAL_SCALE)
+		if vv.get("_base_sprite") != null and vv._base_sprite != null:
+			vv._base_sprite.scale = Vector2.ONE
 	controller.check_terminal_states()
 
 func _rollback_uncommitted_passenger(p: Dictionary, pid: int) -> void:
