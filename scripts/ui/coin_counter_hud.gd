@@ -7,7 +7,7 @@ class_name CoinCounterHUD
 
 signal plus_pressed()
 
-const COUNTER_TEXTURE_PATH := "res://assets/ui/clay/hud_coin_counter_blank.png"
+const COUNTER_TEXTURE_PATH := "res://assets/ui/clay_textless/counter_navy_coin_plus_wide_blank.png"
 const ClayStyle := preload("res://scripts/ui/style_helpers.gd")
 
 var texture_rect: TextureRect
@@ -130,13 +130,17 @@ func _build_ui() -> void:
 	balance_label.name = "BalanceLabel"
 	balance_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	balance_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	balance_label.add_theme_font_size_override("font_size", 16)
-	balance_label.add_theme_color_override("font_color", Color("fef08a")) # bright warm cream gold
-	balance_label.add_theme_color_override("font_outline_color", Color("0f172a")) # deep navy shadow outline
-	balance_label.add_theme_constant_override("outline_size", 3)
-	balance_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
-	balance_label.add_theme_constant_override("shadow_offset_y", 2)
 	balance_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ClayStyle.apply_label_style(
+		balance_label,
+		16,
+		Color("FFF0AA"), # Pale gold
+		Color("593209"), # Brown outline
+		3,
+		Color(0.2, 0.1, 0.03, 0.45),
+		Vector2(0, 1),
+		true
+	)
 	add_child(balance_label)
 
 	# 4. Interactive Transparent Plus Button over green plus badge
@@ -333,16 +337,11 @@ func show_earn_coins_popup() -> void:
 	dummy_spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	header_hbox.add_child(dummy_spacer)
 
-	var header_rect := TextureRect.new()
-	header_rect.texture = load("res://assets/ui/clay/header_earn_coins.png")
-	header_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	header_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	header_rect.custom_minimum_size = Vector2(190, 34)
+	var header_rect := ClayStyle.create_banner_header("EARN COINS", "res://assets/ui/clay_textless/banner_navy_gold_blank.png", Vector2(200, 44), 22)
 	header_rect.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	header_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	header_hbox.add_child(header_rect)
 
-	var close_btn := ClayStyle.create_clay_texture_button("res://assets/ui/clay/icon_close_red.png", Vector2(34, 34))
+	var close_btn := ClayStyle.create_clay_texture_button("res://assets/ui/clay_textless/icon_close_red.png", Vector2(34, 34), 0.95)
 	close_btn.pressed.connect(func():
 		_play_ui_sfx()
 		_close_popup(popup_root)
@@ -376,7 +375,7 @@ func show_earn_coins_popup() -> void:
 	coin_icon.size = Vector2(72, 64)
 	coin_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	coin_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	coin_icon.texture = load("res://assets/ui/clay/icon_coin_reward.png")
+	coin_icon.texture = load("res://assets/ui/clay_textless/icon_coin_gold.png")
 	coin_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	coin_margin.add_child(coin_icon)
 
@@ -387,24 +386,19 @@ func show_earn_coins_popup() -> void:
 	desc_lbl.text = "Clear traffic and complete puzzle levels to collect coins!\n\nEach victory awards +50 Coins."
 	desc_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	desc_lbl.add_theme_font_size_override("font_size", 15)
-	desc_lbl.add_theme_color_override("font_color", Color("334155"))
+	ClayStyle.apply_label_style(desc_lbl, 15, Color("334155"), Color.TRANSPARENT, 0, Color.TRANSPARENT, Vector2.ZERO, false)
 	vbox.add_child(desc_lbl)
 
 	# Claymorphic Action Button
-	var act_btn := ClayStyle.create_clay_texture_button("res://assets/ui/clay/button_orange_blank.png", Vector2(210, 56))
+	var act_btn := ClayStyle.create_text_button(
+		"res://assets/ui/clay_textless/button_orange_wide_blank.png",
+		_custom_action_title,
+		Vector2(210, 56),
+		20,
+		false,
+		0.95
+	)
 	act_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	var act_lbl := Label.new()
-	act_lbl.text = _custom_action_title
-	act_lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
-	act_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	act_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	act_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	act_lbl.add_theme_font_size_override("font_size", 18)
-	act_lbl.add_theme_color_override("font_color", Color.WHITE)
-	act_lbl.add_theme_color_override("font_outline_color", Color("7c2d12"))
-	act_lbl.add_theme_constant_override("outline_size", 4)
-	act_btn.add_child(act_lbl)
 	act_btn.pressed.connect(func():
 		_play_ui_sfx()
 		var cb := _custom_action_callback

@@ -91,29 +91,15 @@ func _build_ui() -> void:
 	_logo_wrapper.add_child(_logo_rect)
 
 	# C. Top-right Settings button (Genuine Claymorphic 3D Gear Icon)
-	_settings_btn = TextureButton.new()
+	_settings_btn = ClayStyle.create_clay_texture_button("res://assets/ui/clay_textless/icon_settings_blue.png", Vector2(50, 50), 0.95)
 	_settings_btn.name = "settings_btn"
-	_settings_btn.texture_normal = load("res://assets/ui/clay/icon_settings.png")
-	_settings_btn.ignore_texture_size = true
-	_settings_btn.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
-	_settings_btn.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
-	_settings_btn.mouse_filter = Control.MOUSE_FILTER_STOP
-	_settings_btn.focus_mode = Control.FOCUS_NONE
 	_settings_btn.pressed.connect(_on_settings_pressed)
-	ClayStyle.apply_clay_squish(_settings_btn, 3.0, 0.91)
 	_hud_ctrl.add_child(_settings_btn)
 
-	# D. Bottom-center Play button (Genuine Claymorphic 3D Candy Button)
-	_play_btn = TextureButton.new()
+	# D. Bottom-center Play button (Textless Orange Button with Dynamic Styled Text)
+	_play_btn = ClayStyle.create_text_button("res://assets/ui/clay_textless/button_orange_large_blank.png", "PLAY", Vector2.ZERO, 32, false, 0.95)
 	_play_btn.name = "PlayButton"
-	_play_btn.texture_normal = load("res://assets/ui/clay/button_play.png")
-	_play_btn.ignore_texture_size = true
-	_play_btn.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
-	_play_btn.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
-	_play_btn.mouse_filter = Control.MOUSE_FILTER_STOP
-	_play_btn.focus_mode = Control.FOCUS_NONE
 	_play_btn.pressed.connect(_on_play_pressed)
-	ClayStyle.apply_clay_squish(_play_btn, 4.0, 0.93)
 	_hud_ctrl.add_child(_play_btn)
 
 	# E. Top-left Premium Coin Counter HUD
@@ -248,14 +234,9 @@ func _show_settings_overlay() -> void:
 	vbox.add_theme_constant_override("separation", 14)
 	margin.add_child(vbox)
 
-	var header_rect := TextureRect.new()
+	var header_rect := ClayStyle.create_banner_header("SETTINGS", "res://assets/ui/clay_textless/banner_navy_gold_compact_blank.png", Vector2(190, 44), 26)
 	header_rect.name = "SettingsHeader"
-	header_rect.texture = load("res://assets/ui/clay/header_settings.png")
-	header_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	header_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	header_rect.custom_minimum_size = Vector2(180, 42)
 	header_rect.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	header_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	vbox.add_child(header_rect)
 
 	var toggles := VBoxContainer.new()
@@ -268,10 +249,10 @@ func _show_settings_overlay() -> void:
 	var music_on: bool = sm_mgr.music_enabled() if sm_mgr and sm_mgr.has_method("music_enabled") else true
 	var haptics_on: bool = sm_mgr.haptics_enabled() if sm_mgr and sm_mgr.has_method("haptics_enabled") else true
 
-	toggles.add_child(_create_custom_toggle("Sound", "res://assets/ui/icons/sound.svg", sfx_on, func(on):
+	toggles.add_child(_create_custom_toggle("Sound", "res://assets/ui/clay_textless/icon_sound_cream.png", sfx_on, func(on):
 		var s = _get_settings_manager()
 		if s and s.has_method("set_sfx"): s.set_sfx(on)))
-	toggles.add_child(_create_custom_toggle("Music", "res://assets/ui/icons/music.svg", music_on, func(on):
+	toggles.add_child(_create_custom_toggle("Music", "res://assets/ui/clay_textless/icon_music_cream.png", music_on, func(on):
 		var s = _get_settings_manager()
 		if s and s.has_method("set_music"): s.set_music(on)
 		var am = get_tree().root.get_node_or_null("AudioManager") if is_inside_tree() and get_tree() and get_tree().root else null
@@ -280,7 +261,7 @@ func _show_settings_overlay() -> void:
 				am.play_music()
 			elif not on and am.has_method("stop_music"):
 				am.stop_music()))
-	toggles.add_child(_create_custom_toggle("Vibration", "res://assets/ui/icons/vibration.svg", haptics_on, func(on):
+	toggles.add_child(_create_custom_toggle("Vibration", "res://assets/ui/clay_textless/icon_vibration_cream.png", haptics_on, func(on):
 		var s = _get_settings_manager()
 		if s and s.has_method("set_haptics"): s.set_haptics(on)))
 
@@ -334,8 +315,7 @@ func _create_custom_toggle(text: String, icon_path: String, is_on: bool, on_togg
 
 	var lbl := Label.new()
 	lbl.text = text
-	lbl.add_theme_font_size_override("font_size", 16)
-	lbl.add_theme_color_override("font_color", Color("4a2810")) # High contrast warm brown
+	ClayStyle.apply_label_style(lbl, 16, Color("4a2810"), Color.TRANSPARENT, 0, Color.TRANSPARENT, Vector2.ZERO, false)
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -349,16 +329,16 @@ func _create_custom_toggle(text: String, icon_path: String, is_on: bool, on_togg
 	toggle_btn.custom_minimum_size = Vector2(56, 36)
 	toggle_btn.size = Vector2(56, 36)
 	toggle_btn.pivot_offset = Vector2(28, 18)
-	toggle_btn.texture_normal = load("res://assets/ui/clay/toggle_on.png" if is_on else "res://assets/ui/clay/toggle_off.png")
+	toggle_btn.texture_normal = load("res://assets/ui/clay_textless/toggle_on_green.png" if is_on else "res://assets/ui/clay_textless/toggle_off_grey.png")
 	toggle_btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	toggle_btn.focus_mode = Control.FOCUS_NONE
-	ClayStyle.apply_clay_squish(toggle_btn, 2.0, 0.92)
+	ClayStyle.apply_clay_squish(toggle_btn, 2.0, 0.95)
 
 	var state := {"on": is_on}
 	toggle_btn.pressed.connect(func():
 		_play_sfx("ui_click")
 		state["on"] = not state["on"]
-		toggle_btn.texture_normal = load("res://assets/ui/clay/toggle_on.png" if state["on"] else "res://assets/ui/clay/toggle_off.png")
+		toggle_btn.texture_normal = load("res://assets/ui/clay_textless/toggle_on_green.png" if state["on"] else "res://assets/ui/clay_textless/toggle_off_grey.png")
 		on_toggle.call(state["on"])
 	)
 	row.add_child(toggle_btn)
@@ -367,17 +347,7 @@ func _create_custom_toggle(text: String, icon_path: String, is_on: bool, on_togg
 
 
 func _create_close_button(on_close: Callable) -> Control:
-	var btn := TextureButton.new()
-	btn.texture_normal = load("res://assets/ui/clay/icon_close_red.png")
-	btn.ignore_texture_size = true
-	btn.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
-	btn.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
-	btn.custom_minimum_size = Vector2(40, 40)
-	btn.size = Vector2(40, 40)
-	btn.pivot_offset = Vector2(20, 20)
-	btn.mouse_filter = Control.MOUSE_FILTER_STOP
-	btn.focus_mode = Control.FOCUS_NONE
-	ClayStyle.apply_clay_squish(btn, 0.0, 0.90)
+	var btn := ClayStyle.create_clay_texture_button("res://assets/ui/clay_textless/icon_close_red.png", Vector2(40, 40), 0.95)
 	btn.pressed.connect(on_close)
 	return btn
 
@@ -411,12 +381,12 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 		if safe_rect.position.y > 0:
 			safe_top = maxf(28.0, safe_rect.position.y + 6.0)
 
-	var s_w: float = 58.0
-	var s_h: float = s_w * (142.0 / 137.0)
+	var s_w: float = 52.0
+	var s_h: float = s_w * (305.0 / 310.0)
 
-	# Responsive Coin Counter sizing: scaled proportionally to viewport width (482x131 aspect)
+	# Responsive Coin Counter sizing: scaled proportionally to viewport width (452x151 aspect)
 	var c_h: float = clampf(vp_size.x * 0.088, 30.0, 38.0)
-	var c_w: float = c_h * (482.0 / 131.0)
+	var c_w: float = c_h * (452.0 / 151.0)
 	if _coin_counter != null and is_instance_valid(_coin_counter):
 		_coin_counter.custom_minimum_size = Vector2(c_w, c_h)
 		_coin_counter.size = Vector2(c_w, c_h)
@@ -431,9 +401,9 @@ func _update_layout(override_vp_size: Vector2 = Vector2.ZERO) -> void:
 		_settings_btn.pivot_offset = Vector2(s_w * 0.5, s_h * 0.5)
 		_settings_btn.rotation = 0.0
 
-	# Compact 3D Orange Play Button (428x181 genuine claymorphic artwork)
-	var btn_w: float = minf(vp_size.x * 0.52, 280.0)
-	var btn_h: float = btn_w * (181.0 / 428.0)
+	# 3D Orange Play Button (735x268 textless claymorphic artwork)
+	var btn_w: float = minf(vp_size.x * 0.62, 310.0)
+	var btn_h: float = btn_w * (268.0 / 735.0)
 	var btn_y: float = (vp_size.y * 0.81) - (btn_h * 0.5)
 	if _play_btn != null and is_instance_valid(_play_btn):
 		_play_btn.size = Vector2(btn_w, btn_h)

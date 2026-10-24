@@ -131,6 +131,48 @@ static func create_clay_pill(
 	return sb
 
 
+# --- Font Paths ---
+const FONT_FREDOKA_SEMIBOLD := "res://assets/fonts/Fredoka-SemiBold.ttf"
+const FONT_FREDOKA_BOLD := "res://assets/fonts/Fredoka-Bold.ttf"
+const FONT_ARIAL_ROUNDED := "res://assets/fonts/arial_rounded_bold.ttf"
+
+## Retrieves the preferred UI font (Fredoka SemiBold/Bold with fallbacks).
+static func get_ui_font(bold: bool = false) -> Font:
+	var path := FONT_FREDOKA_BOLD if bold else FONT_FREDOKA_SEMIBOLD
+	if ResourceLoader.exists(path):
+		return load(path)
+	elif ResourceLoader.exists(FONT_FREDOKA_SEMIBOLD):
+		return load(FONT_FREDOKA_SEMIBOLD)
+	elif ResourceLoader.exists(FONT_ARIAL_ROUNDED):
+		return load(FONT_ARIAL_ROUNDED)
+	return null
+
+
+## Applies standard text typography styling to any Godot Label.
+static func apply_label_style(
+		lbl: Label,
+		font_size: int,
+		font_color: Color = Color("FFF8E8"),
+		outline_color: Color = Color("6B351B"),
+		outline_size: int = 4,
+		shadow_color: Color = Color(0.26, 0.14, 0.07, 0.45),
+		shadow_offset: Vector2 = Vector2(0, 2),
+		bold: bool = false
+) -> void:
+	var f := get_ui_font(bold)
+	if f != null:
+		lbl.add_theme_font_override("font", f)
+	lbl.add_theme_font_size_override("font_size", font_size)
+	lbl.add_theme_color_override("font_color", font_color)
+	if outline_size > 0:
+		lbl.add_theme_color_override("font_outline_color", outline_color)
+		lbl.add_theme_constant_override("outline_size", outline_size)
+	if shadow_color != Color.TRANSPARENT:
+		lbl.add_theme_color_override("font_shadow_color", shadow_color)
+		lbl.add_theme_constant_override("shadow_offset_x", int(shadow_offset.x))
+		lbl.add_theme_constant_override("shadow_offset_y", int(shadow_offset.y))
+
+
 ## Attaches tactile clay squish animation to any Control button or node.
 ## Animates purely via scale squash & stretch centered on pivot_offset.
 ## Never alters position, preventing displacement bugs across viewports and containers.
@@ -185,7 +227,7 @@ static func apply_clay_squish(
 static func create_clay_texture_button(
 		tex_path: String,
 		custom_size: Vector2 = Vector2.ZERO,
-		squish_scale: float = 0.92
+		squish_scale: float = 0.95
 ) -> TextureButton:
 	var btn := TextureButton.new()
 	if ResourceLoader.exists(tex_path):
@@ -199,8 +241,70 @@ static func create_clay_texture_button(
 		btn.custom_minimum_size = custom_size
 		btn.size = custom_size
 		btn.pivot_offset = custom_size * 0.5
-	apply_clay_squish(btn, 2.5, squish_scale)
+	apply_clay_squish(btn, 0.0, squish_scale)
 	return btn
+
+
+## Builds a textless clay button with centered dynamic styled text overlay.
+static func create_text_button(
+		tex_path: String,
+		text: String,
+		custom_size: Vector2 = Vector2.ZERO,
+		font_size: int = 24,
+		is_blue_or_header: bool = false,
+		squish_scale: float = 0.95,
+		label_offset_y: float = -2.0
+) -> TextureButton:
+	var btn := create_clay_texture_button(tex_path, custom_size, squish_scale)
+	
+	var lbl := Label.new()
+	lbl.name = "ButtonLabel"
+	lbl.text = text
+	lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lbl.offset_top = label_offset_y
+	lbl.offset_bottom = label_offset_y
+
+	if is_blue_or_header:
+		apply_label_style(lbl, font_size, Color("FFF8E8"), Color("142D59"), 4, Color(0.07, 0.16, 0.32, 0.50), Vector2(0, 2), true)
+	else:
+		apply_label_style(lbl, font_size, Color("FFF8E8"), Color("6B351B"), 4, Color(0.26, 0.14, 0.07, 0.45), Vector2(0, 2), true)
+
+	btn.add_child(lbl)
+	return btn
+
+
+## Builds a textless banner header with centered dynamic styled title overlay.
+static func create_banner_header(
+		text: String,
+		tex_path: String = "res://assets/ui/clay_textless/banner_navy_gold_compact_blank.png",
+		custom_size: Vector2 = Vector2(180, 44),
+		font_size: int = 26
+) -> TextureRect:
+	var rect := TextureRect.new()
+	if ResourceLoader.exists(tex_path):
+		rect.texture = load(tex_path)
+	rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	rect.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	rect.custom_minimum_size = custom_size
+	rect.size = custom_size
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var lbl := Label.new()
+	lbl.name = "HeaderLabel"
+	lbl.text = text
+	lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lbl.offset_top = -2
+	lbl.offset_bottom = -2
+	apply_label_style(lbl, font_size, Color("FFF8E8"), Color("142D59"), 4, Color(0.07, 0.16, 0.32, 0.50), Vector2(0, 2), true)
+	rect.add_child(lbl)
+	return rect
 
 
 ## Builds a complete claymorphic button widget with tactile squish.
