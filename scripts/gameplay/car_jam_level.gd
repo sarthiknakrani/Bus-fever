@@ -990,7 +990,10 @@ func _fly_bus_to_vip_slot(vehicle_id: int) -> void:
 	transit_layer.add_child(vv)
 	vv.global_position = global_start
 	vv.global_rotation = global_rot
-	vv.global_scale = orig_global_scale
+	vv.scale = Vector2(VehicleView.BUS_VISUAL_SCALE, VehicleView.BUS_VISUAL_SCALE)
+	if vv.get("_base_sprite") != null and vv._base_sprite != null:
+		vv._base_sprite.scale = Vector2.ONE
+		vv._base_sprite.position = Vector2.ZERO
 	vv.z_index = 400
 
 	var target_slot_pos := _get_slot_world_pos(0)
@@ -1283,9 +1286,9 @@ func _setup_visuals(lvl: CarJamLevelData) -> void:
 		vv.setup(vd.id, vd.code, vd.color_id, vd.direction, vd.capacity, vd.footprint)
 		var center_offset = _calc_footprint_center_offset(vd.footprint)
 		vv.position = _cell_to_board_local(vd.anchor, lvl.board_size) + center_offset
-		# Compensate board_root's 0.72 Y-scaling so buses render with square aspect ratio across all orientations
+		# Authoritative uniform bus body scale across board, transit, and parking
 		var board_scale_y = board_root.scale.y if board_root != null and board_root.scale.y != 0.0 else 0.72
-		vv.scale = Vector2(1.0, 1.0 / board_scale_y)
+		vv.scale = Vector2(VehicleView.BUS_VISUAL_SCALE, VehicleView.BUS_VISUAL_SCALE / board_scale_y)
 		vv.tapped.connect(_on_vehicle_tapped)
 		vehicle_layer.add_child(vv)
 		vehicle_views[vd.id] = vv
@@ -1791,7 +1794,10 @@ func _on_vehicle_dispatch_started(vehicle_id: int, slot_id: int, corridor: Array
 	transit_layer.add_child(vv)
 	vv.global_position = global_start
 	vv.global_rotation = global_rot
-	vv.global_scale = orig_global_scale
+	vv.scale = Vector2(VehicleView.BUS_VISUAL_SCALE, VehicleView.BUS_VISUAL_SCALE)
+	if vv.get("_base_sprite") != null and vv._base_sprite != null:
+		vv._base_sprite.scale = Vector2.ONE
+		vv._base_sprite.position = Vector2.ZERO
 
 	var target_slot_pos := _get_slot_world_pos(slot_id)
 	var slot_rot: float = slot_views[slot_id].rotation if slot_id < slot_views.size() else deg_to_rad(-22.0)
@@ -4110,7 +4116,7 @@ func _animate_individual_boarding(p: Dictionary, vehicle_id: int, slot_id: int, 
 		# 3. Ground contact shadow stays on road surface and contracts at jump apex
 		if shadow_sprite != null:
 			var s_factor: float = 1.0 - jump_arc * 0.35
-			shadow_sprite.position = Vector2(0.0, 10.0 + jump_height)
+			shadow_sprite.position = Vector2(0.0, 20.0 + jump_height)
 			shadow_sprite.scale = Vector2(pv.BASE_SCALE * 1.5 * s_factor, pv.BASE_SCALE * 0.75 * s_factor)
 			shadow_sprite.modulate.a = 0.45 * (1.0 - jump_arc * 0.25)
 		

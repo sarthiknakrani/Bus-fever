@@ -20,11 +20,11 @@ var _last_pos: Vector2 = Vector2.ZERO
 var _facing_right: bool = true
 var _smoothed_speed: float = 0.0
 
-const BASE_SCALE := 0.26
+const BASE_SCALE := 0.52
 const IDLE_FRAME := 6
 const RUN_FRAMES := 6
 const TOTAL_FRAMES := 8
-const STRIDE_DISTANCE: float = 36.0
+const STRIDE_DISTANCE: float = 48.0
 @export var stride_distance: float = STRIDE_DISTANCE
 
 func set_movement_direction(tangent: Vector2) -> void:
@@ -54,7 +54,7 @@ func setup(p_col_id: String, p_id: int = 0, p_lane: int = 0) -> void:
 	if t_shadow != null:
 		_shadow.texture = t_shadow
 	_shadow.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
-	_shadow.position = Vector2(0, 10.0)
+	_shadow.position = Vector2(0, 20.0)
 	_shadow.scale = Vector2(BASE_SCALE * 1.5, BASE_SCALE * 0.75)
 	_shadow.modulate = Color(0, 0, 0, 0.45)
 	_shadow.z_index = -1

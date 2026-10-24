@@ -26,11 +26,8 @@ const CANONICAL_CANVAS_HEIGHT: float = 110.0
 # Authoritative visual scale factor (~15% reduction across all short buses in parking)
 const BUS_VISUAL_SCALE: float = 0.85
 
-# Board bus cell-fit parameters (tightens spacing on board to compact 5.0px gap matching reference)
-# BOARD_BUS_TARGET_WIDTH is the target visible body WIDTH in board-local px.
-# At 50.0 px, adjacent parallel buses leave 4.7-5.3 px on-screen clearance with 0 overlaps across all levels.
-# BOARD_ANCHOR_SHIFT is 0.0 to prevent cross-cluster divergence and frontal overlaps.
-const BOARD_BUS_TARGET_WIDTH: float = 50.0
+# Board bus cell-fit parameters (aligned with authoritative BUS_VISUAL_SCALE)
+const BOARD_BUS_TARGET_WIDTH: float = CANONICAL_BODY_WIDTH_V
 const BOARD_ANCHOR_SHIFT: float = 0.0
 
 var board_scale_factor: float = 1.0
@@ -116,14 +113,14 @@ func set_parking_mode(in_parking: bool) -> void:
 static func _get_smoke_texture() -> Texture2D:
 	if _smoke_texture != null:
 		return _smoke_texture
-	var img := Image.create(32, 32, false, Image.FORMAT_RGBA8)
-	var center := Vector2(15.5, 15.5)
-	var max_r: float = 15.5
-	for y in 32:
-		for x in 32:
+	var img := Image.create(8, 8, false, Image.FORMAT_RGBA8)
+	var center := Vector2(3.5, 3.5)
+	var max_r: float = 3.5
+	for y in 8:
+		for x in 8:
 			var d: float = Vector2(x, y).distance_to(center)
 			var a: float = clampf(1.0 - (d / max_r), 0.0, 1.0)
-			a = a * a * (3.0 - 2.0 * a)
+			a = a * a # Soft smooth falloff
 			img.set_pixel(x, y, Color(1.0, 1.0, 1.0, a))
 	_smoke_texture = ImageTexture.create_from_image(img)
 	return _smoke_texture
@@ -133,31 +130,31 @@ func _setup_exhaust_smoke() -> void:
 		_update_exhaust_position()
 		return
 	_exhaust_smoke = CPUParticles2D.new()
-	_exhaust_smoke.name = "ExhaustSmoke"
+	_exhaust_smoke.name = "ExhaustDust"
 	_exhaust_smoke.z_index = -1
 	_exhaust_smoke.local_coords = false
 	_exhaust_smoke.emitting = false
-	_exhaust_smoke.amount = 16
-	_exhaust_smoke.lifetime = 0.50
+	_exhaust_smoke.amount = 2
+	_exhaust_smoke.lifetime = 0.35 # ~5.7 particles/sec (within 4-7 / sec range)
 	_exhaust_smoke.one_shot = false
-	_exhaust_smoke.explosiveness = 0.02
-	_exhaust_smoke.randomness = 0.35
-	_exhaust_smoke.spread = 20.0
-	_exhaust_smoke.gravity = Vector2(0.0, -12.0)
-	_exhaust_smoke.initial_velocity_min = 20.0
-	_exhaust_smoke.initial_velocity_max = 42.0
-	_exhaust_smoke.scale_amount_min = 3.5
-	_exhaust_smoke.scale_amount_max = 7.0
+	_exhaust_smoke.explosiveness = 0.0
+	_exhaust_smoke.randomness = 0.25
+	_exhaust_smoke.spread = 25.0
+	_exhaust_smoke.gravity = Vector2.ZERO # Dust stays close to ground, no vertical float
+	_exhaust_smoke.initial_velocity_min = 8.0
+	_exhaust_smoke.initial_velocity_max = 16.0
+	_exhaust_smoke.scale_amount_min = 0.55 # 8 * 0.55 = 4.4px
+	_exhaust_smoke.scale_amount_max = 0.90 # 8 * 0.90 = 7.2px
 
 	var scale_curve := Curve.new()
-	scale_curve.add_point(Vector2(0.0, 0.35))
-	scale_curve.add_point(Vector2(0.5, 0.95))
-	scale_curve.add_point(Vector2(1.0, 1.25))
+	scale_curve.add_point(Vector2(0.0, 0.70))
+	scale_curve.add_point(Vector2(1.0, 1.15)) # Slight expansion
 	_exhaust_smoke.scale_amount_curve = scale_curve
 
 	var grad := Gradient.new()
-	grad.set_color(0, Color(0.90, 0.92, 0.95, 0.45))
-	grad.set_color(1, Color(0.85, 0.86, 0.90, 0.0))
+	# Muted brown-grey / dark-grey dust puffs at 20% opacity fading smoothly to 0%
+	grad.set_color(0, Color(0.30, 0.28, 0.26, 0.20))
+	grad.set_color(1, Color(0.35, 0.33, 0.31, 0.0))
 	_exhaust_smoke.color_ramp = grad
 
 	_exhaust_smoke.texture = _get_smoke_texture()
@@ -175,9 +172,8 @@ func _update_exhaust_position() -> void:
 		CarJamVehicleData.Direction.RIGHT: front_native = Vector2(1, 0)
 
 	var rear_dir := -front_native
-	var rear_dist: float = (CANONICAL_BODY_LENGTH * 0.45)
-	var lat_dir := rear_dir.orthogonal() * 10.0
-	_exhaust_smoke.position = rear_dir * rear_dist + lat_dir
+	var rear_dist: float = (CANONICAL_BODY_LENGTH * 0.42)
+	_exhaust_smoke.position = rear_dir * rear_dist
 	_exhaust_smoke.direction = rear_dir
 
 func set_exhaust_smoke_active(p_active: bool, p_speed_scale: float = 1.0) -> void:
@@ -340,13 +336,9 @@ func play_jumble_pop() -> void:
 func _apply_bus_cell_fit() -> void:
 	if _base_sprite == null or _base_sprite.texture == null:
 		return
-	board_scale_factor = BOARD_BUS_TARGET_WIDTH / CANONICAL_BODY_WIDTH_V
-	_base_sprite.scale = Vector2(board_scale_factor, board_scale_factor)
-
-	# Keep bus centered in its cell without anchor distortion
-	var dir_vec := Vector2(CarJamVehicleData.dir_to_vector(vehicle_dir))
-	board_anchor_offset = dir_vec * BOARD_ANCHOR_SHIFT
-	_base_sprite.position = board_anchor_offset
+	board_scale_factor = 1.0
+	_base_sprite.scale = Vector2.ONE
+	_base_sprite.position = Vector2.ZERO
 
 	# Keep touch area collision shape synchronized with sprite scale and offset
 	if _touch_area != null and _touch_area.get_child_count() > 0:
