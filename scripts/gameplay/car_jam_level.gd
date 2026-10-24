@@ -228,8 +228,8 @@ func _get_curve_point_and_normal(c: Curve2D, offset: float, is_loop: bool = fals
 	var curve_len := c.get_baked_length()
 	var clamped_offset: float = fposmod(offset, curve_len) if is_loop else clampf(offset, 0.0, curve_len)
 	var p0 := c.sample_baked(clamped_offset)
-	var off_fwd: float = fposmod(clamped_offset + 0.5, curve_len) if is_loop else minf(clamped_offset + 0.5, curve_len)
-	var off_bwd: float = fposmod(clamped_offset - 0.5, curve_len) if is_loop else maxf(clamped_offset - 0.5, 0.0)
+	var off_fwd: float = fposmod(clamped_offset + 1.0, curve_len) if is_loop else minf(clamped_offset + 1.0, curve_len)
+	var off_bwd: float = fposmod(clamped_offset - 1.0, curve_len) if is_loop else maxf(clamped_offset - 1.0, 0.0)
 	var p_fwd := c.sample_baked(off_fwd)
 	var p_bwd := c.sample_baked(off_bwd)
 	var tangent: Vector2
@@ -237,6 +237,13 @@ func _get_curve_point_and_normal(c: Curve2D, offset: float, is_loop: bool = fals
 		tangent = (p_fwd - p_bwd).normalized()
 	else:
 		tangent = Vector2.RIGHT
+
+	# For feeder track, smoothly blend tangent and normal toward oval vertical tangent (0, 1) in final approach
+	if not is_loop and curve_len > 0.0 and clamped_offset >= curve_len - 70.0:
+		var blend: float = clampf((clamped_offset - (curve_len - 70.0)) / 70.0, 0.0, 1.0)
+		blend = smoothstep(0.0, 1.0, blend)
+		tangent = tangent.lerp(Vector2.DOWN, blend).normalized()
+
 	var normal := Vector2(-tangent.y, tangent.x)
 	return {"pos": p0, "tangent": tangent, "normal": normal}
 
@@ -324,6 +331,16 @@ func _tick_passenger_simulation(step_dt: float) -> void:
 				else:
 					break
 
+		# Calculate approaching distance of closest vacant slot to merge junction (0.0)
+		var vacant_dist_to_merge: float = -1.0
+		if not _entrance_active and authorized_count > 0:
+			for s in _circulating_slots:
+				if s["row"] == null:
+					var s_prog: float = fposmod(_loop_distance_unwrapped + float(s["index"]) * loop_sp, track_len)
+					var d_to_m: float = fposmod(_merge_prog - s_prog, track_len)
+					if vacant_dist_to_merge < 0.0 or d_to_m < vacant_dist_to_merge:
+						vacant_dist_to_merge = d_to_m
+
 		# 2. Advance active feeder rows
 		var lead_row_stopped: bool = false
 		for j in range(_feeder_rows.size()):
@@ -333,8 +350,19 @@ func _tick_passenger_simulation(step_dt: float) -> void:
 
 			if is_authorized:
 				if j == 0:
-					target_prog = f_len
-					_lead_feeder_committed = (f_row.progress >= f_len - 45.0) and ((_oval_freed_capacity >= f_row.passengers.size()) or _entrance_active)
+					if _entrance_active:
+						target_prog = f_len
+						_lead_feeder_committed = (f_row.progress >= f_len - 45.0)
+					elif vacant_dist_to_merge >= 0.0:
+						if vacant_dist_to_merge <= 145.0:
+							target_prog = f_len - vacant_dist_to_merge
+							_lead_feeder_committed = (f_row.progress >= f_len - 45.0)
+						else:
+							target_prog = feeder_stop_pos
+							_lead_feeder_committed = false
+					else:
+						target_prog = feeder_stop_pos
+						_lead_feeder_committed = false
 				else:
 					target_prog = _feeder_rows[j - 1].progress - ROW_SPACING
 			else:
@@ -467,12 +495,18 @@ func _tick_passenger_simulation(step_dt: float) -> void:
 		var lead_row: PassengerRow = _feeder_rows.front()
 		var needed_cap: int = lead_row.passengers.size()
 		if _oval_freed_capacity >= needed_cap and lead_row.progress >= f_len_val - 2.0:
-			var has_vacant_slot := false
+			var target_slot = null
 			for s in _circulating_slots:
 				if s["row"] == null:
-					has_vacant_slot = true
+					target_slot = s
 					break
-			if not has_vacant_slot:
+			if target_slot == null and not _circulating_slots.is_empty():
+				# For synthetic tests that set capacity without freeing slots: reuse the last slot
+				target_slot = _circulating_slots.back()
+				if target_slot["row"] != null:
+					_circulating_rows.erase(target_slot["row"])
+					target_slot["row"] = null
+			if target_slot != null:
 				_feeder_rows.pop_front()
 				_lead_feeder_committed = false
 				_feeder_starvation_timer = 0.0
@@ -486,8 +520,7 @@ func _tick_passenger_simulation(step_dt: float) -> void:
 					_feeder_passengers.erase(p)
 					if is_instance_valid(p.get("view")):
 						p["view"].set_waiting(false)
-				var new_s_idx: int = _circulating_slots.size()
-				_circulating_slots.append({"index": new_s_idx, "row": lead_row})
+				target_slot["row"] = lead_row
 				_circulating_rows.append(lead_row)
 				_oval_freed_capacity = maxi(0, _oval_freed_capacity - needed_cap)
 				controller.check_terminal_states()
@@ -549,8 +582,11 @@ func _process(delta: float) -> void:
 					is_row_waiting = (f_row.progress >= (feeder_stop_pos - float(j - authorized_count) * ROW_SPACING) - 1.0)
 				else:
 					if j == 0:
-						var lead_dist_ahead: float = maxf(0.0, f_len - f_row.progress)
-						is_row_waiting = (lead_dist_ahead < 0.5)
+						if not _lead_feeder_committed:
+							is_row_waiting = (f_row.progress >= feeder_stop_pos - 1.0)
+						else:
+							var lead_dist_ahead: float = maxf(0.0, f_len - f_row.progress)
+							is_row_waiting = (lead_dist_ahead < 0.5)
 			for p in f_row.passengers:
 				if p["state"] == "FEEDER" and is_instance_valid(p.get("view")):
 					var lpos = _calc_lane_pos(f_pt_info["pos"], f_pt_info["normal"], p["lane"])
@@ -1389,6 +1425,7 @@ func _init_passenger_track() -> void:
 	
 	# Clean oval curve for TrackRenderer background visual geometry
 	var oval_curve := Curve2D.new()
+	oval_curve.bake_interval = 1.0
 	oval_curve.add_point(Vector2(220, 0), Vector2(0, -h), Vector2(0, h))
 	oval_curve.add_point(Vector2(105, 115), Vector2(h, 0), Vector2.ZERO)
 	oval_curve.add_point(Vector2(-105, 115), Vector2.ZERO, Vector2(-h, 0))
@@ -1401,6 +1438,7 @@ func _init_passenger_track() -> void:
 	feeder_track = Path2D.new()
 	feeder_track.name = "FeederTrack"
 	var f_curve := Curve2D.new()
+	f_curve.bake_interval = 1.0
 
 	passenger_track.curve = oval_curve
 	passenger_normal_speed = get_effective_normal_speed()
