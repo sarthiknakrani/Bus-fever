@@ -20,3 +20,7 @@ scratch/
 # Godot editor auto-backup directories (timestamped, regenerated per session)
 .godot_backup*/
 
+# Python bytecode
+__pycache__/
+*.pyc
+
